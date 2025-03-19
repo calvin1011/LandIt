@@ -20,11 +20,11 @@ const firebaseConfig = {
 };
 
 
-// ✅ Initialize Firebase
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// ✅ Signup Function
+// Signup Function
 export async function signup(email, password) {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -35,12 +35,12 @@ export async function signup(email, password) {
     }
 }
 
-// ✅ Login Function
+// Login Function
 export async function login(email, password) {
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        const token = await user.getIdToken();  // 🔹 Get Firebase ID Token
+        const token = await user.getIdToken();  // Get Firebase ID Token
 
         // Store token in localStorage for API requests
         localStorage.setItem("firebaseToken", token);
@@ -52,7 +52,7 @@ export async function login(email, password) {
     }
 }
 
-// ✅ Logout Function
+// Logout Function
 export async function logout() {
     try {
         await signOut(auth);
@@ -64,7 +64,7 @@ export async function logout() {
     }
 }
 
-// ✅ Auth State Change Listener (Keeps track of user state)
+// Auth State Change Listener (Keeps track of user state)
 export function onAuthChange(callback) {
     onAuthStateChanged(auth, (user) => {
         if (user) {
