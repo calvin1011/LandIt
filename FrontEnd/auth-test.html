@@ -3,11 +3,10 @@
 <head>
     <title>Firebase Auth Test</title>
     <script type="module">
-        // Import Firebase functions from auth.js
         import { login, signup, logout, onAuthChange } from "./auth.js";
 
-        // Signup function (calls signup from auth.js)
-        window.handleSignup = async function() {
+        // Signup
+        window.handleSignup = async function () {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
             try {
@@ -16,45 +15,75 @@
             } catch (error) {
                 alert("Error: " + error.message);
             }
-        }
+        };
 
-        // Login function (calls login from auth.js)
-        window.handleLogin = async function() {
+        // Login
+        window.handleLogin = async function () {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
             try {
                 const user = await login(email, password);
-                const token = await user.getIdToken();  // 🔹 Get Firebase Token
-                console.log("Firebase Token:", token);  // Log token in Console
-                localStorage.setItem("firebaseToken", token);  // Store token in localStorage
+                const token = await user.getIdToken();
+                console.log("Firebase Token:", token);
+                localStorage.setItem("firebaseToken", token);
                 alert("Login successful!");
             } catch (error) {
                 alert("Error: " + error.message);
             }
-        }
+        };
 
-        // Logout function (calls logout from auth.js)
-        window.handleLogout = async function() {
+        // Logout
+        window.handleLogout = async function () {
             try {
                 await logout();
-                localStorage.removeItem("firebaseToken"); // ✅ Remove token on logout
+                localStorage.removeItem("firebaseToken");
                 console.log("User logged out. Token cleared.");
                 alert("User logged out!");
             } catch (error) {
                 alert("Error: " + error.message);
             }
-        }
+        };
 
-        // Detect authentication state changes and update UI
+        // Auth state changes
         onAuthChange(user => {
-            document.getElementById("status").innerText = user ? `Logged in as: ${user.email}` : "Not logged in";
+            document.getElementById("status").innerText = user
+                ? `Logged in as: ${user.email}`
+                : "Not logged in";
             if (user) {
                 user.getIdToken().then(token => {
-                    console.log("🔥 Firebase Token (onAuthChange):", token);
+                    console.log("Firebase Token (onAuthChange):", token);
                     localStorage.setItem("firebaseToken", token);
                 });
             }
         });
+
+        window.testBackendAuth = async function () {
+            const token = localStorage.getItem("firebaseToken");
+            if (!token) {
+                document.getElementById("backendResult").textContent = "No token found. Please login first.";
+                return;
+            }
+
+            try {
+                const response = await fetch("http://localhost:5000/api/auth/user", {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById("backendResult").textContent =
+                        "Authenticated!\n" + JSON.stringify(data, null, 2);
+                } else {
+                    document.getElementById("backendResult").textContent =
+                        ` ${response.status} - ${data.error}`;
+                }
+            } catch (err) {
+                document.getElementById("backendResult").textContent = "Error: " + err.message;
+            }
+        };
     </script>
 </head>
 <body>
@@ -67,5 +96,9 @@
 <button onclick="handleSignup()">Signup</button>
 <button onclick="handleLogin()">Login</button>
 <button onclick="handleLogout()">Logout</button>
+
+<hr />
+<button onclick="testBackendAuth()">Test Protected Backend Route</button>
+<pre id="backendResult"></pre>
 </body>
 </html>
