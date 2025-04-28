@@ -22,7 +22,7 @@ const Login = ({ onLoginSuccess }) => {
                 localStorage.setItem('token', response.data.token);
             }
 
-            onLoginSuccess();
+            onLoginSuccess(email);
         } catch (err) {
             console.error(err);
             alert('Login/signup failed.');
@@ -31,8 +31,9 @@ const Login = ({ onLoginSuccess }) => {
 
     const handleGoogleLogin = async () => {
         try {
-            await signInWithPopup(auth, googleProvider);
-            onLoginSuccess();
+            const result = await signInWithPopup(auth, googleProvider);
+            const userEmail = result.user.email;
+            onLoginSuccess(userEmail);
         } catch (error) {
             console.error(error);
             alert('Google Sign-in failed.');

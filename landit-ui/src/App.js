@@ -8,6 +8,7 @@ import './App.css';
 function App() {
     const [parsedData, setParsedData] = useState([]);
     const [loggedIn, setLoggedIn] = useState(false);
+    const [userEmail, setUserEmail] = useState('');
     const [userInfo, setUserInfo] = useState({
         fullName: '',
         age: '',
@@ -19,9 +20,11 @@ function App() {
     useEffect(() => {
         const isLoggedIn = localStorage.getItem('loggedIn');
         const savedProfile = localStorage.getItem('userInfo');
+        const savedEmail = localStorage.getItem('userEmail');
 
-        if (isLoggedIn === 'true') {
+        if (isLoggedIn === 'true' && savedEmail) {
             setLoggedIn(true);
+            setUserInfo(JSON.parse(savedProfile)); // when user loged in, we use their own profile
         }
 
         if (savedProfile) {
@@ -31,7 +34,9 @@ function App() {
 
     const handleLoginSuccess = () => {
         setLoggedIn(true);
+        setUserEmail(email);
         localStorage.setItem('loggedIn', 'true');
+        localStorage.setItem('userEmail', email);
     };
 
     const handleLogout = () => {
@@ -41,12 +46,12 @@ function App() {
         setParsedData([]);
     };
 
-    // Save profile to local storage when logged in
+    // Save userInfo under the users profile
     useEffect(() => {
-        if (loggedIn) {
-            localStorage.setItem('userInfo', JSON.stringify(userInfo));
+        if (loggedIn && userEmail) {
+            localStorage.setItem(`userInfo_${userEmail}`, JSON.stringify(userInfo));
         }
-    }, [userInfo, loggedIn]);
+    }, [userInfo, loggedIn, userEmail]);
 
     return (
         <div className="App">
