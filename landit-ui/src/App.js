@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ResumeUploader from './components/ResumeUploader';
 import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
@@ -8,8 +8,22 @@ function App() {
     const [parsedData, setParsedData] = useState([]);
     const [loggedIn, setLoggedIn] = useState(false);
 
+    // Check local storage for login status
+    useEffect(() => {
+        const isLoggedIn = localStorage.getItem('loggedIn');
+        if (isLoggedIn === 'true') {
+            setLoggedIn(true);
+        }
+    }, []);
+
+    const handleLoginSuccess = () => {
+        setLoggedIn(true);
+        localStorage.setItem('loggedIn', 'true');
+    };
+
     const handleLogout = () => {
         setLoggedIn(false);
+        localStorage.removeItem('loggedIn');
         setParsedData([]);
     };
 
@@ -20,21 +34,20 @@ function App() {
             {/* If not logged in, show login screen */}
             {!loggedIn ? (
                 <>
-                    <h2>Login to continue</h2>
-                    <Login onLoginSuccess={() => setLoggedIn(true)} />
+                    <h2>Login to Continue</h2>
+                    <Login onLoginSuccess={handleLoginSuccess} />
                 </>
             ) : (
                 <>
+                    <button
+                        onClick={handleLogout}
+                        style={{ position: 'absolute', top: '20px', right: '20px', padding: '0.5rem 1rem' }}
+                    >
+                        Sign Out
+                    </button>
 
-                <button
-                    onClick={handleLogout}
-                    style={{ position: 'absolute', top: '20px', right: '20px', padding: '0.5rem 1rem' }}
-                >
-                    Sign Out
-                </button>
-
-                <ResumeUploader onUploadSuccess={setParsedData} />
-                <OutputViewer data={parsedData} />
+                    <ResumeUploader onUploadSuccess={setParsedData} />
+                    <OutputViewer data={parsedData} />
                 </>
             )}
         </div>
