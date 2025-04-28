@@ -1,43 +1,39 @@
-require('dotenv').config();
-const axios = require('axios');
+const { DocumentProcessorServiceClient } = require('@google-cloud/documentai').v1;
 const fs = require('fs');
-const path = require('path');
 
-const PROJECT_ID = process.env.PROJECT_ID;
-const LOCATION = 'us';
-const PROCESSOR_ID = process.env.PROCESSOR_ID;
-const API_KEY = process.env.GOOGLE_DOC_AI_KEY;
+const client = new DocumentProcessorServiceClient({
+    keyFilename: './config/google-service-key.json',
+});
+
+const projectId = '884257115550';
+const location = 'us';
+const processorId = '7aa0060393f9f46';
+const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
 
 exports.parseResume = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const encodedImage = fileBuffer.toString('base64');
 
-        const filePath = req.file.path;
-        const fileData = fs.readFileSync(filePath);
-        const encodedFile = Buffer.from(fileData).toString('base64');
-
-        const endpoint = `https://us-documentai.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/processors/${PROCESSOR_ID}:process?key=${API_KEY}`;
-
-        const response = await axios.post(endpoint, {
+        const request = {
+            name,
             rawDocument: {
-                content: encodedFile,
-                mimeType: 'application/pdf'
-            }
-        }, {
-            headers: { 'Content-Type': 'application/json' }
-        });
+                content: encodedImage,
+                mimeType: 'application/pdf',
+            },
+        };
 
-        const entities = response.data.document.entities || [];
-        const parsed = entities.map(e => ({
-            type: e.type,
-            value: e.mentionText
+        const [result] = await client.processDocument(request);
+        const document = result.document;
+
+        const parsed = document.entities.map(entity => ({
+            type: entity.type,
+            value: entity.mentionText,
         }));
 
-        res.status(200).json({ extracted: parsed });
+        res.json({ extracted: parsed });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Failed to parse resume', details: err.message });
+        console.error(err);
+        res.status(500).json({ error: 'Resume processing failed', details: err.message });
     }
 };
