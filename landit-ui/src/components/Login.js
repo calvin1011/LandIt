@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { auth, googleProvider } from '../firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 
 const Login = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState('');
@@ -27,6 +29,16 @@ const Login = ({ onLoginSuccess }) => {
         }
     };
 
+    const handleGoogleLogin = async () => {
+        try {
+            await signInWithPopup(auth, googleProvider);
+            onLoginSuccess();
+        } catch (error) {
+            console.error(error);
+            alert('Google Sign-in failed.');
+        }
+    };
+
     return (
         <div>
             <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
@@ -49,6 +61,14 @@ const Login = ({ onLoginSuccess }) => {
                 <br />
                 <button type="submit">{isLogin ? 'Login' : 'Sign Up'}</button>
             </form>
+
+            {/* Insert Google Sign In Button */}
+            <div style={{ marginTop: '1rem' }}>
+                <button onClick={handleGoogleLogin}>
+                    Sign in with Google
+                </button>
+            </div>
+
             <button onClick={() => setIsLogin(!isLogin)} style={{ marginTop: '1rem' }}>
                 {isLogin ? 'Create an Account' : 'Already have an account? Log In'}
             </button>
