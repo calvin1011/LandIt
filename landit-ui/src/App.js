@@ -2,11 +2,18 @@ import React, { useState, useEffect } from 'react';
 import ResumeUploader from './components/ResumeUploader';
 import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
+import Profile from './components/Profile';
 import './App.css';
 
 function App() {
     const [parsedData, setParsedData] = useState([]);
     const [loggedIn, setLoggedIn] = useState(false);
+    const [userInfo, setUserInfo] = useState({
+        fullName: '',
+        age: '',
+        profession: '',
+        country: ''
+    });
 
     // Check local storage for login status
     useEffect(() => {
@@ -46,6 +53,10 @@ function App() {
                         Sign Out
                     </button>
 
+                    {/* New Profile section */}
+                    <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
+
+                    {/* Resume uploader and output viewer */}
                     <ResumeUploader onUploadSuccess={setParsedData} />
                     <OutputViewer data={parsedData} />
                 </>
