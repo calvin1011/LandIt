@@ -1,0 +1,621 @@
+[
+  [
+    "Calvin Ssendawula is a Software Developer skilled in React and Node.js.",
+    {
+      "entities": [
+        [0, 18, "NAME"],
+        [25, 44, "TITLE"],
+        [58, 63, "SKILL"],
+        [68, 75, "SKILL"]]
+    }
+  ],
+  [
+    "Jane Doe earned her degree in Data Science from Stanford University in 2022.",
+    {
+      "entities": [
+        [0, 8, "NAME"],
+        [29, 41, "DEGREE"],
+        [47, 67, "EDUCATION"],
+        [71, 75, "GRAD_YEAR"]]
+    }
+  ],
+  [
+    "Ahmed built machine learning models using Python, TensorFlow and pandas.",
+    {
+      "entities": [
+        [6, 38, "EXPERIENCE"],
+        [46, 52, "SKILL"],
+        [54, 65, "SKILL"],
+        [70, 76, "SKILL"]]
+    }
+  ],
+  [
+    "She interned at Amazon as a Data Analyst in 2021.",
+    {
+      "entities": [
+        [17, 23, "COMPANY"],
+        [29, 41, "TITLE"],
+        [45, 49, "YEAR"]]
+    }
+  ],
+  [
+    "Kai Smith earned a degree in computer science from Adams State University in 2020.",
+    {
+      "entities": [
+        [0, 10, "NAME"],
+        [22, 28, "DEGREE"],
+        [32, 49, "FIELD"],
+        [55, 80, "EDUCATION"],
+        [84, 88, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "Danny Ray Martinez graduated from Winfree Academy in 2022 with strong IT support and cybersecurity skills.",
+    {
+      "entities": [
+        [0, 20, "NAME"],
+        [35, 50, "EDUCATION"],
+        [54, 58, "GRAD_YEAR"],
+        [75, 92, "FIELD"]
+      ]
+    }
+  ],
+  [
+    "Sebastian Blevins earned his Biology degree at Adams State University in 2024.",
+    {
+      "entities": [
+        [0, 18, "NAME"],
+        [30, 37, "DEGREE"],
+        [41, 64, "EDUCATION"],
+        [68, 72, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "Riley Johnson interned as a Frontend Developer at Duolingo and studies Software Engineering at Georgia Tech.",
+    {
+      "entities": [
+        [0, 13, "NAME"],
+        [24, 43, "TITLE"],
+        [47, 55, "COMPANY"],
+        [69, 89, "DEGREE"],
+        [93, 105, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "Taylor Kim completed her M.S. in Data Science at NYU in 2023 and interned at Spotify.",
+    {
+      "entities": [
+        [0, 10, "NAME"],
+        [24, 47, "DEGREE"],
+        [51, 54, "EDUCATION"],
+        [58, 62, "GRAD_YEAR"],
+        [79, 86, "COMPANY"]
+      ]
+    }
+  ],
+  [
+    "Calvin Smith worked at Amazon in 2024 as a Software Engineering Intern and studied Computer Science at Adams State University.",
+    {
+      "entities": [
+        [0, 13, "NAME"],
+        [23, 29, "COMPANY"],
+        [33, 37, "YEAR"],
+        [43, 71, "TITLE"],
+        [85, 102, "FIELD"],
+        [106, 129, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "Highly motivated software engineer with 3 years of experience in full-stack development.",
+    {
+      "entities": [
+        [0, 84, "SUMMARY"]
+      ]
+    }
+  ],
+  [
+    "Contact: dani@email.com",
+    {
+      "entities": [
+        [9, 25, "EMAIL"]
+      ]
+    }
+  ],
+  [
+    "Phone: (123) 456-7890",
+    {
+      "entities": [
+        [7, 21, "PHONE"]
+      ]
+    }
+  ],
+  [
+    "Dr. Fatima Al-Zahrani published research on renewable energy at MIT in 2023.",
+    {
+      "entities": [
+        [0, 4, "TITLE_PREFIX"],
+        [5, 23, "NAME"],
+        [34, 59, "RESEARCH_TOPIC"],
+        [63, 66, "EDUCATION"],
+        [70, 74, "YEAR"]
+      ]
+    }
+  ],
+  [
+    "Zainab Wong, Ph.D., specializes in quantum computing and has 12+ years of experience.",
+    {
+      "entities": [
+        [0, 11, "NAME"],
+        [13, 19, "TITLE_SUFFIX"],
+        [35, 51, "SPECIALIZATION"],
+        [65, 74, "EXPERIENCE_DURATION"]
+      ]
+    }
+  ],
+  [
+    "LinkedIn: https://www.linkedin.com/in/amara-patel",
+    {
+      "entities": [
+        [10, 47, "LINKEDIN_URL"]
+      ]
+    }
+  ],
+  [
+    "Portfolio available at www.jackson-designs.com",
+    {
+      "entities": [
+        [21, 43, "WEBSITE"]
+      ]
+    }
+  ],
+  [
+    "Nguyen Thi Minh served as CFO at Tencent from 2018-2023.",
+    {
+      "entities": [
+        [0, 14, "NAME"],
+        [25, 28, "TITLE"],
+        [32, 39, "COMPANY"],
+        [45, 54, "DURATION"]
+      ]
+    }
+  ],
+  [
+    "Rajiv Sharma created the award-winning mobile app 'EcoTrack' using Swift and Firebase.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [24, 58, "PROJECT"],
+        [65, 70, "SKILL"],
+        [75, 83, "SKILL"]
+      ]
+    }
+  ],
+  [
+    "Jorge Mendez speaks fluent Spanish, Portuguese, and English.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [20, 26, "LANGUAGE_SKILL"],
+        [27, 34, "LANGUAGE"],
+        [36, 46, "LANGUAGE"],
+        [52, 59, "LANGUAGE"]
+      ]
+    }
+  ],
+  [
+    "Aisha Johnson-Smith completed her J.D. from Howard Law School with honors in 2019.",
+    {
+      "entities": [
+        [0, 19, "NAME"],
+        [34, 37, "DEGREE"],
+        [43, 61, "EDUCATION"],
+        [67, 78, "DISTINCTION"],
+        [82, 86, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "Current Address: 123 Main St, Apt 4B, Boston, MA 02115",
+    {
+      "entities": [
+        [17, 53, "ADDRESS"]
+      ]
+    }
+  ],
+  [
+    "Lead UX Designer with expertise in Figma, Sketch, and user research methodologies.",
+    {
+      "entities": [
+        [0, 15, "TITLE"],
+        [31, 36, "TOOL"],
+        [38, 44, "TOOL"],
+        [50, 74, "SKILL_AREA"]
+      ]
+    }
+  ],
+  [
+    "在北京大学学习计算机科学的陈明，精通Python和机器学习。",
+    {
+      "entities": [
+        [0, 5, "EDUCATION"],
+        [5, 11, "FIELD"],
+        [12, 15, "NAME"],
+        [18, 24, "SKILL"],
+        [25, 30, "SKILL"]
+      ]
+    }
+  ],
+  [
+    "Project Manager specializing in Agile methodologies with PMP certification since 2021.",
+    {
+      "entities": [
+        [0, 15, "TITLE"],
+        [31, 49, "METHODOLOGY"],
+        [55, 58, "CERTIFICATION"],
+        [77, 81, "YEAR"]
+      ]
+    }
+  ],
+  [
+    "María González has 8+ years' experience in healthcare administration and an MBA from INSEAD.",
+    {
+      "entities": [
+        [0, 15, "NAME"],
+        [20, 28, "EXPERIENCE_DURATION"],
+        [42, 66, "INDUSTRY_EXPERIENCE"],
+        [74, 77, "DEGREE"],
+        [83, 89, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "References available upon request.",
+    {
+      "entities": [
+        [0, 34, "REFERENCES"]
+      ]
+    }
+  ],
+  [
+    "Oluwaseun Adebayo founded a tech startup focused on fintech solutions for underbanked communities.",
+    {
+      "entities": [
+        [0, 17, "NAME"],
+        [26, 37, "ACHIEVEMENT"],
+        [50, 57, "INDUSTRY"],
+        [71, 100, "IMPACT"]
+      ]
+    }
+  ],
+  [
+    "Proficient in AutoCAD, SolidWorks, and 3D printing technologies.",
+    {
+      "entities": [
+        [14, 21, "TOOL"],
+        [23, 33, "TOOL"],
+        [39, 62, "SKILL"]
+      ]
+    }
+  ],
+  [
+    "Available for relocation: Yes",
+    {
+      "entities": [
+        [25, 28, "AVAILABILITY"]
+      ]
+    }
+  ],
+  [
+    "GPA: 3.92/4.0",
+    {
+      "entities": [
+        [5, 13, "GPA"]
+      ]
+    }
+  ],
+  [
+    "Elena Rodríguez presented her research at the International Conference on Climate Change (ICCC 2023).",
+    {
+      "entities": [
+        [0, 16, "NAME"],
+        [44, 90, "CONFERENCE"],
+        [91, 95, "YEAR"]
+      ]
+    }
+  ],
+  [
+    "Salary Expectation: $85,000 - $95,000 per annum",
+    {
+      "entities": [
+        [19, 43, "SALARY_RANGE"]
+      ]
+    }
+  ],
+  [
+    "Published \"Machine Learning in Healthcare: A Comprehensive Review\" in Nature Medicine, 2024.",
+    {
+      "entities": [
+        [10, 63, "PUBLICATION_TITLE"],
+        [67, 82, "JOURNAL"],
+        [84, 88, "YEAR"]
+      ]
+    }
+  ],
+  [
+    "Fluent in American Sign Language (ASL) and Tactile Signing.",
+    {
+      "entities": [
+        [10, 35, "LANGUAGE"],
+        [37, 40, "LANGUAGE_ACRONYM"],
+        [45, 60, "LANGUAGE"]
+      ]
+    }
+  ],
+  [
+    "Citizenship Status: U.S. Permanent Resident (Green Card Holder)",
+    {
+      "entities": [
+        [19, 62, "CITIZENSHIP_STATUS"]
+      ]
+    }
+  ],
+  [
+    "Kiran Patel deployed a serverless architecture on AWS using Lambda and DynamoDB.",
+    {
+      "entities": [
+        [0, 11, "NAME"],
+        [22, 45, "TECHNICAL_ACHIEVEMENT"],
+        [49, 52, "PLATFORM"],
+        [59, 65, "TECHNOLOGY"],
+        [70, 78, "TECHNOLOGY"]
+      ]
+    }
+  ],
+  [
+    "Mentored junior developers in test-driven development and Scrum practices.",
+    {
+      "entities": [
+        [0, 8, "EXPERIENCE_TYPE"],
+        [9, 25, "AFFECTED_GROUP"],
+        [29, 53, "METHODOLOGY"],
+        [58, 72, "METHODOLOGY"]
+      ]
+    }
+  ],
+  [
+    "Military Service: U.S. Army, 2015-2019, Honorable Discharge",
+    {
+      "entities": [
+        [17, 25, "MILITARY_BRANCH"],
+        [27, 36, "SERVICE_PERIOD"],
+        [38, 57, "DISCHARGE_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Volunteered at Habitat for Humanity, building houses for low-income families 2018-2020.",
+    {
+      "entities": [
+        [0, 11, "EXPERIENCE_TYPE"],
+        [15, 35, "ORGANIZATION"],
+        [37, 78, "DESCRIPTION"],
+        [79, 88, "DURATION"]
+      ]
+    }
+  ],
+  [
+    "Ayesha Khan - ayesha.khan@gmail.com - (555) 123-4567 - Brooklyn, NY",
+    {
+      "entities": [
+        [0, 11, "NAME"],
+        [14, 35, "EMAIL"],
+        [38, 52, "PHONE"],
+        [55, 67, "LOCATION"]
+      ]
+    }
+  ],
+  [
+    "Collaborated with cross-functional teams to deliver projects on-time and under-budget.",
+    {
+      "entities": [
+        [0, 76, "ACHIEVEMENT"]
+      ]
+    }
+  ],
+  [
+    "Work Authorization: Eligible to work in the EU (Irish citizenship)",
+    {
+      "entities": [
+        [19, 60, "WORK_AUTHORIZATION"]
+      ]
+    }
+  ],
+  [
+    "Technical Skills: Java (Expert), Python (Advanced), Kubernetes (Intermediate)",
+    {
+      "entities": [
+        [17, 21, "SKILL"],
+        [23, 29, "PROFICIENCY_LEVEL"],
+        [32, 38, "SKILL"],
+        [40, 48, "PROFICIENCY_LEVEL"],
+        [51, 61, "SKILL"],
+        [63, 75, "PROFICIENCY_LEVEL"]
+      ]
+    }
+  ],
+  [
+    "Jun Li earned the Employee of the Year award at Salesforce in 2022.",
+    {
+      "entities": [
+        [0, 7, "NAME"],
+        [18, 39, "AWARD"],
+        [48, 58, "COMPANY"],
+        [62, 66, "YEAR"]
+      ]
+    }
+  ],
+  [
+    "Availability: Immediately / 2 weeks' notice required",
+    {
+      "entities": [
+        [13, 24, "START_DATE"],
+        [27, 48, "NOTICE_PERIOD"]
+      ]
+    }
+  ],
+  [
+    "Developed REST APIs using Django and integrated them with Vue.js frontend applications.",
+    {
+      "entities": [
+        [10, 19, "TECHNOLOGY_TYPE"],
+        [26, 32, "FRAMEWORK"],
+        [51, 57, "FRAMEWORK"],
+        [58, 67, "SPECIALTY"]
+      ]
+    }
+  ],
+  [
+    "Samira Noor holds CISSP and AWS Solutions Architect certifications.",
+    {
+      "entities": [
+        [0, 11, "NAME"],
+        [18, 23, "CERTIFICATION"],
+        [28, 52, "CERTIFICATION"]
+      ]
+    }
+  ],
+  [
+    "Date of Birth: January 15, 1992",
+    {
+      "entities": [
+        [15, 30, "DOB"]
+      ]
+    }
+  ],
+  [
+    "Key Accomplishment: Reduced server response time by 45% through database optimization.",
+    {
+      "entities": [
+        [20, 88, "ACHIEVEMENT"]
+      ]
+    }
+  ],
+  [
+    "Bilingual in French and Arabic with DELF C1 certification.",
+    {
+      "entities": [
+        [13, 19, "LANGUAGE"],
+        [24, 30, "LANGUAGE"],
+        [36, 43, "CERTIFICATION_NAME"],
+        [44, 46, "CERTIFICATION_LEVEL"]
+      ]
+    }
+  ],
+  [
+    "Industry Experience: FinTech (5 years), Healthcare IT (3 years), E-commerce (2 years)",
+    {
+      "entities": [
+        [20, 28, "INDUSTRY"],
+        [30, 38, "DURATION"],
+        [41, 54, "INDUSTRY"],
+        [56, 64, "DURATION"],
+        [67, 77, "INDUSTRY"],
+        [79, 87, "DURATION"]
+      ]
+    }
+  ],
+  [
+    "Preference for remote work or hybrid (2 days in office) arrangements.",
+    {
+      "entities": [
+        [15, 26, "WORK_ARRANGEMENT"],
+        [30, 56, "WORK_ARRANGEMENT"]
+      ]
+    }
+  ],
+  [
+    "Dr. James Chen, MD, PhD, conducted groundbreaking research in neuroscience at Johns Hopkins.",
+    {
+      "entities": [
+        [0, 3, "TITLE_PREFIX"],
+        [4, 15, "NAME"],
+        [17, 19, "DEGREE"],
+        [21, 24, "DEGREE"],
+        [36, 60, "ACHIEVEMENT"],
+        [64, 76, "FIELD"],
+        [80, 93, "ORGANIZATION"]
+      ]
+    }
+  ],
+  [
+    "Pronouns: she/her",
+    {
+      "entities": [
+        [10, 17, "PRONOUNS"]
+      ]
+    }
+  ],
+  [
+    "Portfolio: github.com/kevinrodriguez | dribbble.com/kevinr-designs",
+    {
+      "entities": [
+        [11, 34, "GITHUB_URL"],
+        [37, 64, "PORTFOLIO_URL"]
+      ]
+    }
+  ],
+  [
+    "Miguel Torres oversees a team of 15 engineers developing AI solutions for autonomous vehicles.",
+    {
+      "entities": [
+        [0, 13, "NAME"],
+        [23, 40, "LEADERSHIP"],
+        [56, 78, "PROJECT_DESCRIPTION"],
+        [83, 103, "INDUSTRY_APPLICATION"]
+      ]
+    }
+  ],
+  [
+    "Priya Sharma achieved 30% revenue growth in Q4 2023 as Regional Sales Director.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [22, 44, "ACHIEVEMENT"],
+        [48, 56, "TIME_PERIOD"],
+        [60, 82, "TITLE"]
+      ]
+    }
+  ],
+  [
+    "Desired Salary Range: Confidential / To be discussed during interview",
+    {
+      "entities": [
+        [22, 72, "SALARY_DISCLOSURE_STATUS"]
+      ]
+    }
+  ],
+  [
+    "Obtained 97th percentile score on the GMAT (720/800).",
+    {
+      "entities": [
+        [9, 25, "TEST_SCORE"],
+        [33, 37, "TEST_NAME"],
+        [39, 47, "SCORE"]
+      ]
+    }
+  ],
+  [
+    "Led successful digital transformation projects for Fortune 500 clients in healthcare sector.",
+    {
+      "entities": [
+        [4, 42, "LEADERSHIP_EXPERIENCE"],
+        [47, 60, "CLIENT_TYPE"],
+        [71, 81, "INDUSTRY"]
+      ]
+    }
+  ]
+]
