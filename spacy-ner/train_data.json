@@ -617,5 +617,695 @@
         [71, 81, "INDUSTRY"]
       ]
     }
+  ],
+  [
+    "Alexandra Thompson holds a B.S. in Chemical Engineering from MIT and an M.B.A. from Wharton.",
+    {
+      "entities": [
+        [0, 19, "NAME"],
+        [28, 32, "DEGREE"],
+        [36, 55, "FIELD"],
+        [61, 64, "EDUCATION"],
+        [72, 78, "DEGREE"],
+        [84, 91, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "Frontend Developer proficient in React, Angular, TypeScript, and Sass with 4 years experience.",
+    {
+      "entities": [
+        [0, 18, "TITLE"],
+        [33, 38, "SKILL"],
+        [40, 47, "SKILL"],
+        [49, 59, "SKILL"],
+        [65, 69, "SKILL"],
+        [75, 82, "EXPERIENCE_DURATION"]
+      ]
+    }
+  ],
+  [
+    "Marcus Williams IV, CPA, earned his MBA in Finance from University of Chicago Booth School in 2020.",
+    {
+      "entities": [
+        [0, 19, "NAME"],
+        [21, 24, "CERTIFICATION"],
+        [37, 40, "DEGREE"],
+        [44, 51, "FIELD"],
+        [57, 90, "EDUCATION"],
+        [94, 98, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "DevOps Engineer with experience in Docker, Kubernetes, Jenkins, and CI/CD pipelines.",
+    {
+      "entities": [
+        [0, 15, "TITLE"],
+        [35, 41, "TECHNOLOGY"],
+        [43, 53, "TECHNOLOGY"],
+        [55, 62, "TECHNOLOGY"],
+        [68, 83, "TECHNOLOGY_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Sarah Kim-Williams worked as Product Manager at Meta from June 2022 to December 2024.",
+    {
+      "entities": [
+        [0, 17, "NAME"],
+        [28, 43, "TITLE"],
+        [47, 51, "COMPANY"],
+        [57, 83, "EMPLOYMENT_PERIOD"]
+      ]
+    }
+  ],
+  [
+    "Certified Kubernetes Administrator (CKA) and AWS DevOps Professional certifications.",
+    {
+      "entities": [
+        [0, 33, "CERTIFICATION"],
+        [35, 38, "CERTIFICATION_ACRONYM"],
+        [43, 66, "CERTIFICATION"]
+      ]
+    }
+  ],
+  [
+    "Graduated summa cum laude with a 3.98 GPA from Harvard University in Computer Science.",
+    {
+      "entities": [
+        [10, 25, "DISTINCTION"],
+        [33, 41, "GPA"],
+        [47, 64, "EDUCATION"],
+        [68, 84, "FIELD"]
+      ]
+    }
+  ],
+  [
+    "Robert Chang, PharmD, has 15 years of clinical pharmacy experience at Mayo Clinic.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [14, 20, "DEGREE"],
+        [26, 34, "EXPERIENCE_DURATION"],
+        [38, 64, "SPECIALTY"],
+        [68, 79, "ORGANIZATION"]
+      ]
+    }
+  ],
+  [
+    "Startup founder and CEO of TechFlow Solutions, raised $2.5M in Series A funding.",
+    {
+      "entities": [
+        [0, 15, "TITLE"],
+        [19, 22, "TITLE"],
+        [26, 44, "COMPANY"],
+        [46, 78, "ACHIEVEMENT"]
+      ]
+    }
+  ],
+  [
+    "Published 12 peer-reviewed papers in IEEE journals on machine learning applications.",
+    {
+      "entities": [
+        [10, 34, "PUBLICATION_TYPE"],
+        [38, 51, "JOURNAL"],
+        [55, 82, "RESEARCH_TOPIC"]
+      ]
+    }
+  ],
+  [
+    "David Lee transitioned from military service (U.S. Navy, 2010-2016) to software development.",
+    {
+      "entities": [
+        [0, 9, "NAME"],
+        [26, 42, "PREVIOUS_EXPERIENCE"],
+        [44, 53, "MILITARY_BRANCH"],
+        [55, 64, "SERVICE_PERIOD"],
+        [69, 89, "CURRENT_FIELD"]
+      ]
+    }
+  ],
+  [
+    "Speaks native Korean, fluent English, conversational Japanese and basic Mandarin.",
+    {
+      "entities": [
+        [7, 20, "LANGUAGE_SKILL"],
+        [22, 28, "LANGUAGE"],
+        [30, 44, "LANGUAGE_SKILL"],
+        [45, 52, "LANGUAGE"],
+        [54, 69, "LANGUAGE_SKILL"],
+        [70, 78, "LANGUAGE"],
+        [83, 88, "LANGUAGE_SKILL"],
+        [89, 96, "LANGUAGE"]
+      ]
+    }
+  ],
+  [
+    "Senior Data Scientist with expertise in NLP, computer vision, and deep learning frameworks.",
+    {
+      "entities": [
+        [0, 21, "TITLE"],
+        [40, 43, "SKILL"],
+        [45, 60, "SKILL"],
+        [66, 89, "SKILL_AREA"]
+      ]
+    }
+  ],
+  [
+    "Emma Rodriguez completed her residency in Pediatrics at Children's Hospital of Philadelphia.",
+    {
+      "entities": [
+        [0, 14, "NAME"],
+        [29, 38, "TRAINING_TYPE"],
+        [42, 52, "MEDICAL_SPECIALTY"],
+        [56, 89, "MEDICAL_INSTITUTION"]
+      ]
+    }
+  ],
+  [
+    "Licensed Professional Engineer (PE) in California and Texas with structural engineering focus.",
+    {
+      "entities": [
+        [0, 31, "PROFESSIONAL_LICENSE"],
+        [33, 35, "LICENSE_ACRONYM"],
+        [40, 50, "LICENSE_STATE"],
+        [55, 60, "LICENSE_STATE"],
+        [66, 91, "SPECIALIZATION"]
+      ]
+    }
+  ],
+  [
+    "Volunteer experience: Red Cross disaster relief coordinator for Hurricane Sandy response.",
+    {
+      "entities": [
+        [19, 28, "ORGANIZATION"],
+        [29, 54, "VOLUNTEER_ROLE"],
+        [59, 87, "EVENT_RESPONSE"]
+      ]
+    }
+  ],
+  [
+    "Agile Coach and Scrum Master certified by Scrum Alliance with SAFe 5.0 Practitioner credential.",
+    {
+      "entities": [
+        [0, 11, "TITLE"],
+        [16, 28, "TITLE"],
+        [41, 55, "CERTIFYING_BODY"],
+        [61, 79, "CERTIFICATION"],
+        [80, 90, "CERTIFICATION_LEVEL"]
+      ]
+    }
+  ],
+  [
+    "Natasha Petrov earned her LL.M. in International Law from Oxford University in 2023.",
+    {
+      "entities": [
+        [0, 14, "NAME"],
+        [26, 31, "DEGREE"],
+        [35, 51, "FIELD"],
+        [57, 73, "EDUCATION"],
+        [77, 81, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "Cloud Solutions Architect designing scalable microservices on Azure and Google Cloud Platform.",
+    {
+      "entities": [
+        [0, 25, "TITLE"],
+        [36, 58, "TECHNICAL_SKILL"],
+        [62, 67, "PLATFORM"],
+        [72, 93, "PLATFORM"]
+      ]
+    }
+  ],
+  [
+    "Christopher Davis III holds CFA, FRM, and CPA designations with 8 years in investment banking.",
+    {
+      "entities": [
+        [0, 22, "NAME"],
+        [29, 32, "CERTIFICATION"],
+        [34, 37, "CERTIFICATION"],
+        [43, 46, "CERTIFICATION"],
+        [64, 71, "EXPERIENCE_DURATION"],
+        [75, 92, "INDUSTRY"]
+      ]
+    }
+  ],
+  [
+    "Mobile App Developer specializing in iOS Swift and Android Kotlin with 25+ published apps.",
+    {
+      "entities": [
+        [0, 20, "TITLE"],
+        [38, 41, "PLATFORM"],
+        [42, 47, "PROGRAMMING_LANGUAGE"],
+        [52, 59, "PLATFORM"],
+        [60, 66, "PROGRAMMING_LANGUAGE"],
+        [72, 89, "ACHIEVEMENT"]
+      ]
+    }
+  ],
+  [
+    "Dr. Jennifer Walsh, DVM, operates an animal clinic and teaches veterinary medicine at UC Davis.",
+    {
+      "entities": [
+        [0, 3, "TITLE_PREFIX"],
+        [4, 18, "NAME"],
+        [20, 23, "DEGREE"],
+        [33, 46, "BUSINESS_TYPE"],
+        [58, 77, "TEACHING_SUBJECT"],
+        [81, 89, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "International experience: Worked in Singapore, Tokyo, and London offices for consulting projects.",
+    {
+      "entities": [
+        [26, 35, "LOCATION"],
+        [37, 42, "LOCATION"],
+        [48, 54, "LOCATION"],
+        [67, 86, "PROJECT_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Machine Learning Engineer with patents in recommendation systems and natural language processing.",
+    {
+      "entities": [
+        [0, 27, "TITLE"],
+        [33, 40, "INTELLECTUAL_PROPERTY"],
+        [44, 65, "TECHNOLOGY_AREA"],
+        [70, 96, "TECHNOLOGY_AREA"]
+      ]
+    }
+  ],
+  [
+    "Lisa Chen-Park completed executive education at INSEAD and Harvard Business School.",
+    {
+      "entities": [
+        [0, 13, "NAME"],
+        [24, 42, "EDUCATION_TYPE"],
+        [46, 52, "EDUCATION"],
+        [57, 80, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "Security Clearance: Top Secret with TS/SCI eligibility for government contracting.",
+    {
+      "entities": [
+        [19, 29, "CLEARANCE_LEVEL"],
+        [35, 41, "CLEARANCE_TYPE"],
+        [55, 79, "CLEARANCE_PURPOSE"]
+      ]
+    }
+  ],
+  [
+    "Blockchain Developer with expertise in Ethereum, Solidity, and smart contract auditing.",
+    {
+      "entities": [
+        [0, 19, "TITLE"],
+        [39, 47, "BLOCKCHAIN_PLATFORM"],
+        [49, 57, "PROGRAMMING_LANGUAGE"],
+        [63, 85, "TECHNICAL_SKILL"]
+      ]
+    }
+  ],
+  [
+    "Ahmed Hassan earned his master's degree in Renewable Energy Engineering from Technical University of Munich.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [24, 40, "DEGREE"],
+        [44, 74, "FIELD"],
+        [80, 108, "EDUCATION"]
+      ]
+    }
+  ],
+  [
+    "Product Owner with Agile certification and experience managing cross-functional teams of 10-15 members.",
+    {
+      "entities": [
+        [0, 13, "TITLE"],
+        [19, 24, "METHODOLOGY"],
+        [25, 38, "CERTIFICATION"],
+        [54, 102, "LEADERSHIP_EXPERIENCE"]
+      ]
+    }
+  ],
+  [
+    "Katherine Lopez fluent in Spanish and English, holds dual citizenship USA/Mexico.",
+    {
+      "entities": [
+        [0, 15, "NAME"],
+        [27, 34, "LANGUAGE"],
+        [39, 46, "LANGUAGE"],
+        [54, 69, "CITIZENSHIP_STATUS"],
+        [70, 79, "CITIZENSHIP_STATUS"]
+      ]
+    }
+  ],
+  [
+    "Full-stack engineer with 6+ years building scalable web applications using React, Node.js, and PostgreSQL.",
+    {
+      "entities": [
+        [0, 19, "TITLE"],
+        [25, 33, "EXPERIENCE_DURATION"],
+        [43, 73, "TECHNICAL_SKILL"],
+        [80, 85, "SKILL"],
+        [87, 94, "SKILL"],
+        [100, 110, "SKILL"]
+      ]
+    }
+  ],
+  [
+    "Michael Chen graduated with honors from Stanford with a Computer Science degree in 2021.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [28, 34, "DISTINCTION"],
+        [40, 48, "EDUCATION"],
+        [56, 81, "DEGREE"],
+        [85, 89, "GRAD_YEAR"]
+      ]
+    }
+  ],
+  [
+    "Remote work preferred, available for occasional travel up to 25% of time.",
+    {
+      "entities": [
+        [0, 11, "WORK_ARRANGEMENT"],
+        [33, 49, "TRAVEL_WILLINGNESS"],
+        [53, 65, "TRAVEL_PERCENTAGE"]
+      ]
+    }
+  ],
+  [
+    "AWS Certified Solutions Architect Professional with expertise in cloud migration and DevOps automation.",
+    {
+      "entities": [
+        [0, 47, "CERTIFICATION"],
+        [65, 79, "TECHNICAL_SKILL"],
+        [84, 101, "TECHNICAL_SKILL"]
+      ]
+    }
+  ],
+  [
+    "Diana Prince worked at Tesla as Senior Software Engineer from January 2020 to March 2024.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [23, 28, "COMPANY"],
+        [32, 57, "TITLE"],
+        [63, 87, "EMPLOYMENT_PERIOD"]
+      ]
+    }
+  ],
+  [
+    "Published 5 research papers on artificial intelligence in top-tier conferences including NeurIPS and ICML.",
+    {
+      "entities": [
+        [10, 27, "PUBLICATION_TYPE"],
+        [31, 54, "RESEARCH_TOPIC"],
+        [58, 78, "PUBLICATION_VENUE"],
+        [89, 96, "CONFERENCE"],
+        [101, 105, "CONFERENCE"]
+      ]
+    }
+  ],
+  [
+    "Startup experience: Co-founded fintech company that reached $1M ARR before acquisition.",
+    {
+      "entities": [
+        [20, 30, "ACHIEVEMENT"],
+        [31, 39, "INDUSTRY"],
+        [31, 46, "COMPANY_TYPE"],
+        [60, 67, "REVENUE_METRIC"],
+        [75, 86, "EXIT_EVENT"]
+      ]
+    }
+  ],
+  [
+    "Jessica Wang holds PMP certification and managed $50M+ infrastructure projects across Asia-Pacific.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [19, 22, "CERTIFICATION"],
+        [46, 50, "PROJECT_VALUE"],
+        [52, 75, "PROJECT_TYPE"],
+        [83, 95, "GEOGRAPHIC_REGION"]
+      ]
+    }
+  ],
+  [
+    "Data Engineer specializing in Apache Spark, Kafka, and real-time analytics pipelines.",
+    {
+      "entities": [
+        [0, 13, "TITLE"],
+        [30, 42, "TECHNOLOGY"],
+        [44, 49, "TECHNOLOGY"],
+        [55, 84, "TECHNICAL_SKILL"]
+      ]
+    }
+  ],
+  [
+    "Currently pursuing PhD in Machine Learning at Carnegie Mellon, expected graduation May 2025.",
+    {
+      "entities": [
+        [18, 21, "DEGREE"],
+        [25, 41, "FIELD"],
+        [45, 60, "EDUCATION"],
+        [71, 81, "GRADUATION_STATUS"],
+        [82, 90, "EXPECTED_GRADUATION"]
+      ]
+    }
+  ],
+  [
+    "Scrum Master certified with experience leading agile transformations at Fortune 100 companies.",
+    {
+      "entities": [
+        [0, 12, "TITLE"],
+        [13, 22, "CERTIFICATION_STATUS"],
+        [39, 60, "LEADERSHIP_EXPERIENCE"],
+        [64, 79, "CLIENT_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Antonio Silva speaks Portuguese, Spanish, English and Italian with business proficiency.",
+    {
+      "entities": [
+        [0, 13, "NAME"],
+        [21, 31, "LANGUAGE"],
+        [33, 40, "LANGUAGE"],
+        [42, 49, "LANGUAGE"],
+        [54, 61, "LANGUAGE"],
+        [67, 86, "PROFICIENCY_LEVEL"]
+      ]
+    }
+  ],
+  [
+    "Security Engineer with CISSP, CISM certifications and penetration testing expertise.",
+    {
+      "entities": [
+        [0, 17, "TITLE"],
+        [23, 28, "CERTIFICATION"],
+        [30, 34, "CERTIFICATION"],
+        [52, 71, "TECHNICAL_SKILL"]
+      ]
+    }
+  ],
+  [
+    "Former Navy SEAL (2012-2018) transitioned to cybersecurity consulting for government agencies.",
+    {
+      "entities": [
+        [7, 16, "MILITARY_ROLE"],
+        [18, 27, "SERVICE_PERIOD"],
+        [42, 66, "CURRENT_FIELD"],
+        [71, 89, "CLIENT_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Rachel Green earned MBA from Wharton in 2019 and currently serves as VP Marketing at Spotify.",
+    {
+      "entities": [
+        [0, 12, "NAME"],
+        [20, 23, "DEGREE"],
+        [29, 36, "EDUCATION"],
+        [40, 44, "GRAD_YEAR"],
+        [67, 79, "TITLE"],
+        [83, 90, "COMPANY"]
+      ]
+    }
+  ],
+  [
+    "Open source contributor to TensorFlow, PyTorch, and scikit-learn with 50+ merged pull requests.",
+    {
+      "entities": [
+        [0, 22, "CONTRIBUTION_TYPE"],
+        [26, 36, "OPEN_SOURCE_PROJECT"],
+        [38, 45, "OPEN_SOURCE_PROJECT"],
+        [51, 63, "OPEN_SOURCE_PROJECT"],
+        [69, 95, "CONTRIBUTION_METRIC"]
+      ]
+    }
+  ],
+  [
+    "Cloud Architect designing multi-region AWS infrastructure supporting 10M+ daily active users.",
+    {
+      "entities": [
+        [0, 15, "TITLE"],
+        [26, 40, "TECHNICAL_SKILL"],
+        [41, 44, "PLATFORM"],
+        [45, 59, "TECHNICAL_SKILL"],
+        [71, 92, "SCALE_METRIC"]
+      ]
+    }
+  ],
+  [
+    "Thomas Anderson holds CPA license in New York and California with Big 4 audit experience.",
+    {
+      "entities": [
+        [0, 15, "NAME"],
+        [22, 25, "PROFESSIONAL_LICENSE"],
+        [36, 44, "LICENSE_STATE"],
+        [49, 59, "LICENSE_STATE"],
+        [65, 70, "COMPANY_TYPE"],
+        [71, 76, "EXPERIENCE_TYPE"]
+      ]
+    }
+  ],
+  [
+    "UX/UI Designer with portfolio featuring apps downloaded 2M+ times across iOS and Android platforms.",
+    {
+      "entities": [
+        [0, 14, "TITLE"],
+        [44, 48, "PROJECT_TYPE"],
+        [60, 63, "DOWNLOAD_METRIC"],
+        [77, 80, "PLATFORM"],
+        [85, 92, "PLATFORM"]
+      ]
+    }
+  ],
+  [
+    "Machine Learning Researcher at Google DeepMind with 15 patents in computer vision and NLP.",
+    {
+      "entities": [
+        [0, 31, "TITLE"],
+        [35, 50, "COMPANY"],
+        [56, 66, "INTELLECTUAL_PROPERTY"],
+        [70, 85, "TECHNOLOGY_AREA"],
+        [90, 93, "TECHNOLOGY_AREA"]
+      ]
+    }
+  ],
+  [
+    "Sarah Kim published in Nature, Science, and Cell journals with 500+ citations and h-index of 15.",
+    {
+      "entities": [
+        [0, 9, "NAME"],
+        [23, 29, "JOURNAL"],
+        [31, 38, "JOURNAL"],
+        [44, 48, "JOURNAL"],
+        [62, 76, "CITATION_METRIC"],
+        [81, 96, "ACADEMIC_METRIC"]
+      ]
+    }
+  ],
+  [
+    "DevSecOps Engineer implementing zero-trust security architecture for financial services clients.",
+    {
+      "entities": [
+        [0, 18, "TITLE"],
+        [31, 64, "TECHNICAL_SKILL"],
+        [69, 87, "INDUSTRY"],
+        [88, 95, "CLIENT_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Board certified physician (Internal Medicine) practicing at Mayo Clinic since 2018.",
+    {
+      "entities": [
+        [0, 21, "PROFESSIONAL_STATUS"],
+        [23, 41, "MEDICAL_SPECIALTY"],
+        [56, 67, "MEDICAL_INSTITUTION"],
+        [74, 82, "EMPLOYMENT_START"]
+      ]
+    }
+  ],
+  [
+    "Quantum Computing Researcher with PhD from MIT, published 20+ papers in Physical Review Letters.",
+    {
+      "entities": [
+        [0, 29, "TITLE"],
+        [35, 38, "DEGREE"],
+        [44, 47, "EDUCATION"],
+        [59, 69, "PUBLICATION_COUNT"],
+        [73, 96, "JOURNAL"]
+      ]
+    }
+  ],
+  [
+    "Growth hacker who scaled user base from 10K to 1M users in 18 months using data-driven strategies.",
+    {
+      "entities": [
+        [0, 13, "TITLE"],
+        [26, 36, "GROWTH_METRIC"],
+        [40, 50, "GROWTH_METRIC"],
+        [54, 63, "TIME_PERIOD"],
+        [70, 93, "METHODOLOGY"]
+      ]
+    }
+  ],
+  [
+    "Emergency Medicine physician with wilderness medicine certification and disaster response experience.",
+    {
+      "entities": [
+        [0, 28, "MEDICAL_SPECIALTY"],
+        [34, 52, "MEDICAL_SPECIALTY"],
+        [53, 66, "CERTIFICATION"],
+        [71, 97, "EXPERIENCE_TYPE"]
+      ]
+    }
+  ],
+  [
+    "Investment banker at Goldman Sachs covering technology sector M&A deals worth $2B+ annually.",
+    {
+      "entities": [
+        [0, 17, "TITLE"],
+        [21, 34, "COMPANY"],
+        [44, 61, "INDUSTRY_FOCUS"],
+        [62, 72, "DEAL_TYPE"],
+        [79, 82, "DEAL_VALUE"],
+        [84, 92, "TIME_PERIOD"]
+      ]
+    }
+  ],
+  [
+    "Robotics Engineer developing autonomous systems for manufacturing using ROS and Python.",
+    {
+      "entities": [
+        [0, 17, "TITLE"],
+        [29, 46, "TECHNICAL_SKILL"],
+        [51, 64, "INDUSTRY_APPLICATION"],
+        [71, 74, "TECHNOLOGY"],
+        [79, 85, "PROGRAMMING_LANGUAGE"]
+      ]
+    }
+  ],
+  [
+    "Blockchain consultant helping enterprises implement DeFi solutions and smart contract auditing.",
+    {
+      "entities": [
+        [0, 21, "TITLE"],
+        [30, 41, "CLIENT_TYPE"],
+        [52, 66, "TECHNOLOGY_AREA"],
+        [71, 92, "TECHNICAL_SKILL"]
+      ]
+    }
   ]
 ]
