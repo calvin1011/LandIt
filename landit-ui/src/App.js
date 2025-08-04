@@ -94,7 +94,7 @@ function App() {
             ) : (
                 <>
                     <button
-                        onClick={handleLogout} // Use the updated handler
+                        onClick={handleLogout}
                         style={{ position: 'absolute', top: '20px', right: '20px', padding: '0.5rem 1rem' }}
                     >
                         Sign Out
