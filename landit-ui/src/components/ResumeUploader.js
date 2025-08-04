@@ -113,7 +113,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 });
             }, 200);
 
-            const response = await axios.post('http://localhost:5000/api/parse-resume', formData, {
+            const response = await axios.post('http://localhost:5001/api/parse-resume', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 

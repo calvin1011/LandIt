@@ -12,8 +12,8 @@ const Login = ({ onLoginSuccess }) => {
         e.preventDefault();
         try {
             const endpoint = isLogin
-                ? 'http://localhost:5000/api/auth/login'
-                : 'http://localhost:5000/api/auth/signup';
+                ? 'http://localhost:5001/api/auth/login'
+                : 'http://localhost:5001/api/auth/signup';
 
             const response = await axios.post(endpoint, { email, password });
 

@@ -5,7 +5,7 @@ const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
 // spaCy API configuration
-const SPACY_API_URL = 'http://localhost:8000/parse-resume';
+const SPACY_API_URL = 'http://127.0.0.1:8000/parse-resume';
 
 /**
  * Extract text from PDF files
