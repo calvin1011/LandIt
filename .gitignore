@@ -4,4 +4,6 @@ config/google-service-key.json
 upload/
 .env
 
+FrontEnd/
+
 node_modules/

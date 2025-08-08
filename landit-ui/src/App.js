@@ -22,7 +22,6 @@ function App() {
     const [loading, setLoading] = useState(true); // Loading state for auth check
     const [firebaseUser, setFirebaseUser] = useState(null);
 
-    // Firebase Auth State Listener - This is the key fix!
     useEffect(() => {
         console.log('🔥 Setting up Firebase auth listener...');
 
@@ -135,9 +134,6 @@ function App() {
     if (loading) {
         return (
             <div className="App">
-                <h1 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
-                    LandIt — Smart Document Parser
-                </h1>
                 <div style={{
                     display: 'flex',
                     justifyContent: 'center',
@@ -154,15 +150,8 @@ function App() {
 
     return (
         <div className="App">
-            <h1 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>
-                LandIt — Smart Document Parser
-            </h1>
-
             {!loggedIn ? (
-                <>
-                    <h2>Login to Continue</h2>
                     <Login onLoginSuccess={handleLoginSuccess} />
-                </>
             ) : (
                 <>
                     <div style={{
