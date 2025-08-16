@@ -2,38 +2,38 @@ import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 
 // Simple SVG Icon Components
-const Upload = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const Upload = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
     </svg>
 );
 
-const FileText = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const FileText = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
     </svg>
 );
 
-const CheckCircle = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const CheckCircle = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
-const AlertCircle = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const AlertCircle = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
-const X = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const X = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
 );
 
-const Eye = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const Eye = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
@@ -144,7 +144,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     };
 
     const getFileIcon = () => {
-        if (!file) return <FileText style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} />;
+        if (!file) return <FileText style={{ width: '3rem', height: '3rem', color: '#9ca3af' }} />;
 
         if (file.type === 'application/pdf') {
             return (
@@ -191,12 +191,19 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     };
 
     return (
-        <div style={{ maxWidth: '42rem', margin: '0 auto', padding: '1.5rem' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.5rem' }}>
+        <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '20px',
+            padding: '40px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+        }}>
+            <div style={{ marginBottom: '30px', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
                     Upload Your Resume
                 </h2>
-                <p style={{ color: '#4b5563' }}>
+                <p style={{ color: '#6b7280', fontSize: '16px', margin: 0 }}>
                     Upload your resume and let our AI extract and organize your information automatically.
                 </p>
             </div>
@@ -205,74 +212,73 @@ const ResumeUploader = ({ onUploadSuccess }) => {
             {uploadStatus === 'idle' && (
                 <div
                     style={{
-                        border: dragActive ? '2px dashed #3b82f6' : '2px dashed #d1d5db',
-                        backgroundColor: dragActive ? '#eff6ff' : 'transparent',
-                        borderRadius: '0.5rem',
-                        padding: '2rem',
-                        transition: 'all 0.2s',
-                        cursor: 'pointer'
+                        border: dragActive ? '2px dashed #6366f1' : '2px dashed #d1d5db',
+                        backgroundColor: dragActive ? '#eff6ff' : '#f8fafc',
+                        borderRadius: '16px',
+                        padding: '3rem',
+                        transition: 'all 0.3s',
+                        cursor: 'pointer',
+                        textAlign: 'center'
                     }}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                 >
-                    <div style={{ textAlign: 'center' }}>
-                        <Upload style={{
-                            width: '3rem',
-                            height: '3rem',
-                            color: dragActive ? '#3b82f6' : '#9ca3af',
-                            margin: '0 auto'
-                        }} />
-                        <div style={{ marginTop: '1rem' }}>
-                            <p style={{ fontSize: '1.125rem', fontWeight: '500', color: '#111827' }}>
-                                {dragActive ? 'Drop your resume here' : 'Drag and drop your resume'}
-                            </p>
-                            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>or</p>
-                            <label style={{
-                                marginTop: '0.5rem',
-                                display: 'inline-block',
-                                backgroundColor: '#2563eb',
-                                color: 'white',
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.375rem',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.15s'
-                            }}
-                            onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                            onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
-                            >
-                                Browse Files
-                                <input
-                                    type="file"
-                                    style={{ display: 'none' }}
-                                    accept=".pdf,.doc,.docx"
-                                    onChange={handleFileInput}
-                                />
-                            </label>
-                        </div>
-                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '1rem' }}>
-                            Supports PDF, DOC, DOCX • Max file size: 5MB
+                    <Upload style={{
+                        width: '4rem',
+                        height: '4rem',
+                        color: dragActive ? '#6366f1' : '#9ca3af',
+                        margin: '0 auto 1.5rem auto'
+                    }} />
+                    <div>
+                        <p style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+                            {dragActive ? 'Drop your resume here' : 'Drag and drop your resume'}
                         </p>
+                        <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px' }}>or</p>
+                        <label style={{
+                            display: 'inline-block',
+                            backgroundColor: '#6366f1',
+                            color: 'white',
+                            padding: '12px 24px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            fontSize: '16px',
+                            fontWeight: '500'
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = '#4f46e5'}
+                        onMouseOut={(e) => e.target.style.backgroundColor = '#6366f1'}
+                        >
+                            Choose File
+                            <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx"
+                                onChange={handleFileInput}
+                            />
+                        </label>
                     </div>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '20px', margin: 0 }}>
+                        Supports PDF, DOC, DOCX • Max file size: 5MB
+                    </p>
                 </div>
             )}
 
             {/* File Info & Progress */}
             {file && uploadStatus !== 'idle' && (
                 <div style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '1.5rem',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '24px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {getFileIcon()}
                             <div>
-                                <p style={{ fontWeight: '500', color: '#111827' }}>{file.name}</p>
-                                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>{formatFileSize(file.size)}</p>
+                                <p style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>{file.name}</p>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, marginTop: '4px' }}>{formatFileSize(file.size)}</p>
                             </div>
                         </div>
                         <button
@@ -282,19 +288,20 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                                 background: 'none',
                                 border: 'none',
                                 cursor: 'pointer',
-                                transition: 'color 0.15s'
+                                transition: 'color 0.15s',
+                                padding: '4px'
                             }}
                             onMouseOver={(e) => e.target.style.color = '#4b5563'}
                             onMouseOut={(e) => e.target.style.color = '#9ca3af'}
                         >
-                            <X style={{ width: '1.25rem', height: '1.25rem' }} />
+                            <X style={{ width: '20px', height: '20px' }} />
                         </button>
                     </div>
 
                     {/* Progress Bar */}
                     {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
-                        <div style={{ marginBottom: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.5rem' }}>
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
                                 <span>
                                     {uploadStatus === 'uploading' ? 'Uploading...' : 'Processing with AI...'}
                                 </span>
@@ -304,13 +311,13 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                                 width: '100%',
                                 backgroundColor: '#e5e7eb',
                                 borderRadius: '9999px',
-                                height: '0.5rem'
+                                height: '8px'
                             }}>
                                 <div
                                     style={{
-                                        height: '0.5rem',
+                                        height: '8px',
                                         borderRadius: '9999px',
-                                        backgroundColor: uploadStatus === 'uploading' ? '#3b82f6' : '#10b981',
+                                        backgroundColor: uploadStatus === 'uploading' ? '#6366f1' : '#10b981',
                                         width: uploadStatus === 'uploading' ? `${progress}%` : '100%',
                                         transition: 'all 0.3s',
                                         animation: uploadStatus === 'processing' ? 'pulse 2s infinite' : 'none'
@@ -322,42 +329,44 @@ const ResumeUploader = ({ onUploadSuccess }) => {
 
                     {/* Status Messages */}
                     {uploadStatus === 'success' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669', marginBottom: '1rem' }}>
-                            <CheckCircle style={{ width: '1.25rem', height: '1.25rem' }} />
-                            <span style={{ fontWeight: '500' }}>Resume processed successfully!</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '20px' }}>
+                            <CheckCircle style={{ width: '20px', height: '20px' }} />
+                            <span style={{ fontWeight: '500', fontSize: '16px' }}>Resume processed successfully!</span>
                         </div>
                     )}
 
                     {uploadStatus === 'error' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', marginBottom: '1rem' }}>
-                            <AlertCircle style={{ width: '1.25rem', height: '1.25rem' }} />
-                            <span style={{ fontWeight: '500' }}>{errorMessage}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', marginBottom: '20px' }}>
+                            <AlertCircle style={{ width: '20px', height: '20px' }} />
+                            <span style={{ fontWeight: '500', fontSize: '16px' }}>{errorMessage}</span>
                         </div>
                     )}
 
                     {/* Quick Preview */}
                     {uploadStatus === 'success' && extractedData && (
                         <div style={{
-                            marginTop: '1rem',
-                            padding: '1rem',
-                            backgroundColor: '#f9fafb',
-                            borderRadius: '0.5rem'
+                            marginTop: '20px',
+                            padding: '20px',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '12px',
+                            border: '1px solid #bfdbfe'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                                <h4 style={{ fontWeight: '500', color: '#111827' }}>Extracted Information</h4>
-                                <Eye style={{ width: '1rem', height: '1rem', color: '#9ca3af' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <h4 style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>Extracted Information</h4>
+                                <Eye style={{ width: '16px', height: '16px', color: '#9ca3af' }} />
                             </div>
-                            <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
-                                <p>Found {extractedData.length} data points including names, skills, experience, and more.</p>
-                                <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                                <p style={{ margin: 0, marginBottom: '12px' }}>Found {extractedData.length} data points including names, skills, experience, and more.</p>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                     {extractedData.slice(0, 3).map((item, index) => (
                                         <span key={index} style={{
                                             display: 'inline-block',
                                             backgroundColor: '#dbeafe',
                                             color: '#1e40af',
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '0.25rem',
-                                            fontSize: '0.75rem'
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: '500'
                                         }}>
                                             {item.type}: {item.value.length > 20 ? item.value.substring(0, 20) + '...' : item.value}
                                         </span>
@@ -367,9 +376,10 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                                             display: 'inline-block',
                                             backgroundColor: '#f3f4f6',
                                             color: '#4b5563',
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '0.25rem',
-                                            fontSize: '0.75rem'
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: '500'
                                         }}>
                                             +{extractedData.length - 3} more
                                         </span>
@@ -384,14 +394,14 @@ const ResumeUploader = ({ onUploadSuccess }) => {
             {/* Error Display */}
             {errorMessage && uploadStatus === 'idle' && (
                 <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
+                    marginTop: '20px',
+                    padding: '16px',
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
-                    borderRadius: '0.5rem'
+                    borderRadius: '12px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626' }}>
-                        <AlertCircle style={{ width: '1.25rem', height: '1.25rem' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626' }}>
+                        <AlertCircle style={{ width: '20px', height: '20px' }} />
                         <span style={{ fontWeight: '500' }}>{errorMessage}</span>
                     </div>
                 </div>

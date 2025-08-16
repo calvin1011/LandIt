@@ -8,7 +8,6 @@ import {
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
-// ✅ Your Firebase Configuration (Replace with your actual config)
 const firebaseConfig = {
     apiKey: "AIzaSyAEMGHk81mx50-8RLpQiapXA1VOBmTLYW4",
     authDomain: "landit-9217d.firebaseapp.com",
