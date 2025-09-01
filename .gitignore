@@ -6,4 +6,13 @@ upload/
 
 FrontEnd/
 
+spacy-ner/env/
+
+data/
+spacy-ner/output/
+
+spacy-ner/train_data.json
+
+spacy-ner/__pycache__/
+.idea/
 node_modules/

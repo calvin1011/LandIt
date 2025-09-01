@@ -4,11 +4,14 @@ import random
 import json
 import warnings
 
-# Suppress alignment warnings
+# Suppress alignment warnings for spaCy
 warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 
+# --- Function Definitions ---
+# All helper functions should be defined at the beginning of the script.
+
 def load_training_data():
-    """Load training data with fallback options"""
+    """Load existing training data with fallback options."""
     try:
         # Try to load fixed data first
         with open("train_data_fixed.json", "r", encoding="utf-8") as f:
@@ -27,9 +30,19 @@ def load_training_data():
             print("❌ No training data file found!")
             return []
 
+def load_prelabeled_data():
+    """Load newly pre-labeled data from 'prelabeled_data.json'."""
+    try:
+        with open("../data/kaggle/processed/kaggle_prelabeled.json", "r", encoding="utf-8") as f:
+            new_data = json.load(f)
+        print(f"✅ Loaded {len(new_data)} new examples from data/kaggle/processed/kaggle_prelabeled.json")
+        return new_data
+    except FileNotFoundError:
+        print("❌ data/kaggle/processed/kaggle_prelabeled.json not found. Skipping.")
+        return []
 
 def validate_example(nlp, text, entities):
-    """Validate a single training example"""
+    """Validate a single training example against the spaCy model's vocabulary."""
     try:
         doc = nlp.make_doc(text)
         example = Example.from_dict(doc, {"entities": entities})
@@ -38,6 +51,7 @@ def validate_example(nlp, text, entities):
         print(f"❌ Invalid example: {text[:30]}... - {str(e)[:50]}...")
         return None
 
+# --- Main Script Execution ---
 
 # Load the English model
 try:
@@ -55,11 +69,22 @@ else:
     ner = nlp.get_pipe("ner")
     print("✅ Using existing NER pipe")
 
-# Load training data
+# Get other pipes to disable during training
+other_pipes = [pipe for pipe in nlp.pipe_names if pipe != "ner"]
+if other_pipes:
+    print(f"🔇 Will disable pipes during training: {other_pipes}")
+
+# Load existing training data
 TRAIN_DATA = load_training_data()
 
+# Load newly pre-labeled data and combine it with the existing data
+NEW_DATA = load_prelabeled_data()
+if NEW_DATA:
+    TRAIN_DATA.extend(NEW_DATA)
+    print(f"✅ Combined datasets. Total examples: {len(TRAIN_DATA)}")
+
 if not TRAIN_DATA:
-    print("❌ No training data available. Exiting.")
+    print("❌ No training data available after combining datasets. Exiting.")
     exit(1)
 
 # Collect all labels and validate examples
@@ -68,7 +93,7 @@ all_labels = set()
 valid_examples = []
 skipped_examples = 0
 
-for i, (text, annotations) in enumerate(TRAIN_DATA):
+for text, annotations in TRAIN_DATA:
     entities = annotations.get("entities", [])
 
     # Collect labels
@@ -78,7 +103,7 @@ for i, (text, annotations) in enumerate(TRAIN_DATA):
     # Validate example
     example = validate_example(nlp, text, entities)
     if example:
-        valid_examples.append((text, annotations))
+        valid_examples.append(example)
     else:
         skipped_examples += 1
 
@@ -113,16 +138,14 @@ print(f"\n🎯 Adding {len(all_labels)} labels to NER...")
 for label in all_labels:
     ner.add_label(label)
 
-# Get other pipes to disable during training
-other_pipes = [pipe for pipe in nlp.pipe_names if pipe != "ner"]
-if other_pipes:
-    print(f"🔇 Will disable pipes during training: {other_pipes}")
+# --- KEY FIX: Initialize the model before training ---
+print("\n🛠️ Initializing model for training...")
+nlp.initialize()
 
 print(f"\n🚀 Starting training with {len(valid_examples)} examples...")
 
 # Training loop
 with nlp.disable_pipes(*other_pipes):
-    # Initialize training
     optimizer = nlp.resume_training()
 
     for iteration in range(20):
@@ -143,22 +166,12 @@ with nlp.disable_pipes(*other_pipes):
             end_idx = min(start_idx + batch_size, len(valid_examples))
             batch = valid_examples[start_idx:end_idx]
 
-            examples = []
-            for text, annotations in batch:
-                try:
-                    doc = nlp.make_doc(text)
-                    example = Example.from_dict(doc, annotations)
-                    examples.append(example)
-                except Exception:
-                    continue
-
-            if examples:
-                try:
-                    nlp.update(examples, drop=0.3, losses=losses)
-                    successful_updates += 1
-                except Exception as e:
-                    print(f"    ⚠️  Batch {batch_num + 1} failed: {str(e)[:30]}...")
-                    continue
+            try:
+                nlp.update(batch, drop=0.3, losses=losses)
+                successful_updates += 1
+            except Exception as e:
+                print(f"    ⚠️  Batch {batch_num + 1} failed: {str(e)[:50]}...")
+                continue
 
         print(f"    ✅ Successful batches: {successful_updates}/{total_batches}")
 
