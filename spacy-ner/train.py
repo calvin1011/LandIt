@@ -3,6 +3,7 @@ from spacy.training.example import Example
 import random
 import json
 import warnings
+import os
 
 # Suppress alignment warnings for spaCy
 warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
@@ -30,16 +31,24 @@ def load_training_data():
             print("❌ No training data file found!")
             return []
 
-def load_prelabeled_data():
-    """Load newly pre-labeled data from 'prelabeled_data.json'."""
-    try:
-        with open("../data/kaggle/processed/kaggle_prelabeled.json", "r", encoding="utf-8") as f:
-            new_data = json.load(f)
-        print(f"✅ Loaded {len(new_data)} new examples from data/kaggle/processed/kaggle_prelabeled.json")
-        return new_data
-    except FileNotFoundError:
-        print("❌ data/kaggle/processed/kaggle_prelabeled.json not found. Skipping.")
-        return []
+def load_all_prelabeled_data(directory):
+    """Load all pre-labeled JSON files from a directory."""
+    all_data = []
+    file_count = 0
+    # List all files in the specified directory
+    for filename in os.listdir(directory):
+        if filename.endswith(".json"):
+            filepath = os.path.join(directory, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    new_data = json.load(f)
+                    all_data.extend(new_data)
+                    file_count += 1
+                    print(f"✅ Loaded {len(new_data)} examples from {filename}")
+            except (json.JSONDecodeError, FileNotFoundError) as e:
+                print(f"❌ Failed to load {filename}: {e}")
+    print(f"✅ Loaded data from a total of {file_count} file(s).")
+    return all_data
 
 def validate_example(nlp, text, entities):
     """Validate a single training example against the spaCy model's vocabulary."""
@@ -77,8 +86,8 @@ if other_pipes:
 # Load existing training data
 TRAIN_DATA = load_training_data()
 
-# Load newly pre-labeled data and combine it with the existing data
-NEW_DATA = load_prelabeled_data()
+# Load ALL pre-labeled data from a folder and combine
+NEW_DATA = load_all_prelabeled_data("../data/kaggle/processed/")
 if NEW_DATA:
     TRAIN_DATA.extend(NEW_DATA)
     print(f"✅ Combined datasets. Total examples: {len(TRAIN_DATA)}")

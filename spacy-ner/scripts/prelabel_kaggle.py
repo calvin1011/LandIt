@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+from datetime import datetime
 
 def clean_resume_text(text):
     """Clean and preprocess resume text"""
@@ -100,7 +101,11 @@ def main():
 
     csv_path = project_root / "data" / "kaggle" / "raw" / "UpdatedResumeDataSet.csv"
     model_path = script_dir.parent / "output"
-    output_path = project_root / "data" / "kaggle" / "processed" / "kaggle_prelabeled.json"
+
+    # Generate a dynamic output filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename = f"kaggle_prelabeled_{timestamp}.json"
+    output_path = project_root / "data" / "kaggle" / "processed" / output_filename
 
     print(f"Loading CSV from: {csv_path}")
     print(f"Loading model from: {model_path}")
