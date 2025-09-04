@@ -10,6 +10,7 @@ spacy-ner/env/
 
 data/
 spacy-ner/output/
+spacy-ner/output_hybrid/
 
 spacy-ner/train_data.json
 

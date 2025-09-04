@@ -3,55 +3,55 @@ from spacy.training.example import Example
 import random
 import json
 import warnings
-import os
+from pathlib import Path
 
 # Suppress alignment warnings for spaCy
 warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 
-# --- Function Definitions ---
-# All helper functions should be defined at the beginning of the script.
 
-def load_training_data():
-    """Load existing training data with fallback options."""
-    try:
-        # Try to load fixed data first
-        with open("train_data_fixed.json", "r", encoding="utf-8") as f:
-            training_data = json.load(f)
-        print(f"✅ Loaded {len(training_data)} examples from train_data_fixed.json")
-        return training_data
-    except FileNotFoundError:
+def load_clean_training_data():
+    """Load only your original clean training data (not Kaggle)"""
+    training_files = [
+        "train_data.json"
+    ]
+
+    for filename in training_files:
         try:
-            # Fall back to original data
-            with open("train_data.json", "r", encoding="utf-8") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 training_data = json.load(f)
-            print(f"⚠️  Using original train_data.json with {len(training_data)} examples")
-            print("   Consider running the data fixer first!")
+            print(f"✅ Loaded {len(training_data)} clean examples from {filename}")
             return training_data
         except FileNotFoundError:
-            print("❌ No training data file found!")
-            return []
+            continue
 
-def load_all_prelabeled_data(directory):
-    """Load all pre-labeled JSON files from a directory."""
-    all_data = []
-    file_count = 0
-    # List all files in the specified directory
-    for filename in os.listdir(directory):
-        if filename.endswith(".json"):
-            filepath = os.path.join(directory, filename)
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    new_data = json.load(f)
-                    all_data.extend(new_data)
-                    file_count += 1
-                    print(f"✅ Loaded {len(new_data)} examples from {filename}")
-            except (json.JSONDecodeError, FileNotFoundError) as e:
-                print(f"❌ Failed to load {filename}: {e}")
-    print(f"✅ Loaded data from a total of {file_count} file(s).")
-    return all_data
+    print("❌ No clean training data file found!")
+    print("   Looking for: train_data_fixed.json or train_data.json")
+    return []
+
+
+def filter_quality_examples(training_data, max_examples=200):
+    """Filter and limit to highest quality examples"""
+    if not training_data:
+        return []
+
+    # Filter examples with reasonable entity counts (5-25 entities)
+    quality_examples = []
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        if 5 <= len(entities) <= 25:  # Sweet spot for learning
+            quality_examples.append((text, annotations))
+
+    # Limit total examples for efficiency
+    if len(quality_examples) > max_examples:
+        quality_examples = quality_examples[:max_examples]
+        print(f"⚡ Limited to {max_examples} examples for efficient training")
+
+    print(f"📊 Using {len(quality_examples)} quality examples")
+    return quality_examples
+
 
 def validate_example(nlp, text, entities):
-    """Validate a single training example against the spaCy model's vocabulary."""
+    """Validate a single training example"""
     try:
         doc = nlp.make_doc(text)
         example = Example.from_dict(doc, {"entities": entities})
@@ -60,165 +60,203 @@ def validate_example(nlp, text, entities):
         print(f"❌ Invalid example: {text[:30]}... - {str(e)[:50]}...")
         return None
 
-# --- Main Script Execution ---
 
-# Load the English model
-try:
-    nlp = spacy.load("en_core_web_sm")
-    print("✅ Loaded en_core_web_sm model")
-except OSError:
-    print("⚠️  en_core_web_sm not found, creating blank model")
-    nlp = spacy.blank("en")
+def analyze_labels(training_data):
+    """Analyze and categorize labels from training data"""
+    all_labels = set()
+    label_counts = {}
 
-# Add NER pipe if missing
-if "ner" not in nlp.pipe_names:
-    ner = nlp.add_pipe("ner")
-    print("✅ Added NER pipe")
-else:
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        for start, end, label in entities:
+            all_labels.add(label)
+            label_counts[label] = label_counts.get(label, 0) + 1
+
+    return all_labels, label_counts
+
+
+def main():
+    print("🚀 HYBRID RESUME NER TRAINING")
+    print("=" * 50)
+    print("Using: en_core_web_sm + Your Custom Resume Labels")
+    print("=" * 50)
+
+    # 1. Load the pre-trained English model (the hybrid foundation)
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        print("✅ Loaded en_core_web_sm as base model")
+        print(f"   Existing labels: {len(nlp.get_pipe('ner').labels)}")
+    except OSError:
+        print("❌ en_core_web_sm not found!")
+        print("   Install it with: python -m spacy download en_core_web_sm")
+        return
+
+    # 2. Load only your clean training data (skip Kaggle for now)
+    training_data = load_clean_training_data()
+    if not training_data:
+        print("❌ No training data available. Exiting.")
+        return
+
+    # 3. Filter to highest quality examples for efficient training
+    quality_data = filter_quality_examples(training_data, max_examples=150)
+
+    # 4. Analyze labels
+    custom_labels, label_counts = analyze_labels(quality_data)
+    print(f"\n🏷️  Found {len(custom_labels)} custom resume labels:")
+
+    # Group labels logically
+    label_groups = {
+        "Contact": ["NAME", "EMAIL", "PHONE", "ADDRESS", "LOCATION"],
+        "Professional": ["TITLE", "COMPANY", "SKILL", "EXPERIENCE"],
+        "Education": ["EDUCATION", "DEGREE", "FIELD", "GRAD_YEAR", "GPA"],
+        "Other": []
+    }
+
+    for label in sorted(custom_labels):
+        categorized = False
+        for category, category_labels in label_groups.items():
+            if label in category_labels:
+                categorized = True
+                break
+        if not categorized:
+            label_groups["Other"].append(label)
+
+    for category, labels in label_groups.items():
+        if labels:
+            label_list = [f"{label}({label_counts.get(label, 0)})" for label in labels]
+            print(f"   {category}: {', '.join(label_list)}")
+
+    # 5. Add your custom labels to the existing NER pipe
     ner = nlp.get_pipe("ner")
-    print("✅ Using existing NER pipe")
+    print(f"\n🎯 Adding custom labels to existing NER...")
 
-# Get other pipes to disable during training
-other_pipes = [pipe for pipe in nlp.pipe_names if pipe != "ner"]
-if other_pipes:
-    print(f"🔇 Will disable pipes during training: {other_pipes}")
+    for label in custom_labels:
+        ner.add_label(label)
 
-# Load existing training data
-TRAIN_DATA = load_training_data()
+    print(f"   Total labels now: {len(ner.labels)}")
 
-# Load ALL pre-labeled data from a folder and combine
-NEW_DATA = load_all_prelabeled_data("../data/kaggle/processed/")
-if NEW_DATA:
-    TRAIN_DATA.extend(NEW_DATA)
-    print(f"✅ Combined datasets. Total examples: {len(TRAIN_DATA)}")
+    # 6. Prepare training examples
+    print(f"\n📋 Preparing training examples...")
+    valid_examples = []
+    skipped = 0
 
-if not TRAIN_DATA:
-    print("❌ No training data available after combining datasets. Exiting.")
-    exit(1)
+    for text, annotations in quality_data:
+        entities = annotations.get("entities", [])
+        example = validate_example(nlp, text, entities)
+        if example:
+            valid_examples.append(example)
+        else:
+            skipped += 1
 
-# Collect all labels and validate examples
-print("\n📋 Processing training examples...")
-all_labels = set()
-valid_examples = []
-skipped_examples = 0
+    print(f"   ✅ Valid examples: {len(valid_examples)}")
+    print(f"   ❌ Skipped: {skipped}")
 
-for text, annotations in TRAIN_DATA:
-    entities = annotations.get("entities", [])
+    if not valid_examples:
+        print("❌ No valid training examples. Check your data format.")
+        return
 
-    # Collect labels
-    for start, end, label in entities:
-        all_labels.add(label)
+    # 7. Fine-tune the model (fewer iterations since we have a good base)
+    print(f"\n🚀 Starting hybrid training with {len(valid_examples)} examples...")
 
-    # Validate example
-    example = validate_example(nlp, text, entities)
-    if example:
-        valid_examples.append(example)
-    else:
-        skipped_examples += 1
+    # Get pipes to disable (keep only NER active)
+    other_pipes = [pipe for pipe in nlp.pipe_names if pipe != "ner"]
+    print(f"   🔇 Disabling pipes: {other_pipes}")
 
-print(f"✅ Valid examples: {len(valid_examples)}")
-print(f"❌ Skipped examples: {skipped_examples}")
-print(f"🏷️  Found {len(all_labels)} unique labels:")
+    # Training loop - fewer iterations since we're fine-tuning
+    with nlp.disable_pipes(*other_pipes):
+        # Initialize with existing weights
+        optimizer = nlp.resume_training()
 
-# Print labels in organized groups
-label_groups = {
-    "Basic Info": ["NAME", "TITLE", "COMPANY", "EMAIL", "PHONE", "ADDRESS", "LOCATION"],
-    "Education": ["EDUCATION", "DEGREE", "FIELD", "GRAD_YEAR", "GPA", "DISTINCTION"],
-    "Skills": ["SKILL", "TECHNOLOGY", "TOOL", "LANGUAGE", "PROFICIENCY_LEVEL"],
-    "Experience": ["EXPERIENCE", "EXPERIENCE_DURATION", "ACHIEVEMENT", "LEADERSHIP"],
-    "Other": []
-}
+        # Reduced iterations for fine-tuning
+        n_iter = 10  # Less than from-scratch training
 
-for label in sorted(all_labels):
-    categorized = False
-    for category, category_labels in label_groups.items():
-        if label in category_labels:
-            categorized = True
-            break
-    if not categorized:
-        label_groups["Other"].append(label)
+        for iteration in range(n_iter):
+            print(f"\n   📈 Iteration {iteration + 1}/{n_iter}")
 
-for category, labels in label_groups.items():
-    if labels:
-        print(f"  {category}: {', '.join(sorted(labels))}")
+            # Shuffle examples
+            random.shuffle(valid_examples)
+            losses = {}
 
-# Add labels to NER
-print(f"\n🎯 Adding {len(all_labels)} labels to NER...")
-for label in all_labels:
-    ner.add_label(label)
+            # Process in batches
+            batch_size = 8
+            batches = [valid_examples[i:i + batch_size]
+                       for i in range(0, len(valid_examples), batch_size)]
 
-# --- KEY FIX: Initialize the model before training ---
-print("\n🛠️ Initializing model for training...")
-nlp.initialize()
+            successful_batches = 0
 
-print(f"\n🚀 Starting training with {len(valid_examples)} examples...")
+            for batch in batches:
+                try:
+                    # Lower dropout for fine-tuning
+                    nlp.update(batch, drop=0.2, losses=losses)
+                    successful_batches += 1
+                except Exception as e:
+                    print(f"      ⚠️  Batch failed: {str(e)[:50]}...")
 
-# Training loop
-with nlp.disable_pipes(*other_pipes):
-    optimizer = nlp.resume_training()
+            print(f"      ✅ Successful batches: {successful_batches}/{len(batches)}")
 
-    for iteration in range(20):
-        print(f"\n📈 Iteration {iteration + 1}/20")
+            # Print losses every few iterations
+            if iteration % 3 == 0 or iteration == n_iter - 1:
+                if losses:
+                    print(f"      📊 Loss: {losses.get('ner', 'N/A'):.4f}")
 
-        # Shuffle data
-        random.shuffle(valid_examples)
-        losses = {}
+    print("\n🎉 Hybrid training completed!")
 
-        # Process in batches for better memory management
-        batch_size = 8
-        total_batches = len(valid_examples) // batch_size + (1 if len(valid_examples) % batch_size else 0)
+    # 8. Test the hybrid model
+    print("\n🧪 Testing hybrid model:")
+    test_sentences = [
+        "John Smith is a Senior Software Engineer at Google with 5 years experience.",
+        "Jane graduated from MIT with a Computer Science degree in 2020.",
+        "Skills: Python, JavaScript, React, AWS, Docker, Kubernetes.",
+        "Contact: john.doe@email.com | Phone: (555) 123-4567 | Boston, MA"
+    ]
 
-        successful_updates = 0
+    for sentence in test_sentences:
+        doc = nlp(sentence)
+        print(f"\n   📝 '{sentence}'")
+        if doc.ents:
+            for ent in doc.ents:
+                entity_type = "CUSTOM" if ent.label_ in custom_labels else "PRETRAINED"
+                print(f"      🎯 '{ent.text}' → {ent.label_} ({entity_type})")
+        else:
+            print("      ❌ No entities found")
 
-        for batch_num in range(total_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(valid_examples))
-            batch = valid_examples[start_idx:end_idx]
+    # 9. Save the hybrid model
+    output_dir = Path("output_hybrid")
+    try:
+        nlp.to_disk(output_dir)
+        print(f"\n💾 Hybrid model saved to: {output_dir}/")
 
-            try:
-                nlp.update(batch, drop=0.3, losses=losses)
-                successful_updates += 1
-            except Exception as e:
-                print(f"    ⚠️  Batch {batch_num + 1} failed: {str(e)[:50]}...")
-                continue
+        # Save metadata
+        metadata = {
+            "model_type": "hybrid_pretrained_custom",
+            "base_model": "en_core_web_sm",
+            "custom_labels": list(custom_labels),
+            "training_examples": len(valid_examples),
+            "training_iterations": n_iter,
+            "total_labels": len(ner.labels)
+        }
 
-        print(f"    ✅ Successful batches: {successful_updates}/{total_batches}")
+        with open(output_dir / "training_info.json", "w") as f:
+            json.dump(metadata, f, indent=2)
 
-        # Print losses every 5 iterations
-        if iteration % 5 == 0 or iteration == 19:
-            if losses:
-                print(f"    📊 Losses: {losses}")
+        print(f"📊 Training metadata saved")
 
-print("\n🎉 Training completed!")
+    except Exception as e:
+        print(f"❌ Failed to save model: {e}")
+        return
 
-# Test the model
-print("\n🧪 Testing trained model:")
-test_sentences = [
-    "John Smith is a Software Engineer at Google.",
-    "Jane graduated from MIT with a Computer Science degree in 2020.",
-    "Proficient in Python, JavaScript, and React with 5 years experience.",
-    "Contact: john.doe@email.com | Phone: (555) 123-4567"
-]
+    # 10. Update your API to use the hybrid model
+    print(f"\n🔧 Next steps:")
+    print(f"   1. Update your api.py to load from 'output_hybrid' instead of 'output'")
+    print(f"   2. Restart your FastAPI server")
+    print(f"   3. Test with the diagnostic tool")
+    print(f"   4. The hybrid model should give much more consistent results!")
 
-for sentence in test_sentences:
-    doc = nlp(sentence)
-    print(f"\n📝 Text: {sentence}")
-    if doc.ents:
-        for ent in doc.ents:
-            print(f"    🎯 '{ent.text}' → {ent.label_}")
-    else:
-        print("    ❌ No entities found")
+    print(f"\n✨ Benefits of hybrid approach:")
+    print(f"   • Better entity boundaries from pre-trained model")
+    print(f"   • General entities (PERSON, ORG) still work")
+    print(f"   • Your custom resume labels added on top")
+    print(f"   • More consistent extraction overall")
 
-# Save the trained model
-output_dir = "output"
-try:
-    nlp.to_disk(output_dir)
-    print(f"\n💾 Model saved to /{output_dir}/")
-    print(f"📁 You can now use this model in your resume parser!")
-except Exception as e:
-    print(f"❌ Failed to save model: {e}")
-
-print("\n✨ Training complete! Next steps:")
-print("1. Test the model with real resume data")
-print("2. Integrate with your resume parser application")
-print("3. Monitor performance and add more training data as needed")
+if __name__ == "__main__":
+    main()
