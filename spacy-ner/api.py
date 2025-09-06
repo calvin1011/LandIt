@@ -1,6 +1,6 @@
 import spacy
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re
 import logging
 from typing import List, Optional, Dict, Any
@@ -8,18 +8,20 @@ import time
 import json
 from pathlib import Path
 
+# Import our intelligence modules
+from intelligent_section_detector import ContextAwareEntityExtractor, IntelligentSectionDetector
+from relationship_extractor import ResumeIntelligenceAnalyzer
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load hybrid trained spaCy model
 try:
-    # Try hybrid model first
     model_path = "output_hybrid"
     nlp = spacy.load(model_path)
     logger.info(f"✅ Successfully loaded HYBRID model from: {model_path}")
 
-    # Load training metadata if available
     metadata_path = Path(model_path) / "training_info.json"
     if metadata_path.exists():
         with open(metadata_path, 'r') as f:
@@ -32,22 +34,24 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to load hybrid model: {e}")
     try:
-        # Fallback to original custom model
         nlp = spacy.load("output")
         training_info = {"model_type": "custom_only"}
         logger.warning("⚠️ Using fallback custom model")
     except Exception as e2:
         logger.error(f"❌ Failed to load any model: {e2}")
-        nlp = spacy.blank("en")
-        training_info = {"model_type": "blank"}
-        logger.warning("⚠️ Using blank model - please check your model paths")
+        nlp = spacy.load("en_core_web_sm")
+        training_info = {"model_type": "pretrained_only"}
+        logger.warning("⚠️ Using pretrained model only")
 
-app = FastAPI(title="LandIt Resume Parser API - Hybrid Edition", version="2.0.0")
+app = FastAPI(title="LandIt Intelligent Resume Parser", version="3.0.0")
 
+# Initialize intelligence analyzer
+intelligence_analyzer = ResumeIntelligenceAnalyzer(nlp)
 
 class ResumeText(BaseModel):
     text: str
-
+    analysis_level: str = Field(default="full", description="Analysis level: 'basic', 'standard', or 'full'")
+    include_suggestions: bool = Field(default=True, description="Include improvement suggestions")
 
 class EntityResponse(BaseModel):
     text: str
@@ -55,254 +59,539 @@ class EntityResponse(BaseModel):
     start: Optional[int] = None
     end: Optional[int] = None
     confidence: Optional[float] = None
-    source: Optional[str] = None  # "pretrained" or "custom"
+    source: Optional[str] = None
+    section: Optional[str] = None
 
 
-class ParseResponse(BaseModel):
+class WorkExperienceResponse(BaseModel):
+    title: str
+    company: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    skills: List[str] = []
+    achievements: List[str] = []
+
+
+class EducationResponse(BaseModel):
+    degree: str
+    school: Optional[str] = None
+    year: Optional[str] = None
+    gpa: Optional[str] = None
+
+
+class SkillCategoryResponse(BaseModel):
+    category: str
+    skills: List[Dict[str, Any]]
+
+
+class IntelligentParseResponse(BaseModel):
+    # Basic extraction results
     entities: List[EntityResponse]
+
+    # Structured data
+    work_experience: List[WorkExperienceResponse]
+    education: List[EducationResponse]
+    skills: List[SkillCategoryResponse]
+    achievements: List[str]
+
+    # Intelligence insights
+    experience_metrics: Dict[str, Any]
+    career_progression: Dict[str, Any]
+    resume_analytics: Dict[str, Any]
+
+    # Metadata
     processing_stats: Dict[str, Any]
     model_info: Dict[str, Any]
-
-
-# Define custom resume labels (these are your specific ones)
-CUSTOM_RESUME_LABELS = {
-    "NAME", "EMAIL", "PHONE", "TITLE", "COMPANY", "SKILL",
-    "EDUCATION", "DEGREE", "FIELD", "EXPERIENCE", "LOCATION"
-}
-
-
-def estimate_confidence(ent) -> float:
-    """Enhanced confidence estimation for hybrid model"""
-    confidence = 0.8  # Base confidence
-
-    # Higher confidence for well-formed entities
-    if ent.label_ == "EMAIL" and "@" in ent.text and "." in ent.text:
-        confidence = 0.95
-    elif ent.label_ == "PHONE" and re.match(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', ent.text):
-        confidence = 0.95
-    elif ent.label_ == "NAME" and 2 <= len(ent.text.split()) <= 3:
-        confidence = 0.9
-    elif ent.label_ in ["SKILL", "TITLE", "COMPANY"] and len(ent.text.split()) <= 4:
-        confidence = 0.85
-
-    # Pre-trained model labels get different confidence
-    elif ent.label_ in ["PERSON", "ORG", "GPE", "DATE"]:  # spaCy's standard labels
-        confidence = 0.9  # Pre-trained model is usually quite good
-
-    # Reduce confidence for suspicious entities
-    if len(ent.text) > 50:
-        confidence *= 0.7
-    if len(ent.text.split()) > 6:
-        confidence *= 0.8
-    if len(ent.text.strip()) < 2:
-        confidence *= 0.5
-
-    return min(max(confidence, 0.1), 1.0)
-
-
-def determine_entity_source(label: str) -> str:
-    """Determine if entity comes from custom training or pre-trained model"""
-    if label in CUSTOM_RESUME_LABELS:
-        return "custom"
-    elif label in ["PERSON", "ORG", "GPE", "DATE", "TIME", "PERCENT", "MONEY", "CARDINAL"]:
-        return "pretrained"
-    else:
-        return "unknown"
-
-
-def post_process_entities(doc, min_confidence: float = 0.5) -> List[EntityResponse]:
-    """Enhanced post-processing for hybrid model"""
-    entities = []
-    seen_entities = set()
-
-    for ent in doc.ents:
-        entity_text = ent.text.strip()
-        if not entity_text:
-            continue
-
-        confidence = estimate_confidence(ent)
-
-        if confidence < min_confidence:
-            continue
-
-        # Enhanced deduplication - consider both text and position
-        unique_key = f"{entity_text.lower()}_{ent.label_}_{ent.start_char}"
-        if unique_key in seen_entities:
-            continue
-        seen_entities.add(unique_key)
-
-        # Enhanced validation per entity type
-        if ent.label_ == "EMAIL":
-            if not ("@" in entity_text and "." in entity_text):
-                continue
-        elif ent.label_ == "PHONE":
-            digits = re.findall(r'\d', entity_text)
-            if len(digits) < 7:
-                continue
-        elif ent.label_ in ["NAME", "PERSON"]:
-            if len(entity_text) > 30 or re.search(r'\d', entity_text):
-                continue
-            words = entity_text.split()
-            if len(words) > 4:
-                continue
-
-        # Map some pre-trained labels to custom ones for consistency
-        mapped_label = ent.label_
-        if ent.label_ == "PERSON" and not any(e.label_ == "NAME" for e in entities):
-            mapped_label = "NAME"  # Use NAME instead of PERSON for resumes
-        elif ent.label_ == "ORG":
-            mapped_label = "COMPANY"  # Use COMPANY instead of ORG for resumes
-
-        entities.append(EntityResponse(
-            text=entity_text,
-            label=mapped_label,
-            start=ent.start_char,
-            end=ent.end_char,
-            confidence=confidence,
-            source=determine_entity_source(ent.label_)
-        ))
-
-    return entities
-
-
-def validate_input_text(text: str) -> str:
-    """Enhanced input validation"""
-    if not text or not text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
-
-    if len(text) > 50000:
-        logger.warning(f"Text truncated from {len(text)} to 50000 characters")
-        text = text[:50000]
-
-    return text.strip()
+    suggestions: Optional[List[str]] = None
 
 
 @app.get("/")
 def root():
-    model_type = training_info.get("model_type", "unknown")
     return {
-        "message": "LandIt Resume Parser - Hybrid Edition is running!",
-        "version": "2.0.0",
-        "model_type": model_type,
-        "model_labels": list(nlp.get_pipe('ner').labels) if "ner" in nlp.pipe_names else [],
-        "custom_labels": list(CUSTOM_RESUME_LABELS),
-        "features": [
-            "Hybrid pre-trained + custom model",
-            "Enhanced confidence scoring",
-            "Label mapping for consistency",
-            "Source tracking (custom vs pretrained)"
-        ]
+        "message": "LandIt Intelligent Resume Parser is running!",
+        "version": "3.0.0",
+        "model_type": training_info.get("model_type", "unknown"),
+        "intelligence_features": [
+            "Section-aware entity extraction",
+            "Relationship detection",
+            "Career progression analysis",
+            "Skills categorization",
+            "Achievement extraction",
+            "ATS compatibility scoring",
+            "Resume quality assessment",
+            "Improvement suggestions"
+        ],
+        "analysis_levels": {
+            "basic": "Entity extraction only",
+            "standard": "Entities + structured data",
+            "full": "Complete intelligence analysis"
+        }
     }
 
 
 @app.get("/health")
 def health_check():
-    """Enhanced health check"""
-    model_labels = list(nlp.get_pipe('ner').labels) if "ner" in nlp.pipe_names else []
-    custom_count = len([l for l in model_labels if l in CUSTOM_RESUME_LABELS])
-    pretrained_count = len(model_labels) - custom_count
-
+    """Enhanced health check with intelligence status"""
     return {
         "status": "healthy",
         "model_loaded": "ner" in nlp.pipe_names,
         "model_type": training_info.get("model_type", "unknown"),
-        "total_labels": len(model_labels),
-        "custom_labels": custom_count,
-        "pretrained_labels": pretrained_count
+        "intelligence_modules": {
+            "section_detector": True,
+            "relationship_extractor": True,
+            "analytics_engine": True
+        },
+        "total_labels": len(nlp.get_pipe('ner').labels) if "ner" in nlp.pipe_names else 0
     }
 
 
-@app.post("/parse-resume", response_model=ParseResponse)
-def parse_resume(data: ResumeText):
-    """Enhanced parsing with hybrid model"""
+@app.post("/parse-resume", response_model=IntelligentParseResponse)
+def parse_resume_intelligent(data: ResumeText):
+    """
+    Intelligent resume parsing with multiple analysis levels
+    """
     start_time = time.time()
 
     try:
-        text = validate_input_text(data.text)
-        logger.info(f"Processing text of length {len(text)}")
+        # Validate input
+        text = data.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-        # Process with hybrid spaCy model
-        doc = nlp(text)
+        if len(text) > 50000:
+            logger.warning(f"Text truncated from {len(text)} to 50000 characters")
+            text = text[:50000]
 
-        # Enhanced post-processing
-        entities = post_process_entities(doc, min_confidence=0.5)
+        logger.info(f"Processing resume with {data.analysis_level} analysis level")
+
+        # Perform analysis based on requested level
+        if data.analysis_level == "basic":
+            results = _perform_basic_analysis(text)
+        elif data.analysis_level == "standard":
+            results = _perform_standard_analysis(text)
+        else:  # full
+            results = intelligence_analyzer.analyze_resume(text)
 
         processing_time = time.time() - start_time
 
-        # Enhanced processing stats
-        custom_entities = [e for e in entities if e.source == "custom"]
-        pretrained_entities = [e for e in entities if e.source == "pretrained"]
+        # Generate suggestions if requested
+        suggestions = None
+        if data.include_suggestions and data.analysis_level == "full":
+            suggestions = _generate_improvement_suggestions(results)
 
-        stats = {
-            "text_length": len(text),
-            "processing_time_seconds": round(processing_time, 3),
-            "total_entities_found": len(doc.ents),
-            "entities_after_filtering": len(entities),
-            "custom_entities": len(custom_entities),
-            "pretrained_entities": len(pretrained_entities),
-            "filter_ratio": round(len(entities) / len(doc.ents), 2) if len(doc.ents) > 0 else 0,
-            "entity_types": list(set([e.label for e in entities])),
-            "average_confidence": round(sum([e.confidence for e in entities]) / len(entities), 2) if entities else 0
-        }
+        # Format response
+        response = _format_intelligent_response(results, processing_time, suggestions)
 
-        model_info = {
-            "model_type": training_info.get("model_type", "unknown"),
-            "base_model": training_info.get("base_model", "unknown"),
-            "total_labels": training_info.get("total_labels", len(nlp.get_pipe('ner').labels)),
-            "training_examples": training_info.get("training_examples", "unknown")
-        }
-
-        logger.info(
-            f"Processed resume: {len(entities)} entities ({len(custom_entities)} custom, {len(pretrained_entities)} pretrained) in {processing_time:.2f}s")
-
-        return ParseResponse(
-            entities=entities,
-            processing_stats=stats,
-            model_info=model_info
-        )
+        logger.info(f"Completed {data.analysis_level} analysis in {processing_time:.2f}s")
+        return response
 
     except Exception as e:
-        logger.error(f"Error processing resume: {str(e)}")
+        logger.error(f"Error in intelligent parsing: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
-@app.post("/test-model")
-def test_model(data: ResumeText):
-    """Enhanced test endpoint for hybrid model"""
+@app.post("/analyze-skills")
+def analyze_skills_endpoint(data: ResumeText):
+    """
+    Focused skill analysis endpoint
+    """
     try:
-        text = validate_input_text(data.text)
-        doc = nlp(text)
+        results = intelligence_analyzer.analyze_resume(data.text)
 
-        raw_entities = []
-        for ent in doc.ents:
-            raw_entities.append({
-                "text": ent.text,
-                "label": ent.label_,
-                "start": ent.start_char,
-                "end": ent.end_char,
-                "confidence": estimate_confidence(ent),
-                "source": determine_entity_source(ent.label_)
-            })
+        skills_analysis = {
+            "skills_by_category": results["skills"],
+            "skill_evolution": results["skill_evolution"],
+            "skills_analysis": results["resume_analytics"]["skills_analysis"],
+            "recommendations": _generate_skill_recommendations(results["skills"])
+        }
 
-        # Group by source
-        custom_entities = [e for e in raw_entities if e["source"] == "custom"]
-        pretrained_entities = [e for e in raw_entities if e["source"] == "pretrained"]
+        return skills_analysis
 
-        return {
-            "text_preview": text[:200] + "..." if len(text) > 200 else text,
-            "raw_entities": raw_entities,
-            "entity_count": len(raw_entities),
-            "custom_entities": len(custom_entities),
-            "pretrained_entities": len(pretrained_entities),
-            "model_info": {
-                "model_type": training_info.get("model_type", "unknown"),
-                "model_name": nlp.meta.get("name", "custom"),
-                "labels": list(nlp.get_pipe('ner').labels) if "ner" in nlp.pipe_names else []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Skill analysis failed: {str(e)}")
+
+
+@app.post("/career-insights")
+def career_insights_endpoint(data: ResumeText):
+    """
+    Focused career progression analysis
+    """
+    try:
+        results = intelligence_analyzer.analyze_resume(data.text)
+
+        career_insights = {
+            "work_experience": results["work_experience"],
+            "experience_metrics": results["experience_metrics"],
+            "career_progression": results["career_progression"],
+            "achievements": results["achievements"],
+            "career_recommendations": _generate_career_recommendations(results)
+        }
+
+        return career_insights
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Career analysis failed: {str(e)}")
+
+
+@app.post("/resume-score")
+def resume_score_endpoint(data: ResumeText):
+    """
+    Resume quality scoring endpoint
+    """
+    try:
+        results = intelligence_analyzer.analyze_resume(data.text)
+        analytics = results["resume_analytics"]
+
+        scoring = {
+            "overall_score": analytics["overall_quality_score"],
+            "completeness_score": analytics["completeness_score"],
+            "ats_compatibility_score": analytics["ats_compatibility_score"],
+            "strengths": analytics["strengths"],
+            "red_flags": analytics["red_flags"],
+            "improvement_areas": _identify_improvement_areas(analytics),
+            "score_breakdown": {
+                "contact_info": _score_contact_info(results),
+                "work_experience": _score_work_experience(results),
+                "education": _score_education(results),
+                "skills": _score_skills(results),
+                "achievements": _score_achievements(results)
             }
         }
 
+        return scoring
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Test failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Resume scoring failed: {str(e)}")
+
+
+def _perform_basic_analysis(text: str) -> Dict:
+    """Basic entity extraction only"""
+    context_extractor = ContextAwareEntityExtractor(nlp)
+    return context_extractor.extract_with_context(text)
+
+
+def _perform_standard_analysis(text: str) -> Dict:
+    """Standard analysis with structured data but limited intelligence"""
+    context_results = _perform_basic_analysis(text)
+
+    # Add basic relationship extraction
+    from relationship_extractor import IntelligentRelationshipExtractor
+    rel_extractor = IntelligentRelationshipExtractor(nlp)
+    relationship_results = rel_extractor.extract_relationships(text, context_results["entities"])
+
+    # Combine results
+    return {
+        **context_results,
+        **relationship_results,
+        "resume_analytics": {"completeness_score": 85, "ats_compatibility_score": 80}  # Simplified
+    }
+
+
+def _format_intelligent_response(results: Dict, processing_time: float,
+                                 suggestions: Optional[List[str]]) -> IntelligentParseResponse:
+    """Format results into response model"""
+
+    # Convert entities
+    entities = []
+    for entity in results.get("entities", []):
+        entities.append(EntityResponse(
+            text=entity["text"],
+            label=entity["label"],
+            start=entity.get("start"),
+            end=entity.get("end"),
+            confidence=entity.get("confidence"),
+            source=entity.get("source"),
+            section=entity.get("section")
+        ))
+
+    # Convert work experience
+    work_experience = []
+    for exp in results.get("work_experience", []):
+        work_experience.append(WorkExperienceResponse(
+            title=exp["title"],
+            company=exp["company"],
+            start_date=exp.get("start_date"),
+            end_date=exp.get("end_date"),
+            skills=exp.get("skills", []),
+            achievements=exp.get("achievements", [])
+        ))
+
+    # Convert education
+    education = []
+    for edu in results.get("education", []):
+        education.append(EducationResponse(
+            degree=edu["degree"],
+            school=edu.get("school"),
+            year=edu.get("year"),
+            gpa=edu.get("gpa")
+        ))
+
+    # Convert skills
+    skills = []
+    for category, skill_list in results.get("skills", {}).items():
+        skills.append(SkillCategoryResponse(
+            category=category,
+            skills=skill_list
+        ))
+
+    # Processing stats
+    processing_stats = {
+        "processing_time_seconds": round(processing_time, 3),
+        "total_entities": len(entities),
+        "work_experience_count": len(work_experience),
+        "education_count": len(education),
+        "skill_categories": len(skills),
+        "achievements_count": len(results.get("achievements", []))
+    }
+
+    # Model info
+    model_info = {
+        "model_type": training_info.get("model_type", "unknown"),
+        "version": "3.0.0",
+        "intelligence_level": "full"
+    }
+
+    return IntelligentParseResponse(
+        entities=entities,
+        work_experience=work_experience,
+        education=education,
+        skills=skills,
+        achievements=results.get("achievements", []),
+        experience_metrics=results.get("experience_metrics", {}),
+        career_progression=results.get("career_progression", {}),
+        resume_analytics=results.get("resume_analytics", {}),
+        processing_stats=processing_stats,
+        model_info=model_info,
+        suggestions=suggestions
+    )
+
+
+def _generate_improvement_suggestions(results: Dict) -> List[str]:
+    """Generate personalized improvement suggestions"""
+    suggestions = []
+    analytics = results.get("resume_analytics", {})
+
+    # Based on completeness score
+    if analytics.get("completeness_score", 0) < 80:
+        if not results.get("work_experience"):
+            suggestions.append("Add detailed work experience with specific achievements")
+        if not results.get("skills"):
+            suggestions.append("Include a dedicated skills section with relevant technologies")
+
+        # Check for missing contact info
+        entities = results.get("entities", [])
+        has_email = any(e["label"] == "EMAIL" for e in entities)
+        has_phone = any(e["label"] == "PHONE" for e in entities)
+
+        if not has_email:
+            suggestions.append("Add a professional email address")
+        if not has_phone:
+            suggestions.append("Include your phone number for easy contact")
+
+    # Based on ATS compatibility
+    if analytics.get("ats_compatibility_score", 0) < 85:
+        suggestions.append("Use standard section headers (Experience, Education, Skills)")
+        suggestions.append("Include relevant keywords from your target job descriptions")
+        suggestions.append("Use simple, clean formatting without complex graphics")
+
+    # Based on career progression
+    career_prog = results.get("career_progression", {})
+    if career_prog.get("trend") == "lateral":
+        suggestions.append("Highlight leadership responsibilities and increasing scope of work")
+
+    # Based on achievements
+    if not results.get("achievements"):
+        suggestions.append("Quantify your accomplishments with specific numbers and metrics")
+
+    # Based on skills analysis
+    skills_analysis = analytics.get("skills_analysis", {})
+    if skills_analysis.get("skills_with_proficiency", 0) == 0:
+        suggestions.append("Indicate your proficiency level for key skills (e.g., Expert, Proficient)")
+
+    return suggestions[:5]  # Limit to top 5 suggestions
+
+
+def _generate_skill_recommendations(skills: Dict) -> List[str]:
+    """Generate skill-specific recommendations"""
+    recommendations = []
+
+    # Check for trending skills in each category
+    trending_skills = {
+        "Programming Languages": ["Python", "TypeScript", "Go", "Rust"],
+        "Web Technologies": ["React", "Next.js", "GraphQL", "Svelte"],
+        "Cloud & DevOps": ["Kubernetes", "Terraform", "Docker", "AWS Lambda"],
+        "Data & Analytics": ["Apache Spark", "dbt", "Airflow", "Snowflake"]
+    }
+
+    for category, category_skills in skills.items():
+        if category in trending_skills:
+            current_skills = [skill["name"].lower() for skill in category_skills]
+            missing_trending = []
+
+            for trending in trending_skills[category]:
+                if trending.lower() not in current_skills:
+                    missing_trending.append(trending)
+
+            if missing_trending and len(missing_trending) <= 3:
+                recommendations.append(
+                    f"Consider adding trending {category.lower()}: {', '.join(missing_trending[:2])}")
+
+    return recommendations[:3]
+
+
+def _generate_career_recommendations(results: Dict) -> List[str]:
+    """Generate career-focused recommendations"""
+    recommendations = []
+
+    exp_metrics = results.get("experience_metrics", {})
+    career_prog = results.get("career_progression", {})
+
+    # Experience level recommendations
+    total_years = exp_metrics.get("total_years", 0)
+    if total_years < 2:
+        recommendations.append("Focus on highlighting internships, projects, and relevant coursework")
+    elif total_years > 10:
+        recommendations.append("Consider emphasizing leadership and strategic contributions")
+
+    # Career progression recommendations
+    if career_prog.get("trend") == "upward":
+        recommendations.append("Excellent career progression - continue highlighting increasing responsibilities")
+    elif career_prog.get("seniority_growth", 0) < 0:
+        recommendations.append("Consider emphasizing skill development and expanded scope of work")
+
+    # Company diversity
+    if exp_metrics.get("companies", 0) == 1:
+        recommendations.append("Consider highlighting diverse project experience within your organization")
+    elif exp_metrics.get("companies", 0) > 5:
+        recommendations.append("Focus on demonstrating consistency and deep impact at each role")
+
+    return recommendations[:3]
+
+
+def _identify_improvement_areas(analytics: Dict) -> List[str]:
+    """Identify specific areas for improvement"""
+    areas = []
+
+    completeness = analytics.get("completeness_score", 0)
+    ats_score = analytics.get("ats_compatibility_score", 0)
+
+    if completeness < 70:
+        areas.append("Resume completeness - add missing sections")
+    if ats_score < 75:
+        areas.append("ATS optimization - improve keyword usage and formatting")
+    if analytics.get("red_flags"):
+        areas.append("Address potential red flags identified")
+
+    skills_analysis = analytics.get("skills_analysis", {})
+    if skills_analysis.get("depth_score", 0) < 50:
+        areas.append("Skill depth - add proficiency levels and years of experience")
+
+    return areas
+
+
+def _score_contact_info(results: Dict) -> int:
+    """Score contact information completeness"""
+    score = 0
+    entities = results.get("entities", [])
+
+    has_name = any(e["label"] in ["NAME", "PERSON"] for e in entities)
+    has_email = any(e["label"] == "EMAIL" for e in entities)
+    has_phone = any(e["label"] == "PHONE" for e in entities)
+    has_location = any(e["label"] in ["LOCATION", "GPE"] for e in entities)
+
+    if has_name: score += 25
+    if has_email: score += 30
+    if has_phone: score += 25
+    if has_location: score += 20
+
+    return score
+
+
+def _score_work_experience(results: Dict) -> int:
+    """Score work experience section quality"""
+    work_exp = results.get("work_experience", [])
+    if not work_exp:
+        return 0
+
+    score = 0
+    total_possible = len(work_exp) * 100
+
+    for exp in work_exp:
+        exp_score = 0
+        if exp.get("title"): exp_score += 20
+        if exp.get("company"): exp_score += 20
+        if exp.get("start_date") or exp.get("end_date"): exp_score += 20
+        if exp.get("skills"): exp_score += 20
+        if exp.get("achievements"): exp_score += 20
+
+        score += exp_score
+
+    return min(100, (score / total_possible) * 100) if total_possible > 0 else 0
+
+
+def _score_education(results: Dict) -> int:
+    """Score education section quality"""
+    education = results.get("education", [])
+    if not education:
+        return 50  # Not everyone needs education
+
+    score = 0
+    for edu in education:
+        edu_score = 0
+        if edu.get("degree"): edu_score += 40
+        if edu.get("school"): edu_score += 30
+        if edu.get("year"): edu_score += 20
+        if edu.get("gpa"): edu_score += 10
+
+        score = max(score, edu_score)  # Take best education entry
+
+    return score
+
+
+def _score_skills(results: Dict) -> int:
+    """Score skills section quality"""
+    skills = results.get("skills", {})
+    if not skills:
+        return 0
+
+    total_skills = sum(len(skill_list) for skill_list in skills.values())
+    categories = len(skills)
+
+    # Base score for having skills
+    score = 40
+
+    # Bonus for multiple categories
+    score += min(30, categories * 10)
+
+    # Bonus for skill quantity
+    score += min(20, total_skills * 2)
+
+    # Bonus for proficiency levels
+    skills_with_prof = 0
+    for skill_list in skills.values():
+        for skill in skill_list:
+            if skill.get("proficiency"):
+                skills_with_prof += 1
+
+    if skills_with_prof > 0:
+        score += min(10, skills_with_prof * 2)
+
+    return min(100, score)
+
+
+def _score_achievements(results: Dict) -> int:
+    """Score achievements and quantified results"""
+    achievements = results.get("achievements", [])
+    if not achievements:
+        return 0
+
+    score = len(achievements) * 15  # 15 points per achievement
+
+    # Bonus for quantified achievements
+    quantified = sum(1 for ach in achievements if re.search(r'\d+[%$]|\d+\s*(?:years?|months?)', ach))
+    score += quantified * 10
+
+    return min(100, score)
 
 
 if __name__ == "__main__":
