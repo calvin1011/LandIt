@@ -46,6 +46,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     const [progress, setProgress] = useState(0);
     const [errorMessage, setErrorMessage] = useState('');
     const [extractedData, setExtractedData] = useState(null);
+    const [processingMethod, setProcessingMethod] = useState('hybrid'); // 'intelligent' or 'hybrid'
 
     const handleDrag = useCallback((e) => {
         e.preventDefault();
@@ -74,10 +75,16 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     };
 
     const handleFile = (selectedFile) => {
-        // Validate file type
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        // Validate file type - Now supporting text files too for FastAPI
+        const allowedTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ];
+
         if (!allowedTypes.includes(selectedFile.type)) {
-            setErrorMessage('Please upload a PDF or Word document');
+            setErrorMessage('Please upload a PDF, Word document, or text file');
             setUploadStatus('idle');
             return;
         }
@@ -98,10 +105,18 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         setUploadStatus('uploading');
         setProgress(0);
 
-        const formData = new FormData();
-        formData.append('resume', fileToUpload);
-
         try {
+            // For text files, read content and send to FastAPI text endpoint
+            if (fileToUpload.type === 'text/plain') {
+                const text = await readFileAsText(fileToUpload);
+                await processTextDirectly(text);
+                return;
+            }
+
+            // For PDF/DOC files, try FastAPI file upload first
+            const formData = new FormData();
+            formData.append('resume', fileToUpload);
+
             // Simulate upload progress
             const progressInterval = setInterval(() => {
                 setProgress(prev => {
@@ -113,26 +128,120 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 });
             }, 200);
 
-            const response = await axios.post('http://localhost:5001/api/parse-resume', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // Try FastAPI upload endpoint first (supports PDF/DOCX)
+            let response;
+            try {
+                response = await axios.post('http://localhost:8000/upload-resume', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 30000
+                });
+                clearInterval(progressInterval);
+            } catch (fastApiError) {
+                console.log('FastAPI upload failed, trying Express backend...', fastApiError.message);
+                clearInterval(progressInterval);
 
-            clearInterval(progressInterval);
+                // Fallback to Express backend
+                response = await axios.post('http://localhost:5001/api/parse-resume', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 30000
+                });
+            }
+
             setProgress(100);
             setUploadStatus('processing');
 
+            // Handle different response formats
+            let processedData;
+            if (response.data.entities) {
+                // FastAPI format
+                processedData = formatFastApiResponse(response.data);
+            } else if (response.data.extracted) {
+                // Express format
+                processedData = response.data.extracted;
+            } else {
+                throw new Error('Unexpected response format');
+            }
+
             // Simulate processing delay for better UX
             setTimeout(() => {
-                setExtractedData(response.data.extracted);
+                setExtractedData(processedData);
                 setUploadStatus('success');
-                onUploadSuccess(response.data.extracted);
+                onUploadSuccess(processedData);
             }, 1500);
 
         } catch (error) {
             setUploadStatus('error');
-            setErrorMessage('Failed to process resume. Please try again.');
+
+            // Better error messages
+            if (error.response?.status === 500 && error.response?.data?.detail?.includes('average_tenure')) {
+                setErrorMessage('Backend processing error detected. Please ensure your FastAPI server is updated with the latest fixes.');
+            } else if (error.code === 'ECONNREFUSED') {
+                setErrorMessage('Cannot connect to processing server. Please ensure your FastAPI server is running on port 8000.');
+            } else {
+                setErrorMessage('Failed to process resume. Please try again.');
+            }
+
             console.error('Upload error:', error);
         }
+    };
+
+    const readFileAsText = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsText(file);
+        });
+    };
+
+    const processTextDirectly = async (text) => {
+        setUploadStatus('processing');
+        setProgress(50);
+
+        try {
+            // Call FastAPI text processing endpoint
+            const endpoint = processingMethod === 'hybrid' ? '/parse-resume-hybrid' : '/parse-resume';
+            const response = await axios.post(`http://localhost:8000${endpoint}`, {
+                text: text,
+                analysis_level: "full",
+                include_suggestions: true
+            }, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+
+            setProgress(100);
+
+            const processedData = formatFastApiResponse(response.data);
+
+            setTimeout(() => {
+                setExtractedData(processedData);
+                setUploadStatus('success');
+                onUploadSuccess(processedData);
+            }, 1000);
+
+        } catch (error) {
+            setUploadStatus('error');
+
+            if (error.response?.data?.detail?.includes('average_tenure')) {
+                setErrorMessage('Backend processing error: average_tenure issue detected. Please update your FastAPI backend.');
+            } else {
+                setErrorMessage('Failed to process text. Please try again.');
+            }
+
+            console.error('Text processing error:', error);
+        }
+    };
+
+    const formatFastApiResponse = (data) => {
+        // Convert FastAPI response format to your existing format
+        const entities = data.entities || [];
+
+        return entities.map(entity => ({
+            type: entity.label,
+            value: entity.text,
+            confidence: entity.confidence || 0.8
+        }));
     };
 
     const resetUpload = () => {
@@ -164,6 +273,26 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 </div>
             );
         }
+
+        if (file.type === 'text/plain') {
+            return (
+                <div style={{
+                    width: '2rem',
+                    height: '2rem',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    borderRadius: '0.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                }}>
+                    TXT
+                </div>
+            );
+        }
+
         return (
             <div style={{
                 width: '2rem',
@@ -203,9 +332,45 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
                     Upload Your Resume
                 </h2>
-                <p style={{ color: '#6b7280', fontSize: '16px', margin: 0 }}>
+                <p style={{ color: '#6b7280', fontSize: '16px', margin: 0, marginBottom: '20px' }}>
                     Upload your resume and let our AI extract and organize your information automatically.
                 </p>
+
+                {/* Processing Method Selector */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <button
+                        onClick={() => setProcessingMethod('intelligent')}
+                        style={{
+                            padding: '8px 16px',
+                            backgroundColor: processingMethod === 'intelligent' ? '#6366f1' : '#f3f4f6',
+                            color: processingMethod === 'intelligent' ? 'white' : '#6b7280',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        🧠 Intelligent Analysis
+                    </button>
+                    <button
+                        onClick={() => setProcessingMethod('hybrid')}
+                        style={{
+                            padding: '8px 16px',
+                            backgroundColor: processingMethod === 'hybrid' ? '#6366f1' : '#f3f4f6',
+                            color: processingMethod === 'hybrid' ? 'white' : '#6b7280',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        🔀 Hybrid Extraction
+                    </button>
+                </div>
             </div>
 
             {/* Upload Area */}
@@ -254,13 +419,13 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                             <input
                                 type="file"
                                 style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx"
+                                accept=".pdf,.doc,.docx,.txt"
                                 onChange={handleFileInput}
                             />
                         </label>
                     </div>
                     <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '20px', margin: 0 }}>
-                        Supports PDF, DOC, DOCX • Max file size: 5MB
+                        Supports PDF, DOC, DOCX, TXT • Max file size: 5MB
                     </p>
                 </div>
             )}
@@ -278,7 +443,9 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                             {getFileIcon()}
                             <div>
                                 <p style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>{file.name}</p>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, marginTop: '4px' }}>{formatFileSize(file.size)}</p>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, marginTop: '4px' }}>
+                                    {formatFileSize(file.size)} • {processingMethod === 'hybrid' ? 'Hybrid' : 'Intelligent'} Analysis
+                                </p>
                             </div>
                         </div>
                         <button
@@ -331,7 +498,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                     {uploadStatus === 'success' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '20px' }}>
                             <CheckCircle style={{ width: '20px', height: '20px' }} />
-                            <span style={{ fontWeight: '500', fontSize: '16px' }}>Resume processed successfully!</span>
+                            <span style={{ fontWeight: '500', fontSize: '16px' }}>Resume processed successfully with {processingMethod} analysis!</span>
                         </div>
                     )}
 

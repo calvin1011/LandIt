@@ -1,5 +1,5 @@
 import spacy
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from pydantic import BaseModel, Field
 import re
 import logging
@@ -7,6 +7,22 @@ from typing import List, Optional, Dict, Any
 import time
 import json
 from pathlib import Path
+import io
+
+# File processing imports
+try:
+    import PyPDF2
+
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    import docx
+
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
 
 from semantic_extractor import SemanticResumeExtractor
 
@@ -125,6 +141,50 @@ class IntelligentParseResponse(BaseModel):
     suggestions: Optional[List[str]] = None
 
 
+def extract_text_from_pdf(file_content: bytes) -> str:
+    """Extract text from PDF bytes"""
+    if not PDF_AVAILABLE:
+        raise HTTPException(status_code=400, detail="PDF processing not available. Install PyPDF2: pip install PyPDF2")
+
+    try:
+        pdf_file = io.BytesIO(file_content)
+        reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text.strip()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
+
+
+def extract_text_from_docx(file_content: bytes) -> str:
+    """Extract text from DOCX bytes"""
+    if not DOCX_AVAILABLE:
+        raise HTTPException(status_code=400,
+                            detail="DOCX processing not available. Install python-docx: pip install python-docx")
+
+    try:
+        docx_file = io.BytesIO(file_content)
+        doc = docx.Document(docx_file)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        return text.strip()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"DOCX extraction failed: {str(e)}")
+
+
+def extract_text_from_txt(file_content: bytes) -> str:
+    """Extract text from TXT bytes"""
+    try:
+        return file_content.decode('utf-8').strip()
+    except UnicodeDecodeError:
+        try:
+            return file_content.decode('latin-1').strip()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Text file encoding error: {str(e)}")
+
+
 def safe_get_experience_metrics(results: Dict) -> Dict[str, Any]:
     """Safely extract experience metrics with all required keys"""
     experience_metrics = results.get("experience_metrics", {})
@@ -134,7 +194,7 @@ def safe_get_experience_metrics(results: Dict) -> Dict[str, Any]:
         "total_years": experience_metrics.get("total_years", 0),
         "companies": experience_metrics.get("companies", 0),
         "roles": experience_metrics.get("roles", 0),
-        "average_tenure": experience_metrics.get("average_tenure", 0.0)  # This is the key that was missing!
+        "average_tenure": experience_metrics.get("average_tenure", 0.0)
     }
 
     return safe_metrics
@@ -160,7 +220,6 @@ def safe_context_extraction(text: str) -> Dict:
                 "has_skills": False,
                 "structure_score": 0
             }),
-            # This was missing and causing the KeyError!
             "experience_analysis": results.get("experience_analysis", {
                 "average_tenure": 0.0,
                 "total_jobs": 0,
@@ -211,7 +270,7 @@ def _fallback_basic_extraction(text: str) -> Dict:
                 "structure_score": 0
             },
             "experience_analysis": {
-                "average_tenure": 0.0,  # Essential for preventing KeyError
+                "average_tenure": 0.0,
                 "total_jobs": 0,
                 "total_experience_months": 0.0,
                 "valid_jobs": 0
@@ -247,6 +306,17 @@ def root():
         "version": "3.0.0",
         "model_type": training_info.get("model_type", "unknown"),
         "intelligent_modules": INTELLIGENT_MODULES_AVAILABLE,
+        "file_processing": {
+            "pdf_support": PDF_AVAILABLE,
+            "docx_support": DOCX_AVAILABLE,
+            "txt_support": True
+        },
+        "endpoints": {
+            "/parse-resume": "Text-based parsing",
+            "/parse-resume-file": "File upload parsing",
+            "/parse-resume-semantic": "Semantic pattern matching",
+            "/parse-resume-hybrid": "Combined spaCy + semantic"
+        },
         "intelligence_features": [
             "Section-aware entity extraction",
             "Relationship detection",
@@ -276,6 +346,11 @@ def health_check():
         "model_loaded": "ner" in nlp.pipe_names,
         "model_type": training_info.get("model_type", "unknown"),
         "intelligent_modules": INTELLIGENT_MODULES_AVAILABLE,
+        "file_processing": {
+            "pdf_support": PDF_AVAILABLE,
+            "docx_support": DOCX_AVAILABLE,
+            "txt_support": True
+        },
         "intelligence_modules_detail": {
             "section_detector": INTELLIGENT_MODULES_AVAILABLE,
             "relationship_extractor": INTELLIGENT_MODULES_AVAILABLE,
@@ -285,7 +360,81 @@ def health_check():
     }
 
 
-@app.post("/parse-resume", response_model=Dict[str, Any])  # Changed from IntelligentParseResponse for flexibility
+@app.post("/parse-resume-file")
+async def parse_resume_file(
+        file: UploadFile = File(...),
+        analysis_level: str = "full",
+        include_suggestions: bool = True
+):
+    """
+    Parse resume from uploaded file (PDF, DOCX, TXT)
+    This endpoint replaces your Node.js backend functionality
+    """
+    start_time = time.time()
+
+    try:
+        logger.info(f"📄 Processing file: {file.filename} ({file.content_type})")
+
+        # Validate file type
+        allowed_types = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ]
+
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}. Supported: PDF, DOCX, TXT"
+            )
+
+        # Validate file size (5MB limit)
+        file_content = await file.read()
+        if len(file_content) > 5 * 1024 * 1024:  # 5MB
+            raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+
+        if len(file_content) == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        # Extract text based on file type
+        if file.content_type == 'text/plain':
+            text = extract_text_from_txt(file_content)
+        elif file.content_type == 'application/pdf':
+            text = extract_text_from_pdf(file_content)
+        elif file.content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            text = extract_text_from_docx(file_content)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="No text could be extracted from the file")
+
+        logger.info(f"✅ Extracted {len(text)} characters from {file.filename}")
+
+        # Use your existing parsing logic
+        data = ResumeText(text=text, analysis_level=analysis_level, include_suggestions=include_suggestions)
+        result = parse_resume_intelligent(data)
+
+        # Add file metadata to result
+        result["file_info"] = {
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "size_bytes": len(file_content),
+            "text_length": len(text)
+        }
+
+        logger.info(f"🎉 Successfully processed {file.filename} in {time.time() - start_time:.2f}s")
+        return result
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"❌ File processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
+
+
+@app.post("/parse-resume", response_model=Dict[str, Any])
 def parse_resume_intelligent(data: ResumeText):
     """
     Intelligent resume parsing with multiple analysis levels and comprehensive error handling
@@ -374,28 +523,6 @@ def parse_resume_intelligent(data: ResumeText):
 
     except Exception as e:
         logger.error(f"Error in intelligent parsing: {str(e)}")
-        # Return safe error response
-        error_response = {
-            "entities": [],
-            "sections": {},
-            "section_analysis": {"sections_found": 0, "structure_score": 0},
-            "experience_analysis": {"average_tenure": 0.0, "total_jobs": 0},
-            "work_experience": [],
-            "education": [],
-            "skills": {},
-            "achievements": [],
-            "experience_metrics": {"total_years": 0, "companies": 0, "roles": 0, "average_tenure": 0.0},
-            "career_progression": {},
-            "resume_analytics": {},
-            "error": str(e),
-            "processing_stats": {
-                "processing_time_seconds": 0,
-                "total_entities": 0,
-                "analysis_level": data.analysis_level,
-                "intelligent_modules_used": False
-            }
-        }
-
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
@@ -440,7 +567,6 @@ def _perform_standard_analysis(text: str) -> Dict:
         return _fallback_basic_extraction(text)
 
 
-# Semantic implementation to call api
 @app.post("/parse-resume-semantic")
 def parse_resume_semantic(data: ResumeText):
     """
@@ -468,7 +594,6 @@ def parse_resume_semantic(data: ResumeText):
             "confidence": results.get("confidence", 0.0),
             "processing_time": processing_time,
             "total_entities": len(results["entities"]),
-            # Add the missing experience_analysis for compatibility
             "experience_analysis": {"average_tenure": 0.0, "total_jobs": 0}
         }
 
@@ -526,7 +651,7 @@ def parse_resume_hybrid(data: ResumeText):
                 "skills": spacy_results.get("skills", {}),
                 "achievements": spacy_results.get("achievements", []),
                 "resume_analytics": spacy_results.get("resume_analytics", {}),
-                "experience_metrics": safe_get_experience_metrics(spacy_results)  # Ensure safe metrics
+                "experience_metrics": safe_get_experience_metrics(spacy_results)
             }
 
         processing_time = time.time() - start_time
@@ -569,7 +694,7 @@ def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, origin
             "skills": {},
             "achievements": [],
             "resume_analytics": {},
-            "experience_metrics": {"total_years": 0, "companies": 0, "roles": 0, "average_tenure": 0.0}  # Safe default
+            "experience_metrics": {"total_years": 0, "companies": 0, "roles": 0, "average_tenure": 0.0}
         }
 
         # Start with spaCy results as base (with safe copying)
