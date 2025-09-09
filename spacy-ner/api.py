@@ -616,28 +616,66 @@ def parse_resume_semantic(data: ResumeText):
         raise HTTPException(status_code=500, detail=f"Semantic processing failed: {str(e)}")
 
 
-@app.post("/parse-resume-hybrid")
-def parse_resume_hybrid(data: ResumeText):
+@app.post("/parse-resume-file")
+async def parse_resume_file(
+        file: UploadFile = File(...)
+):
     """
-    Hybrid resume parsing: spaCy NER + Semantic extraction
+    Parse resume from uploaded file using optimal hybrid processing
+    Automatically selects the best combination of AI techniques for maximum accuracy
     """
     start_time = time.time()
 
     try:
-        text = data.text.strip()
-        if not text:
-            raise HTTPException(status_code=400, detail="Text cannot be empty")
+        logger.info(f"📄 Processing file: {file.filename} ({file.content_type})")
 
-        logger.info("Processing resume with hybrid approach")
+        # Validate file type
+        allowed_types = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ]
 
-        # Get spaCy results (your existing intelligent analysis)
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}. Supported: PDF, DOCX, TXT"
+            )
+
+        # Validate file size (5MB limit)
+        file_content = await file.read()
+        if len(file_content) > 5 * 1024 * 1024:  # 5MB
+            raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+
+        if len(file_content) == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        # Extract text based on file type
+        if file.content_type == 'text/plain':
+            text = extract_text_from_txt(file_content)
+        elif file.content_type == 'application/pdf':
+            text = extract_text_from_pdf(file_content)
+        elif file.content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            text = extract_text_from_docx(file_content)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="No text could be extracted from the file")
+
+        logger.info(f"✅ Extracted {len(text)} characters from {file.filename}")
+
+        # Use hybrid processing for optimal results
+        logger.info("🔀 Using hybrid processing for optimal extraction")
+
         try:
+            # Get spaCy results (intelligent analysis)
             if intelligence_analyzer:
                 spacy_results = intelligence_analyzer.analyze_resume(text)
-                logger.info(f"spaCy analysis completed with {len(spacy_results.get('entities', []))} entities")
+                logger.info(f"📊 spaCy analysis: {len(spacy_results.get('entities', []))} entities")
             else:
                 spacy_results = safe_context_extraction(text)
-                logger.info(f"Basic spaCy analysis completed with {len(spacy_results.get('entities', []))} entities")
+                logger.info(f"📊 Basic spaCy analysis: {len(spacy_results.get('entities', []))} entities")
         except Exception as e:
             logger.error(f"spaCy analysis failed: {str(e)}")
             spacy_results = {"entities": [], "experience_metrics": {"average_tenure": 0.0}}
@@ -645,7 +683,7 @@ def parse_resume_hybrid(data: ResumeText):
         # Get semantic results
         try:
             semantic_results = semantic_extractor.extract_semantic_entities(text)
-            logger.info(f"Semantic analysis completed with {len(semantic_results.get('entities', []))} entities")
+            logger.info(f"🎯 Semantic analysis: {len(semantic_results.get('entities', []))} entities")
         except Exception as e:
             logger.error(f"Semantic analysis failed: {str(e)}")
             semantic_results = {"entities": []}
@@ -653,7 +691,7 @@ def parse_resume_hybrid(data: ResumeText):
         # Merge results intelligently
         try:
             merged_results = merge_extraction_results(spacy_results, semantic_results, text)
-            logger.info(f"Merge completed with {len(merged_results.get('entities', []))} total entities")
+            logger.info(f"✅ Hybrid merge: {len(merged_results.get('entities', []))} total entities")
         except Exception as e:
             logger.error(f"Merge failed: {str(e)}")
             # Fallback: combine entities directly
@@ -670,9 +708,8 @@ def parse_resume_hybrid(data: ResumeText):
 
         processing_time = time.time() - start_time
 
-        return {
-            "success": True,
-            "method": "hybrid_extraction",
+        # Build comprehensive response
+        response = {
             "entities": merged_results.get("entities", []),
             "personal_info": merged_results.get("personal_info", {}),
             "work_experience": merged_results.get("work_experience", []),
@@ -683,16 +720,33 @@ def parse_resume_hybrid(data: ResumeText):
             "experience_metrics": merged_results.get("experience_metrics", {"average_tenure": 0.0}),
             "processing_stats": {
                 "processing_time_seconds": processing_time,
+                "total_entities": len(merged_results.get("entities", [])),
                 "spacy_entities": len(spacy_results.get("entities", [])),
                 "semantic_entities": len(semantic_results.get("entities", [])),
-                "merged_entities": len(merged_results.get("entities", [])),
+                "method": "hybrid_optimal",
                 "improvement": len(merged_results.get("entities", [])) - len(spacy_results.get("entities", []))
+            },
+            "file_info": {
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "size_bytes": len(file_content),
+                "text_length": len(text)
+            },
+            "model_info": {
+                "model_type": training_info.get("model_type", "unknown"),
+                "version": "3.0.0",
+                "processing_method": "hybrid_automatic"
             }
         }
 
+        logger.info(f"🎉 Successfully processed {file.filename} in {processing_time:.2f}s using hybrid approach")
+        return response
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in hybrid parsing: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Hybrid processing failed: {str(e)}")
+        logger.error(f"❌ File processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
 @app.get("/test-response")
 def test_response():

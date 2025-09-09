@@ -46,7 +46,6 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     const [progress, setProgress] = useState(0);
     const [errorMessage, setErrorMessage] = useState('');
     const [extractedData, setExtractedData] = useState(null);
-    const [processingMethod, setProcessingMethod] = useState('hybrid'); // 'intelligent', 'hybrid', or 'semantic'
 
     const handleDrag = useCallback((e) => {
         e.preventDefault();
@@ -75,7 +74,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     };
 
     const handleFile = (selectedFile) => {
-        // Validate file type - Updated for FastAPI supported formats
+        // Validate file type
         const allowedTypes = [
             'application/pdf',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -105,14 +104,14 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         setProgress(0);
 
         try {
-            // For text files, read content and send to text endpoint
+            // For text files, read content and send to hybrid text endpoint
             if (fileToUpload.type === 'text/plain') {
                 const text = await readFileAsText(fileToUpload);
                 await processTextDirectly(text);
                 return;
             }
 
-            // For PDF/DOCX files, use the file upload endpoint
+            // For PDF/DOCX files, use the optimized file upload endpoint
             const formData = new FormData();
             formData.append('file', fileToUpload);
 
@@ -127,14 +126,10 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 });
             }, 200);
 
-            // Call Python FastAPI file upload endpoint
+            // Call the optimized file upload endpoint
             const response = await axios.post('http://localhost:8000/parse-resume-file', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
-                },
-                params: {
-                    analysis_level: 'full',
-                    include_suggestions: true
                 },
                 timeout: 30000
             });
@@ -173,20 +168,8 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         setProgress(50);
 
         try {
-            // Choose endpoint based on processing method
-            let endpoint;
-            switch (processingMethod) {
-                case 'hybrid':
-                    endpoint = '/parse-resume-hybrid';
-                    break;
-                case 'semantic':
-                    endpoint = '/parse-resume-semantic';
-                    break;
-                default:
-                    endpoint = '/parse-resume';
-            }
-
-            const response = await axios.post(`http://localhost:8000${endpoint}`, {
+            // Always use hybrid processing for best results
+            const response = await axios.post('http://localhost:8000/parse-resume-hybrid', {
                 text: text,
                 analysis_level: "full",
                 include_suggestions: true
@@ -196,10 +179,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
             });
 
             setProgress(100);
-
             const processedData = formatApiResponse(response.data);
-
-            console.log('API Response:', response.data);
 
             setTimeout(() => {
                 setExtractedData(processedData);
@@ -217,7 +197,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         console.error('Upload error:', error);
 
         if (error.code === 'ECONNREFUSED') {
-            setErrorMessage('Cannot connect to AI parser. Make sure the Python server is running on port 8000.');
+            setErrorMessage('Cannot connect to processing server. Please ensure the server is running.');
         } else if (error.response?.status === 400) {
             setErrorMessage(error.response.data?.detail || 'Invalid file format or content');
         } else if (error.response?.status === 500) {
@@ -230,30 +210,32 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     };
 
     const formatApiResponse = (data) => {
-    console.log('Raw API response:', data);
+        console.log('Raw API response:', data);
 
-    let entities = [];
+        let entities = [];
 
-    // Handle the Python API response format
-    if (data.entities && Array.isArray(data.entities)) {
-        entities = data.entities;
-    } else {
-        console.error('No entities found in response:', data);
-        return [];
-    }
+        // Handle different response formats
+        if (data.entities && Array.isArray(data.entities)) {
+            entities = data.entities;
+        } else if (data.method === 'hybrid_extraction' && data.entities) {
+            entities = data.entities;
+        } else {
+            console.error('No entities found in response:', data);
+            return [];
+        }
 
-    // Convert Python API format to frontend format
-    const converted = entities.map(entity => ({
-        type: entity.label,        // Python API uses 'label'
-        value: entity.text,        // Python API uses 'text'
-        confidence: entity.confidence || 0.8,
-        section: entity.section,
-        source: entity.source || 'ai'
-    }));
+        // Convert to frontend format
+        const converted = entities.map(entity => ({
+            type: entity.label,
+            value: entity.text,
+            confidence: entity.confidence || 0.8,
+            section: entity.section,
+            source: entity.source || 'ai'
+        }));
 
-    console.log('Converted data:', converted);
-    return converted;
-};
+        console.log('Converted data:', converted);
+        return converted;
+    };
 
     const resetUpload = () => {
         setFile(null);
@@ -330,19 +312,6 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
-    const getMethodDescription = (method) => {
-        switch (method) {
-            case 'intelligent':
-                return 'Advanced spaCy NER with section awareness';
-            case 'hybrid':
-                return 'Combined spaCy + semantic pattern matching';
-            case 'semantic':
-                return 'Pure pattern-based extraction';
-            default:
-                return 'Default analysis';
-        }
-    };
-
     return (
         <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
@@ -356,63 +325,8 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                 <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
                     Upload Your Resume
                 </h2>
-                <p style={{ color: '#6b7280', fontSize: '16px', margin: 0, marginBottom: '20px' }}>
+                <p style={{ color: '#6b7280', fontSize: '16px', margin: 0 }}>
                     Upload your resume and let our AI extract and organize your information automatically.
-                </p>
-
-                {/* Processing Method Selector */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                    <button
-                        onClick={() => setProcessingMethod('intelligent')}
-                        style={{
-                            padding: '8px 16px',
-                            backgroundColor: processingMethod === 'intelligent' ? '#6366f1' : '#f3f4f6',
-                            color: processingMethod === 'intelligent' ? 'white' : '#6b7280',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        🧠 Intelligent
-                    </button>
-                    <button
-                        onClick={() => setProcessingMethod('hybrid')}
-                        style={{
-                            padding: '8px 16px',
-                            backgroundColor: processingMethod === 'hybrid' ? '#6366f1' : '#f3f4f6',
-                            color: processingMethod === 'hybrid' ? 'white' : '#6b7280',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        🔀 Hybrid
-                    </button>
-                    <button
-                        onClick={() => setProcessingMethod('semantic')}
-                        style={{
-                            padding: '8px 16px',
-                            backgroundColor: processingMethod === 'semantic' ? '#6366f1' : '#f3f4f6',
-                            color: processingMethod === 'semantic' ? 'white' : '#6b7280',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        🎯 Semantic
-                    </button>
-                </div>
-                <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
-                    {getMethodDescription(processingMethod)}
                 </p>
             </div>
 
@@ -487,7 +401,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                             <div>
                                 <p style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>{file.name}</p>
                                 <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, marginTop: '4px' }}>
-                                    {formatFileSize(file.size)} • {processingMethod.charAt(0).toUpperCase() + processingMethod.slice(1)} Analysis
+                                    {formatFileSize(file.size)} • AI Processing
                                 </p>
                             </div>
                         </div>
@@ -513,7 +427,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                         <div style={{ marginBottom: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
                                 <span>
-                                    {uploadStatus === 'uploading' ? 'Uploading...' : `Processing with ${processingMethod} AI...`}
+                                    {uploadStatus === 'uploading' ? 'Uploading...' : 'Processing with AI...'}
                                 </span>
                                 <span>{uploadStatus === 'uploading' ? `${progress}%` : ''}</span>
                             </div>
@@ -542,7 +456,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '20px' }}>
                             <CheckCircle style={{ width: '20px', height: '20px' }} />
                             <span style={{ fontWeight: '500', fontSize: '16px' }}>
-                                Resume processed successfully with {processingMethod} analysis!
+                                Resume processed successfully!
                             </span>
                         </div>
                     )}
@@ -569,7 +483,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                             </div>
                             <div style={{ fontSize: '14px', color: '#6b7280' }}>
                                 <p style={{ margin: 0, marginBottom: '12px' }}>
-                                    Found {extractedData.length} data points using {processingMethod} extraction
+                                    Found {extractedData.length} data points including names, skills, experience, and more
                                 </p>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                     {extractedData.slice(0, 3).map((item, index) => (
