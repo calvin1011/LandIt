@@ -8,9 +8,13 @@ import time
 import json
 from pathlib import Path
 
+from semantic_extractor import SemanticResumeExtractor
+
 # Import our intelligence modules
 from intelligent_section_detector import ContextAwareEntityExtractor, IntelligentSectionDetector
 from relationship_extractor import ResumeIntelligenceAnalyzer
+
+semantic_extractor = SemanticResumeExtractor()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -263,6 +267,223 @@ def resume_score_endpoint(data: ResumeText):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Resume scoring failed: {str(e)}")
 
+# Semantic implementation to call api
+@app.post("/parse-resume-semantic")
+def parse_resume_semantic(data: ResumeText):
+    """
+    Semantic-based resume parsing using pattern matching
+    """
+    start_time = time.time()
+
+    try:
+        text = data.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+        logger.info("Processing resume with semantic extraction")
+
+        # Extract using semantic approach
+        results = semantic_extractor.extract_semantic_entities(text)
+
+        processing_time = time.time() - start_time
+
+        return {
+            "success": True,
+            "method": "semantic_extraction",
+            "entities": results["entities"],
+            "structured_data": results.get("structured_data", {}),
+            "confidence": results.get("confidence", 0.0),
+            "processing_time": processing_time,
+            "total_entities": len(results["entities"])
+        }
+
+    except Exception as e:
+        logger.error(f"Error in semantic parsing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Semantic processing failed: {str(e)}")
+
+
+@app.post("/parse-resume-hybrid")
+def parse_resume_hybrid(data: ResumeText):
+    """
+    Hybrid resume parsing: spaCy NER + Semantic extraction
+    """
+    start_time = time.time()
+
+    try:
+        text = data.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+        logger.info("Processing resume with hybrid approach")
+
+        # Get spaCy results (your existing intelligent analysis)
+        try:
+            spacy_results = intelligence_analyzer.analyze_resume(text)
+            logger.info(f"spaCy analysis completed with {len(spacy_results.get('entities', []))} entities")
+        except Exception as e:
+            logger.error(f"spaCy analysis failed: {str(e)}")
+            spacy_results = {"entities": []}
+
+        # Get semantic results
+        try:
+            semantic_results = semantic_extractor.extract_semantic_entities(text)
+            logger.info(f"Semantic analysis completed with {len(semantic_results.get('entities', []))} entities")
+        except Exception as e:
+            logger.error(f"Semantic analysis failed: {str(e)}")
+            semantic_results = {"entities": []}
+
+        # Merge results intelligently
+        try:
+            merged_results = merge_extraction_results(spacy_results, semantic_results, text)
+            logger.info(f"Merge completed with {len(merged_results.get('entities', []))} total entities")
+        except Exception as e:
+            logger.error(f"Merge failed: {str(e)}")
+            # Fallback: combine entities directly
+            merged_results = {
+                "entities": spacy_results.get("entities", []) + semantic_results.get("entities", []),
+                "personal_info": semantic_results.get("structured_data", {}).get("contact_info", {}),
+                "work_experience": spacy_results.get("work_experience", []),
+                "education": spacy_results.get("education", []),
+                "skills": spacy_results.get("skills", {}),
+                "achievements": spacy_results.get("achievements", []),
+                "resume_analytics": spacy_results.get("resume_analytics", {})
+            }
+
+        processing_time = time.time() - start_time
+
+        return {
+            "success": True,
+            "method": "hybrid_extraction",
+            "entities": merged_results.get("entities", []),
+            "personal_info": merged_results.get("personal_info", {}),
+            "work_experience": merged_results.get("work_experience", []),
+            "education": merged_results.get("education", []),
+            "skills": merged_results.get("skills", {}),
+            "achievements": merged_results.get("achievements", []),
+            "resume_analytics": merged_results.get("resume_analytics", {}),
+            "processing_stats": {
+                "processing_time_seconds": processing_time,
+                "spacy_entities": len(spacy_results.get("entities", [])),
+                "semantic_entities": len(semantic_results.get("entities", [])),
+                "merged_entities": len(merged_results.get("entities", [])),
+                "improvement": len(merged_results.get("entities", [])) - len(spacy_results.get("entities", []))
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error in hybrid parsing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Hybrid processing failed: {str(e)}")
+
+
+def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
+    """
+    Intelligently merge spaCy and semantic extraction results with error handling
+    """
+    try:
+        merged = {
+            "entities": [],
+            "personal_info": {},
+            "work_experience": [],
+            "education": [],
+            "skills": {},
+            "achievements": [],
+            "resume_analytics": {}
+        }
+
+        # Start with spaCy results as base (with safe copying)
+        if spacy_results:
+            merged["entities"] = spacy_results.get("entities", []).copy()
+            merged["personal_info"] = spacy_results.get("personal_info", {}).copy()
+            merged["work_experience"] = spacy_results.get("work_experience", []).copy()
+            merged["education"] = spacy_results.get("education", []).copy()
+            merged["skills"] = spacy_results.get("skills", {}).copy()
+            merged["achievements"] = spacy_results.get("achievements", []).copy()
+
+            # Handle resume_analytics safely
+            analytics = spacy_results.get("resume_analytics", {})
+            if analytics:
+                merged["resume_analytics"] = analytics.copy()
+
+        # Enhance with semantic results
+        semantic_entities = semantic_results.get("entities", [])
+        semantic_structured = semantic_results.get("structured_data", {})
+
+        # Merge entities (avoid duplicates)
+        existing_entities = set()
+        for e in merged["entities"]:
+            if isinstance(e, dict) and "text" in e and "label" in e:
+                existing_entities.add((e["text"].lower(), e["label"]))
+
+        for entity in semantic_entities:
+            if isinstance(entity, dict) and "text" in entity and "label" in entity:
+                entity_key = (entity["text"].lower(), entity["label"])
+                if entity_key not in existing_entities:
+                    # Add semantic entity
+                    entity_copy = entity.copy()
+                    entity_copy["source"] = "semantic_enhancement"
+                    merged["entities"].append(entity_copy)
+
+        # Enhance personal info with semantic findings
+        semantic_contact = semantic_structured.get("contact_info", {})
+        for field, value in semantic_contact.items():
+            if value and isinstance(value, str):
+                if field not in merged["personal_info"] or not merged["personal_info"].get(field):
+                    merged["personal_info"][field] = value
+
+        # Enhance skills with semantic findings
+        semantic_skills = semantic_structured.get("skills", [])
+        for skill in semantic_skills:
+            if isinstance(skill, dict) and "name" in skill:
+                category = skill.get("category", "Other")
+                if category not in merged["skills"]:
+                    merged["skills"][category] = []
+
+                # Check if skill already exists
+                existing_skill_names = []
+                for s in merged["skills"][category]:
+                    if isinstance(s, dict):
+                        existing_skill_names.append(s.get("name", "").lower())
+                    elif isinstance(s, str):
+                        existing_skill_names.append(s.lower())
+
+                if skill["name"].lower() not in existing_skill_names:
+                    merged["skills"][category].append(skill.copy())
+
+        # Enhance work experience safely
+        semantic_work = semantic_structured.get("work_experience", [])
+        for work in semantic_work:
+            if isinstance(work, dict) and work.get("company"):
+                # Check if already exists
+                company_name = work.get("company", "").lower()
+                existing_companies = [w.get("company", "").lower() for w in merged["work_experience"]
+                                      if isinstance(w, dict)]
+
+                if company_name not in existing_companies:
+                    merged["work_experience"].append(work.copy())
+
+        # Enhance achievements
+        semantic_achievements = semantic_structured.get("achievements", [])
+        for achievement in semantic_achievements:
+            if isinstance(achievement, str) and achievement not in merged["achievements"]:
+                merged["achievements"].append(achievement)
+
+        return merged
+
+    except Exception as e:
+        logger.error(f"Error in merge_extraction_results: {str(e)}")
+        # Return spaCy results as fallback
+        if spacy_results:
+            return spacy_results
+        else:
+            return {
+                "entities": semantic_results.get("entities", []),
+                "personal_info": semantic_results.get("structured_data", {}).get("contact_info", {}),
+                "work_experience": [],
+                "education": [],
+                "skills": {},
+                "achievements": [],
+                "resume_analytics": {}
+            }
 
 def _perform_basic_analysis(text: str) -> Dict:
     """Basic entity extraction only"""

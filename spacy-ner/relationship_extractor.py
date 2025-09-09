@@ -295,7 +295,7 @@ class IntelligentRelationshipExtractor:
     def _calculate_experience_metrics(self, work_experiences: List[WorkExperience]) -> Dict:
         """Calculate experience-related metrics"""
         if not work_experiences:
-            return {"total_years": 0, "companies": 0, "roles": 0}
+            return {"total_years": 0, "companies": 0, "roles": 0, "average_tenure": 0}
 
         total_years = 0
         companies = set()
@@ -316,11 +316,19 @@ class IntelligentRelationshipExtractor:
                 if start_year and end_year:
                     total_years += max(0, end_year - start_year)
 
+        # Safe average tenure calculation
+        average_tenure = 0
+        if work_experiences:
+            try:
+                average_tenure = round(total_years / len(work_experiences), 1)
+            except (ZeroDivisionError, TypeError):
+                average_tenure = 0
+
         return {
             "total_years": total_years,
             "companies": len(companies),
             "roles": len(roles),
-            "average_tenure": round(total_years / len(work_experiences), 1) if work_experiences else 0
+            "average_tenure": average_tenure
         }
 
     def _analyze_career_progression(self, work_experiences: List[WorkExperience]) -> Dict:
