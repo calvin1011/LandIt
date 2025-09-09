@@ -8,6 +8,7 @@ import time
 import json
 from pathlib import Path
 import io
+from fastapi.middleware.cors import CORSMiddleware
 
 # File processing imports
 try:
@@ -71,6 +72,19 @@ except Exception as e:
         logger.warning("⚠️ Using pretrained model only")
 
 app = FastAPI(title="LandIt Intelligent Resume Parser", version="3.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 # Initialize intelligence analyzer with error handling
 intelligence_analyzer = None
@@ -679,6 +693,17 @@ def parse_resume_hybrid(data: ResumeText):
     except Exception as e:
         logger.error(f"Error in hybrid parsing: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Hybrid processing failed: {str(e)}")
+
+@app.get("/test-response")
+def test_response():
+    """Test endpoint to verify response format"""
+    return {
+        "entities": [
+            {"text": "John Doe", "label": "NAME", "confidence": 0.9},
+            {"text": "Software Engineer", "label": "TITLE", "confidence": 0.8}
+        ],
+        "message": "Test successful"
+    }
 
 
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
