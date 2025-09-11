@@ -140,7 +140,8 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
             });
 
             if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
             }
 
             const data = await response.json();
@@ -154,14 +155,12 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 await storeResumeForMatching(data);
             }
 
-            // Format the response
-            const processedData = formatApiResponse(data);
-
-            // Simulate processing delay for better UX
+            // You no longer need to format the data and render it.
+            // Just transition to success state.
             setTimeout(() => {
-                setExtractedData(processedData);
+                setExtractedData([]); // Set extractedData to empty array or null
                 setUploadStatus('success');
-                onUploadSuccess(processedData);
+                onUploadSuccess(); // Call parent success callback
             }, 1500);
 
         } catch (error) {
@@ -173,6 +172,8 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
     const storeResumeForMatching = async (resumeData) => {
         try {
             setProgress(95);
+            // The API response from /parse-resume-file endpoint contains structured data that can be used directly for matching
+            const structuredData = resumeData.structured_data || resumeData;
 
             // Store resume in backend for job matching
             const storeResponse = await fetch('http://localhost:8000/store-resume', {
@@ -183,7 +184,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 body: JSON.stringify({
                     user_email: userEmail,
                     resume_data: resumeData,
-                    structured_data: resumeData
+                    structured_data: structuredData
                 })
             });
 
@@ -222,7 +223,8 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
             });
 
             if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
             }
 
             const data = await response.json();
@@ -233,12 +235,12 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 await storeResumeForMatching(data);
             }
 
-            const processedData = formatApiResponse(data);
-
+            // You no longer need to format the data and render it.
+            // Just transition to success state.
             setTimeout(() => {
-                setExtractedData(processedData);
+                setExtractedData([]); // Set extractedData to empty array or null
                 setUploadStatus('success');
-                onUploadSuccess(processedData);
+                onUploadSuccess(); // Call parent success callback
             }, 1000);
 
         } catch (error) {
@@ -263,57 +265,9 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
         }
     };
 
-    const formatApiResponse = (data) => {
-        console.log('Raw API response:', data);
-
-        // This is the updated logic to handle the backend's response format
-        let entities = [];
-
-        // Check for the new hybrid_optimal format with top-level entities
-        if (data.method === 'hybrid_optimal' && data.entities && Array.isArray(data.entities)) {
-            entities = data.entities;
-        }
-        // Fallback to the older hybrid format
-        else if (data.method === 'hybrid_extraction' && data.entities && Array.isArray(data.entities)) {
-            entities = data.entities;
-        }
-        // General case for when `entities` is a top-level key
-        else if (data.entities && Array.isArray(data.entities)) {
-            entities = data.entities;
-        } else {
-            console.error('No valid entities array found in response:', data);
-            return [];
-        }
-
-        // Convert to frontend format
-        const converted = entities.map(entity => ({
-            type: entity.label,
-            value: entity.text,
-            confidence: entity.confidence || 0.8,
-            section: entity.section,
-            source: entity.source || 'ai'
-        }));
-
-        // Add skills from the structured data if available
-        if (data.skills && typeof data.skills === 'object') {
-            for (const category in data.skills) {
-                data.skills[category].forEach(skill => {
-                    const skillName = typeof skill === 'object' && skill.name ? skill.name : skill;
-                    if (skillName) {
-                        converted.push({
-                            type: 'SKILL',
-                            value: skillName,
-                            confidence: 1.0,
-                            source: 'structured_data',
-                            section: 'Skills'
-                        });
-                    }
-                });
-            }
-        }
-
-        console.log('Converted data:', converted);
-        return converted;
+    // The formatApiResponse function is no longer needed since you don't want to render the parsed data
+    const formatApiResponse = () => {
+        return [];
     };
 
     const resetUpload = () => {
@@ -594,54 +548,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                         </div>
                     )}
 
-                    {/* Quick Preview */}
-                    {uploadStatus === 'success' && extractedData && (
-                        <div style={{
-                            marginTop: '20px',
-                            padding: '20px',
-                            backgroundColor: '#f0f9ff',
-                            borderRadius: '12px',
-                            border: '1px solid #bfdbfe'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <h4 style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>Extracted Information</h4>
-                                <Eye style={{ width: '16px', height: '16px', color: '#9ca3af' }} />
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                                <p style={{ margin: 0, marginBottom: '12px' }}>
-                                    Found {extractedData.length} data points including names, skills, experience, and more
-                                </p>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    {extractedData.slice(0, 3).map((item, index) => (
-                                        <span key={index} style={{
-                                            display: 'inline-block',
-                                            backgroundColor: '#dbeafe',
-                                            color: '#1e40af',
-                                            padding: '4px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: '500'
-                                        }}>
-                                            {item.type}: {item.value.length > 20 ? item.value.substring(0, 20) + '...' : item.value}
-                                        </span>
-                                    ))}
-                                    {extractedData.length > 3 && (
-                                        <span style={{
-                                            display: 'inline-block',
-                                            backgroundColor: '#f3f4f6',
-                                            color: '#4b5563',
-                                            padding: '4px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: '500'
-                                        }}>
-                                            +{extractedData.length - 3} more
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {/* Quick Preview - this section is now hidden */}
                 </div>
             )}
 

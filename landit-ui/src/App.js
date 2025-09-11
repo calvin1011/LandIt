@@ -116,13 +116,12 @@ function App() {
         setActiveTab('resume');
     };
 
-    const handleUploadSuccess = (newData) => {
-        setParsedData(newData);
+    // The core change to support the new workflow
+    const handleUploadSuccess = () => {
+        // We no longer set parsedData as per your request
         setShowUploader(false);
-        // Automatically switch to jobs tab if data was processed
-        if (newData && newData.length > 0) {
-            setTimeout(() => setActiveTab('jobs'), 2000);
-        }
+        // Automatically switch to jobs tab after a small delay
+        setTimeout(() => setActiveTab('jobs'), 2000);
     };
 
     const handleJobCreated = (jobData) => {
