@@ -27,6 +27,10 @@ except ImportError:
 
 from semantic_extractor import SemanticResumeExtractor
 
+from embedding_service import ResumeJobEmbeddingService
+from database import db
+from typing import List, Optional, Dict, Any
+
 # Import our intelligence modules with error handling
 try:
     from intelligent_section_detector import ContextAwareEntityExtractor, IntelligentSectionDetector
@@ -39,6 +43,13 @@ except ImportError as e:
     INTELLIGENT_MODULES_AVAILABLE = False
 
 semantic_extractor = SemanticResumeExtractor()
+
+try:
+    embedding_service = ResumeJobEmbeddingService()
+    logger.info("✅ Embedding service initialized for job matching")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize embedding service: {e}")
+    embedding_service = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -154,6 +165,39 @@ class IntelligentParseResponse(BaseModel):
     model_info: Dict[str, Any]
     suggestions: Optional[List[str]] = None
 
+class JobPostingRequest(BaseModel):
+    title: str
+    company: str
+    description: str
+    requirements: Optional[str] = ""
+    responsibilities: Optional[str] = ""
+    location: Optional[str] = ""
+    remote_allowed: bool = False
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    experience_level: Optional[str] = "mid"  # entry, mid, senior, executive
+    job_type: Optional[str] = "full-time"
+    industry: Optional[str] = ""
+    skills_required: List[str] = []
+    skills_preferred: List[str] = []
+    education_required: Optional[str] = ""
+
+class JobMatchRequest(BaseModel):
+    user_email: str
+    top_k: int = 10
+    min_similarity: float = 0.3
+
+class FeedbackRequest(BaseModel):
+    user_email: str
+    recommendation_id: int
+    overall_rating: Optional[int] = None  # 1-5
+    skills_relevance_rating: Optional[int] = None
+    experience_match_rating: Optional[int] = None
+    location_rating: Optional[int] = None
+    company_interest_rating: Optional[int] = None
+    feedback_type: str  # positive, negative, applied, saved, dismissed
+    feedback_text: Optional[str] = ""
+    action_taken: Optional[str] = ""
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
@@ -313,13 +357,395 @@ def _fallback_basic_extraction(text: str) -> Dict:
         }
 
 
+@app.post("/jobs/create")
+def create_job_posting(job_data: JobPostingRequest):
+    """
+    Create a new job posting with embeddings
+    """
+    if not embedding_service:
+        raise HTTPException(status_code=503, detail="Embedding service not available")
+
+    try:
+        start_time = time.time()
+
+        # Convert to dict for processing
+        job_dict = job_data.dict()
+
+        # Generate embeddings for the job
+        logger.info(f"Generating embeddings for job: {job_data.title}")
+
+        description_embedding = embedding_service.generate_job_embedding(job_dict)
+        title_embedding = embedding_service.model.encode(job_data.title)
+        requirements_embedding = embedding_service.model.encode(job_data.requirements or "")
+
+        # Store in database
+        job_id = db.store_job_posting(
+            job_dict,
+            {
+                'description': description_embedding,
+                'title': title_embedding,
+                'requirements': requirements_embedding
+            }
+        )
+
+        processing_time = time.time() - start_time
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "title": job_data.title,
+            "company": job_data.company,
+            "processing_time": processing_time,
+            "message": "Job posting created successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to create job posting: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create job posting: {str(e)}")
+
+
+@app.post("/jobs/find-matches")
+def find_job_matches(match_request: JobMatchRequest):
+    """
+    Find job matches for a user's resume
+    """
+    if not embedding_service:
+        raise HTTPException(status_code=503, detail="Embedding service not available")
+
+    try:
+        start_time = time.time()
+
+        # Get user's resume
+        user_resume = db.get_user_resume(match_request.user_email)
+        if not user_resume:
+            raise HTTPException(status_code=404, detail="User resume not found. Please upload a resume first.")
+
+        # Get all active jobs
+        all_jobs = db.get_all_jobs_with_embeddings()
+        if not all_jobs:
+            return {
+                "matches": [],
+                "total_found": 0,
+                "message": "No active job postings available"
+            }
+
+        logger.info(f"Finding matches among {len(all_jobs)} jobs for {match_request.user_email}")
+
+        # Get user's resume embedding
+        resume_embedding = user_resume['full_resume_embedding']
+        skills_embedding = user_resume['skills_embedding']
+
+        # Calculate matches
+        matches = []
+        for job in all_jobs:
+            # Calculate similarity scores
+            semantic_similarity = embedding_service.calculate_similarity(
+                resume_embedding,
+                job['description_embedding']
+            )
+
+            skills_similarity = embedding_service.calculate_similarity(
+                skills_embedding,
+                job['description_embedding']
+            )
+
+            # Calculate experience match (simplified)
+            user_years = user_resume.get('years_of_experience', 0)
+            job_level = job.get('experience_level', 'mid')
+            experience_match = calculate_experience_match(user_years, job_level)
+
+            # Calculate location match
+            location_match = calculate_location_match(
+                user_resume.get('preferred_locations', []),
+                job.get('location', ''),
+                job.get('remote_allowed', False)
+            )
+
+            # Calculate overall score with improved weighting
+            overall_score = (
+                    semantic_similarity * 0.25 +
+                    skills_similarity * 0.45 +  # Increased skills weight
+                    experience_match * 0.20 +
+                    location_match * 0.10
+            )
+
+            # Only include jobs above minimum similarity
+            if overall_score >= match_request.min_similarity:
+                # Extract matching skills
+                user_skills = extract_user_skills(user_resume)
+                job_skills = job.get('skills_required', [])
+                skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
+                skill_gaps = list(set([s.lower() for s in job_skills]) - set(user_skills))
+
+                matches.append({
+                    'job_id': job['id'],
+                    'title': job['title'],
+                    'company': job['company'],
+                    'location': job.get('location'),
+                    'remote_allowed': job.get('remote_allowed', False),
+                    'salary_min': job.get('salary_min'),
+                    'salary_max': job.get('salary_max'),
+                    'experience_level': job.get('experience_level'),
+                    'skills_required': job.get('skills_required', []),
+                    'overall_score': round(overall_score, 3),
+                    'semantic_similarity': round(semantic_similarity, 3),
+                    'skills_similarity': round(skills_similarity, 3),
+                    'experience_match': round(experience_match, 3),
+                    'location_match': round(location_match, 3),
+                    'skill_matches': skill_matches,
+                    'skill_gaps': skill_gaps[:5],  # Top 5 missing skills
+                    'match_explanation': generate_match_explanation(
+                        overall_score, skill_matches, skill_gaps, experience_match
+                    )
+                })
+
+        # Sort by overall score
+        matches.sort(key=lambda x: x['overall_score'], reverse=True)
+
+        # Limit results
+        matches = matches[:match_request.top_k]
+
+        # Store recommendations in database for feedback tracking
+        recommendation_ids = []
+        for match in matches:
+            scores = {
+                'semantic_similarity': match['semantic_similarity'],
+                'skills_match': match['skills_similarity'],
+                'experience_match': match['experience_match'],
+                'location_match': match['location_match'],
+                'overall_score': match['overall_score']
+            }
+
+            match_reasons = {
+                'skill_matches': match['skill_matches'],
+                'skill_gaps': match['skill_gaps'],
+                'explanation': match['match_explanation']
+            }
+
+            rec_id = db.store_recommendation(
+                match_request.user_email,
+                match['job_id'],
+                scores,
+                match_reasons
+            )
+            recommendation_ids.append(rec_id)
+            match['recommendation_id'] = rec_id
+
+        processing_time = time.time() - start_time
+
+        return {
+            "matches": matches,
+            "total_found": len(matches),
+            "total_jobs_analyzed": len(all_jobs),
+            "user_email": match_request.user_email,
+            "processing_time": processing_time,
+            "recommendation_ids": recommendation_ids
+        }
+
+    except Exception as e:
+        logger.error(f"Job matching failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Job matching failed: {str(e)}")
+
+
+@app.get("/jobs/recommendations/{user_email}")
+def get_user_recommendations(user_email: str, limit: int = 10):
+    """
+    Get stored recommendations for a user
+    """
+    try:
+        recommendations = db.get_user_recommendations(user_email, limit)
+
+        # Format recommendations for frontend
+        formatted_recommendations = []
+        for rec in recommendations:
+            formatted_recommendations.append({
+                'recommendation_id': rec['id'],
+                'job_id': rec['job_id'],
+                'title': rec['title'],
+                'company': rec['company'],
+                'location': rec['location'],
+                'salary_range': format_salary_range(rec.get('salary_min'), rec.get('salary_max')),
+                'experience_level': rec.get('experience_level'),
+                'overall_score': rec['overall_score'],
+                'skills_match_score': rec['skills_match_score'],
+                'created_at': rec['created_at'].isoformat() if rec['created_at'] else None,
+                'is_viewed': rec.get('is_viewed', False),
+                'is_saved': rec.get('is_saved', False),
+                'skill_matches': rec.get('skill_matches', []),
+                'skill_gaps': rec.get('skill_gaps', [])
+            })
+
+        return {
+            "recommendations": formatted_recommendations,
+            "total": len(formatted_recommendations),
+            "user_email": user_email
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get recommendations: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get recommendations: {str(e)}")
+
+
+@app.post("/jobs/feedback")
+def submit_job_feedback(feedback: FeedbackRequest):
+    """
+    Submit feedback on a job recommendation
+    """
+    try:
+        # Store feedback in database
+        feedback_id = db.store_feedback(
+            feedback.user_email,
+            feedback.recommendation_id,
+            feedback.dict()
+        )
+
+        return {
+            "success": True,
+            "feedback_id": feedback_id,
+            "message": "Feedback submitted successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to submit feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
+
+
+@app.get("/jobs/analytics")
+def get_job_analytics(days: int = 30):
+    """
+    Get job matching analytics for the last N days
+    """
+    try:
+        analytics = db.get_feedback_analytics(days)
+
+        return {
+            "analytics": analytics,
+            "period_days": days,
+            "generated_at": time.time()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get analytics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+
+def calculate_experience_match(user_years: int, job_level: str) -> float:
+    """Calculate experience level match score"""
+    level_requirements = {
+        'entry': (0, 2),
+        'mid': (2, 5),
+        'senior': (5, 10),
+        'executive': (10, 20)
+    }
+
+    if job_level not in level_requirements:
+        return 0.8  # Default moderate match
+
+    min_years, max_years = level_requirements[job_level]
+
+    if min_years <= user_years <= max_years:
+        return 1.0  # Perfect match
+    elif user_years < min_years:
+        # Under-qualified
+        gap = min_years - user_years
+        return max(0.3, 1.0 - (gap * 0.2))
+    else:
+        # Over-qualified
+        excess = user_years - max_years
+        return max(0.5, 1.0 - (excess * 0.1))
+
+
+def calculate_location_match(user_locations: List[str], job_location: str, remote_allowed: bool) -> float:
+    """Calculate location preference match"""
+    if remote_allowed:
+        return 1.0  # Perfect match for remote work
+
+    if not user_locations or not job_location:
+        return 0.6  # Neutral if no location data
+
+    # Simple location matching (you can enhance this)
+    job_location_lower = job_location.lower()
+    for user_loc in user_locations:
+        if user_loc.lower() in job_location_lower or job_location_lower in user_loc.lower():
+            return 1.0
+
+    return 0.3  # Low match for different locations
+
+
+def extract_user_skills(user_resume: Dict) -> List[str]:
+    """Extract skills list from user resume"""
+    skills = []
+
+    # From top_skills
+    if 'top_skills' in user_resume:
+        skills.extend([skill.lower() for skill in user_resume['top_skills']])
+
+    # From structured data
+    structured_data = user_resume.get('structured_data')
+    if structured_data and isinstance(structured_data, str):
+        try:
+            structured_data = json.loads(structured_data)
+        except:
+            structured_data = {}
+
+    if isinstance(structured_data, dict):
+        skills_data = structured_data.get('skills', {})
+        for category, skill_list in skills_data.items():
+            for skill in skill_list:
+                if isinstance(skill, dict):
+                    skills.append(skill.get('name', '').lower())
+                else:
+                    skills.append(str(skill).lower())
+
+    return list(set(skills))  # Remove duplicates
+
+
+def generate_match_explanation(overall_score: float, skill_matches: List[str], skill_gaps: List[str],
+                               experience_match: float) -> str:
+    """Generate human-readable match explanation"""
+    if overall_score >= 0.8:
+        quality = "Excellent"
+    elif overall_score >= 0.6:
+        quality = "Good"
+    elif overall_score >= 0.4:
+        quality = "Fair"
+    else:
+        quality = "Poor"
+
+    explanation = f"{quality} match based on your profile. "
+
+    if skill_matches:
+        explanation += f"Your skills in {', '.join(skill_matches[:3])} align well. "
+
+    if skill_gaps:
+        explanation += f"Consider developing skills in {', '.join(skill_gaps[:2])} to strengthen your application. "
+
+    if experience_match >= 0.8:
+        explanation += "Your experience level is well-suited for this role."
+    elif experience_match < 0.5:
+        explanation += "This role may require different experience level than your background."
+
+    return explanation
+
+
+def format_salary_range(salary_min: Optional[int], salary_max: Optional[int]) -> str:
+    """Format salary range for display"""
+    if salary_min and salary_max:
+        return f"${salary_min:,} - ${salary_max:,}"
+    elif salary_min:
+        return f"${salary_min:,}+"
+    elif salary_max:
+        return f"Up to ${salary_max:,}"
+    else:
+        return "Salary not specified"
+
 @app.get("/")
 def root():
     return {
-        "message": "LandIt Intelligent Resume Parser is running!",
-        "version": "3.0.0",
+        "message": "LandIt Intelligent Resume Parser with Job Matching",
+        "version": "3.1.0",  # Updated version
         "model_type": training_info.get("model_type", "unknown"),
         "intelligent_modules": INTELLIGENT_MODULES_AVAILABLE,
+        "job_matching_enabled": embedding_service is not None,
         "file_processing": {
             "pdf_support": PDF_AVAILABLE,
             "docx_support": DOCX_AVAILABLE,
@@ -329,7 +755,13 @@ def root():
             "/parse-resume": "Text-based parsing",
             "/parse-resume-file": "File upload parsing",
             "/parse-resume-semantic": "Semantic pattern matching",
-            "/parse-resume-hybrid": "Combined spaCy + semantic"
+            "/parse-resume-hybrid": "Combined spaCy + semantic",
+            "/parse-resume-file-with-matching": "Parse resume and find job matches",
+            "/jobs/create": "Create job posting",
+            "/jobs/find-matches": "Find job matches for user",
+            "/jobs/recommendations/{email}": "Get user recommendations",
+            "/jobs/feedback": "Submit feedback on recommendations",
+            "/jobs/analytics": "Get matching analytics"
         },
         "intelligence_features": [
             "Section-aware entity extraction",
@@ -339,7 +771,10 @@ def root():
             "Achievement extraction",
             "ATS compatibility scoring",
             "Resume quality assessment",
-            "Improvement suggestions"
+            "Improvement suggestions",
+            "Vector-based job matching",
+            "Skills gap analysis",
+            "Experience level matching"
         ] if INTELLIGENT_MODULES_AVAILABLE else [
             "Basic entity extraction",
             "Semantic pattern matching"
@@ -348,9 +783,17 @@ def root():
             "basic": "Entity extraction only",
             "standard": "Entities + structured data",
             "full": "Complete intelligence analysis" if INTELLIGENT_MODULES_AVAILABLE else "Semantic analysis"
-        }
+        },
+        "job_matching_features": [
+            "Resume parsing and analysis",
+            "Vector-based job matching",
+            "Skills gap analysis",
+            "Experience level matching",
+            "Location preference matching",
+            "Feedback collection and learning",
+            "Real-time recommendations"
+        ] if embedding_service else []
     }
-
 
 @app.get("/health")
 def health_check():
