@@ -9,6 +9,11 @@ import json
 from pathlib import Path
 import io
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional, Dict, Any
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # File processing imports
 try:
@@ -27,9 +32,14 @@ except ImportError:
 
 from semantic_extractor import SemanticResumeExtractor
 
-from embedding_service import ResumeJobEmbeddingService
-from database import db
-from typing import List, Optional, Dict, Any
+try:
+    from embedding_service import ResumeJobEmbeddingService
+    from database import db
+    embedding_service = ResumeJobEmbeddingService()
+    logger.info("✅ Embedding service initialized for job matching")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize embedding service: {e}")
+    embedding_service = None
 
 # Import our intelligence modules with error handling
 try:
@@ -43,17 +53,6 @@ except ImportError as e:
     INTELLIGENT_MODULES_AVAILABLE = False
 
 semantic_extractor = SemanticResumeExtractor()
-
-try:
-    embedding_service = ResumeJobEmbeddingService()
-    logger.info("✅ Embedding service initialized for job matching")
-except Exception as e:
-    logger.error(f"❌ Failed to initialize embedding service: {e}")
-    embedding_service = None
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Load hybrid trained spaCy model
 try:

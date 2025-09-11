@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import axios from 'axios';
 
 // Simple SVG Icon Components
 const Upload = ({ style }) => (
@@ -39,13 +38,21 @@ const Eye = ({ style }) => (
     </svg>
 );
 
-const ResumeUploader = ({ onUploadSuccess }) => {
+const Search = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+);
+
+const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
     const [dragActive, setDragActive] = useState(false);
     const [file, setFile] = useState(null);
     const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, processing, success, error
     const [progress, setProgress] = useState(0);
     const [errorMessage, setErrorMessage] = useState('');
     const [extractedData, setExtractedData] = useState(null);
+    const [resumeStored, setResumeStored] = useState(false);
+    const [autoFindJobs, setAutoFindJobs] = useState(true);
 
     const handleDrag = useCallback((e) => {
         e.preventDefault();
@@ -127,19 +134,28 @@ const ResumeUploader = ({ onUploadSuccess }) => {
             }, 200);
 
             // Call the optimized file upload endpoint
-            const response = await axios.post('http://localhost:8000/parse-resume-file', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                },
-                timeout: 30000
+            const response = await fetch('http://localhost:8000/parse-resume-file', {
+                method: 'POST',
+                body: formData
             });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const data = await response.json();
 
             clearInterval(progressInterval);
             setProgress(100);
             setUploadStatus('processing');
 
+            // Store resume for job matching if the option is enabled
+            if (userEmail && autoFindJobs) {
+                await storeResumeForMatching(data);
+            }
+
             // Format the response
-            const processedData = formatApiResponse(response.data);
+            const processedData = formatApiResponse(data);
 
             // Simulate processing delay for better UX
             setTimeout(() => {
@@ -151,6 +167,32 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         } catch (error) {
             setUploadStatus('error');
             handleUploadError(error);
+        }
+    };
+
+    const storeResumeForMatching = async (resumeData) => {
+        try {
+            setProgress(95);
+
+            // Store resume in backend for job matching
+            const storeResponse = await fetch('http://localhost:8000/store-resume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    resume_data: resumeData,
+                    structured_data: resumeData
+                })
+            });
+
+            if (storeResponse.ok) {
+                setResumeStored(true);
+            }
+        } catch (error) {
+            console.warn('Failed to store resume for job matching:', error);
+            // Don't fail the entire process if job matching storage fails
         }
     };
 
@@ -168,18 +210,30 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         setProgress(50);
 
         try {
-            // Always use hybrid processing for best results
-            const response = await axios.post('http://localhost:8000/parse-resume-hybrid', {
-                text: text,
-                analysis_level: "full",
-                include_suggestions: true
-            }, {
+            // Use hybrid processing for best results
+            const response = await fetch('http://localhost:8000/parse-resume', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 30000
+                body: JSON.stringify({
+                    text: text,
+                    analysis_level: "full",
+                    include_suggestions: true
+                })
             });
 
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const data = await response.json();
             setProgress(100);
-            const processedData = formatApiResponse(response.data);
+
+            // Store resume for job matching
+            if (userEmail && autoFindJobs) {
+                await storeResumeForMatching(data);
+            }
+
+            const processedData = formatApiResponse(data);
 
             setTimeout(() => {
                 setExtractedData(processedData);
@@ -196,13 +250,13 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     const handleUploadError = (error) => {
         console.error('Upload error:', error);
 
-        if (error.code === 'ECONNREFUSED') {
+        if (error.message.includes('ECONNREFUSED')) {
             setErrorMessage('Cannot connect to processing server. Please ensure the server is running.');
-        } else if (error.response?.status === 400) {
-            setErrorMessage(error.response.data?.detail || 'Invalid file format or content');
-        } else if (error.response?.status === 500) {
+        } else if (error.message.includes('400')) {
+            setErrorMessage('Invalid file format or content');
+        } else if (error.message.includes('500')) {
             setErrorMessage('Server processing error. Please try again or contact support.');
-        } else if (error.code === 'ECONNABORTED') {
+        } else if (error.message.includes('timeout')) {
             setErrorMessage('Request timed out. File might be too large or complex.');
         } else {
             setErrorMessage('Failed to process resume. Please try again.');
@@ -212,15 +266,22 @@ const ResumeUploader = ({ onUploadSuccess }) => {
     const formatApiResponse = (data) => {
         console.log('Raw API response:', data);
 
+        // This is the updated logic to handle the backend's response format
         let entities = [];
 
-        // Handle different response formats
-        if (data.entities && Array.isArray(data.entities)) {
+        // Check for the new hybrid_optimal format with top-level entities
+        if (data.method === 'hybrid_optimal' && data.entities && Array.isArray(data.entities)) {
             entities = data.entities;
-        } else if (data.method === 'hybrid_extraction' && data.entities) {
+        }
+        // Fallback to the older hybrid format
+        else if (data.method === 'hybrid_extraction' && data.entities && Array.isArray(data.entities)) {
+            entities = data.entities;
+        }
+        // General case for when `entities` is a top-level key
+        else if (data.entities && Array.isArray(data.entities)) {
             entities = data.entities;
         } else {
-            console.error('No entities found in response:', data);
+            console.error('No valid entities array found in response:', data);
             return [];
         }
 
@@ -233,6 +294,24 @@ const ResumeUploader = ({ onUploadSuccess }) => {
             source: entity.source || 'ai'
         }));
 
+        // Add skills from the structured data if available
+        if (data.skills && typeof data.skills === 'object') {
+            for (const category in data.skills) {
+                data.skills[category].forEach(skill => {
+                    const skillName = typeof skill === 'object' && skill.name ? skill.name : skill;
+                    if (skillName) {
+                        converted.push({
+                            type: 'SKILL',
+                            value: skillName,
+                            confidence: 1.0,
+                            source: 'structured_data',
+                            section: 'Skills'
+                        });
+                    }
+                });
+            }
+        }
+
         console.log('Converted data:', converted);
         return converted;
     };
@@ -243,6 +322,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         setProgress(0);
         setErrorMessage('');
         setExtractedData(null);
+        setResumeStored(false);
     };
 
     const getFileIcon = () => {
@@ -329,7 +409,41 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                     Upload your resume and let our AI extract and organize your information automatically.
                 </p>
             </div>
-
+             {/* Job Matching Option */}
+            {userEmail && uploadStatus === 'idle' && (
+                <div style={{
+                    background: '#f0f9ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    marginBottom: '20px'
+                }}>
+                    <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#1e40af',
+                        cursor: 'pointer'
+                    }}>
+                        <input
+                            type="checkbox"
+                            checked={autoFindJobs}
+                            onChange={(e) => setAutoFindJobs(e.target.checked)}
+                            style={{ accentColor: '#6366f1' }}
+                        />
+                        Automatically find job matches after uploading
+                    </label>
+                    <p style={{
+                        margin: '8px 0 0 24px',
+                        fontSize: '12px',
+                        color: '#6b7280'
+                    }}>
+                        We'll analyze your resume and show personalized job recommendations
+                    </p>
+                </div>
+            )}
             {/* Upload Area */}
             {uploadStatus === 'idle' && (
                 <div
@@ -402,6 +516,7 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                                 <p style={{ fontWeight: '600', color: '#1f2937', margin: 0, fontSize: '16px' }}>{file.name}</p>
                                 <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, marginTop: '4px' }}>
                                     {formatFileSize(file.size)} • AI Processing
+                                    {autoFindJobs && ' + Job Matching'}
                                 </p>
                             </div>
                         </div>
@@ -427,7 +542,8 @@ const ResumeUploader = ({ onUploadSuccess }) => {
                         <div style={{ marginBottom: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
                                 <span>
-                                    {uploadStatus === 'uploading' ? 'Uploading...' : 'Processing with AI...'}
+                                    {uploadStatus === 'uploading' ? 'Uploading...' :
+                                     progress >= 95 && autoFindJobs ? 'Storing for job matching...' : 'Processing with AI...'}
                                 </span>
                                 <span>{uploadStatus === 'uploading' ? `${progress}%` : ''}</span>
                             </div>
@@ -453,11 +569,21 @@ const ResumeUploader = ({ onUploadSuccess }) => {
 
                     {/* Status Messages */}
                     {uploadStatus === 'success' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '20px' }}>
-                            <CheckCircle style={{ width: '20px', height: '20px' }} />
-                            <span style={{ fontWeight: '500', fontSize: '16px' }}>
-                                Resume processed successfully!
-                            </span>
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '8px' }}>
+                                <CheckCircle style={{ width: '20px', height: '20px' }} />
+                                <span style={{ fontWeight: '500', fontSize: '16px' }}>
+                                    Resume processed successfully!
+                                </span>
+                            </div>
+                            {resumeStored && autoFindJobs && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6366f1' }}>
+                                    <Search style={{ width: '16px', height: '16px' }} />
+                                    <span style={{ fontSize: '14px' }}>
+                                        Ready for job matching - check recommendations below
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
 

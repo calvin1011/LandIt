@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import ResumeUploader from './components/ResumeUploader';
+import JobRecommendations from './components/JobRecommendations';
+import JobCreationForm from './components/JobCreationForm';
 import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
 import Profile from './components/Profile';
@@ -22,6 +24,8 @@ function App() {
     const [loading, setLoading] = useState(true);
     const [firebaseUser, setFirebaseUser] = useState(null);
     const [showUploader, setShowUploader] = useState(false);
+    const [activeTab, setActiveTab] = useState('resume'); // 'resume', 'jobs', 'create-job'
+    const [showJobCreation, setShowJobCreation] = useState(false);
 
     useEffect(() => {
         console.log('🔥 Setting up Firebase auth listener...');
@@ -54,6 +58,7 @@ function App() {
                 setUserInfo(initialUserInfo);
                 setParsedData([]);
                 setShowUploader(false);
+                setActiveTab('resume');
                 localStorage.removeItem('currentUser');
             }
 
@@ -70,6 +75,7 @@ function App() {
         console.log('✅ Login successful for:', email);
         setParsedData([]);
         setShowUploader(false);
+        setActiveTab('resume');
     };
 
     const handleLogout = async () => {
@@ -79,6 +85,7 @@ function App() {
             await auth.signOut();
             setParsedData([]);
             setShowUploader(false);
+            setActiveTab('resume');
         } catch (error) {
             console.error('Logout error:', error);
         }
@@ -93,6 +100,7 @@ function App() {
 
         setParsedData([]);
         setShowUploader(false);
+        setActiveTab('resume');
 
         const newUserProfile = localStorage.getItem(`userInfo_${newEmail}`);
         if (newUserProfile) {
@@ -105,11 +113,22 @@ function App() {
     const handleUploadNew = () => {
         setShowUploader(true);
         setParsedData([]);
+        setActiveTab('resume');
     };
 
     const handleUploadSuccess = (newData) => {
         setParsedData(newData);
         setShowUploader(false);
+        // Automatically switch to jobs tab if data was processed
+        if (newData && newData.length > 0) {
+            setTimeout(() => setActiveTab('jobs'), 2000);
+        }
+    };
+
+    const handleJobCreated = (jobData) => {
+        setShowJobCreation(false);
+        // Could show a success message or refresh job list
+        console.log('Job created:', jobData);
     };
 
     useEffect(() => {
@@ -197,12 +216,68 @@ function App() {
                                     WebkitTextFillColor: 'transparent',
                                     backgroundClip: 'text'
                                 }}>LandIt</h1>
-                                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Smart Document Parser</p>
+                                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Smart Document Parser & Job Matcher</p>
                             </div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            {parsedData.length > 0 && !showUploader && (
+                            {/* Navigation Tabs */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    onClick={() => setActiveTab('resume')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: activeTab === 'resume' ? '#6366f1' : 'transparent',
+                                        color: activeTab === 'resume' ? 'white' : '#6b7280',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    📄 Resume
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('jobs')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: activeTab === 'jobs' ? '#6366f1' : 'transparent',
+                                        color: activeTab === 'jobs' ? 'white' : '#6b7280',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    🎯 Jobs
+                                </button>
+
+                                <button
+                                    onClick={() => setShowJobCreation(true)}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.target.style.background = '#059669'}
+                                    onMouseOut={(e) => e.target.style.background = '#10b981'}
+                                >
+                                    ➕ Post Job
+                                </button>
+                            </div>
+
+                            {parsedData.length > 0 && !showUploader && activeTab === 'resume' && (
                                 <button
                                     onClick={handleUploadNew}
                                     style={{
@@ -225,6 +300,7 @@ function App() {
                                     📤 Upload New Resume
                                 </button>
                             )}
+
                             <span style={{ fontSize: '14px', color: '#6b7280' }}>
                                 👋 {userEmail}
                             </span>
@@ -253,11 +329,52 @@ function App() {
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
 
-                        {/* Resume Upload/Results Section */}
-                        {parsedData.length === 0 || showUploader ? (
-                            <ResumeUploader onUploadSuccess={handleUploadSuccess} />
-                        ) : (
-                            <OutputViewer data={parsedData} />
+                        {/* Job Creation Modal */}
+                        {showJobCreation && (
+                            <div style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'rgba(0, 0, 0, 0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 1000,
+                                padding: '20px'
+                            }}>
+                                <div style={{
+                                    maxWidth: '800px',
+                                    width: '100%',
+                                    maxHeight: '90vh',
+                                    overflow: 'auto'
+                                }}>
+                                    <JobCreationForm
+                                        onJobCreated={handleJobCreated}
+                                        onCancel={() => setShowJobCreation(false)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Main Content Area */}
+                        {activeTab === 'resume' && (
+                            <>
+                                {/* Resume Upload/Results Section */}
+                                {parsedData.length === 0 || showUploader ? (
+                                    <ResumeUploader
+                                        onUploadSuccess={handleUploadSuccess}
+                                        userEmail={userEmail}
+                                    />
+                                ) : (
+                                    <OutputViewer data={parsedData} />
+                                )}
+                            </>
+                        )}
+
+                        {activeTab === 'jobs' && (
+                            <JobRecommendations userEmail={userEmail} />
                         )}
                     </div>
                 </div>
