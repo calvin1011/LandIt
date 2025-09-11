@@ -1,0 +1,675 @@
+import psycopg2
+from psycopg2.extras import RealDictCursor, execute_values
+import numpy as np
+import os
+from typing import Optional, List, Dict, Tuple
+import logging
+from dotenv import load_dotenv
+import json
+
+# Load environment variables
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseConnection:
+    """
+    Database connection class with vector support for job matching system
+    """
+
+    def __init__(self):
+        self.connection = None
+        self.connect()
+
+    def connect(self):
+        """Establish database connection"""
+        try:
+            # Database configuration from environment variables
+            db_config = {
+                'host': os.getenv('DB_HOST', 'localhost'),
+                'port': int(os.getenv('DB_PORT', 5433)),  # Note: using 5433
+                'database': os.getenv('DB_NAME', 'landit_db'),
+                'user': os.getenv('DB_USER', 'landit_user'),
+                'password': os.getenv('DB_PASSWORD', 'landit_secure_2024')
+            }
+
+            self.connection = psycopg2.connect(**db_config)
+            self.connection.autocommit = True
+
+            # Test vector extension
+            cursor = self.get_cursor()
+            cursor.execute("SELECT * FROM pg_extension WHERE extname = 'vector';")
+            if cursor.fetchone():
+                logger.info("✅ Database connection established with vector support")
+            else:
+                logger.warning("⚠️ Database connected but vector extension not found")
+
+            cursor.close()
+
+        except Exception as e:
+            logger.error(f"❌ Database connection failed: {e}")
+            raise
+
+    def get_cursor(self):
+        """Get database cursor with dictionary results"""
+        if not self.connection or self.connection.closed:
+            self.connect()
+        return self.connection.cursor(cursor_factory=RealDictCursor)
+
+    def close(self):
+        """Close database connection"""
+        if self.connection:
+            self.connection.close()
+            logger.info("Database connection closed")
+
+    # Vector utility methods
+
+    def vector_to_db(self, vector: np.ndarray) -> str:
+        """Convert numpy array to PostgreSQL vector format"""
+        return '[' + ','.join(map(str, vector.tolist())) + ']'
+
+    def db_to_vector(self, db_vector: str) -> np.ndarray:
+        """Convert PostgreSQL vector format to numpy array"""
+        if not db_vector:
+            return np.array([])
+
+        # Remove brackets and convert to numpy array
+        vector_str = db_vector.strip('[]')
+        return np.array([float(x) for x in vector_str.split(',')])
+
+    # Resume operations
+
+    def store_user_resume(self, user_email: str, resume_data: Dict,
+                          embeddings: Dict[str, np.ndarray]) -> int:
+        """
+        Store user resume with embeddings
+
+        Args:
+            user_email: User's email
+            resume_data: Structured resume data from your parser
+            embeddings: Dict with keys: 'full_resume', 'skills', 'experience'
+
+        Returns:
+            Resume ID
+        """
+        try:
+            cursor = self.get_cursor()
+
+            # Prepare data
+            resume_text = resume_data.get('resume_text', '')
+            extracted_entities = json.dumps(resume_data.get('extracted_entities', []))
+            structured_data = json.dumps(resume_data.get('structured_data', {}))
+            resume_analytics = json.dumps(resume_data.get('resume_analytics', {}))
+
+            # Extract metadata
+            work_exp = resume_data.get('structured_data', {}).get('work_experience', [])
+            years_of_experience = len(work_exp)  # Simple calculation
+
+            current_job_title = ''
+            if work_exp:
+                current_job_title = work_exp[0].get('title', '')
+
+            # Extract top skills
+            skills_data = resume_data.get('structured_data', {}).get('skills', {})
+            top_skills = []
+            for category, skills_list in skills_data.items():
+                for skill in skills_list[:3]:  # Top 3 per category
+                    if isinstance(skill, dict):
+                        top_skills.append(skill.get('name', ''))
+                    else:
+                        top_skills.append(str(skill))
+
+            # Convert embeddings to database format
+            full_resume_embedding = self.vector_to_db(embeddings.get('full_resume', np.array([])))
+            skills_embedding = self.vector_to_db(embeddings.get('skills', np.array([])))
+            experience_embedding = self.vector_to_db(embeddings.get('experience', np.array([])))
+
+            # Insert or update resume
+            query = """
+                    INSERT INTO user_resumes (user_email, resume_text, extracted_entities, structured_data, \
+                                              resume_analytics, full_resume_embedding, skills_embedding, \
+                                              experience_embedding, years_of_experience, current_job_title, \
+                                              top_skills, updated_at) \
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()) ON CONFLICT (user_email) 
+            DO \
+                    UPDATE SET
+                        resume_text = EXCLUDED.resume_text, \
+                        extracted_entities = EXCLUDED.extracted_entities, \
+                        structured_data = EXCLUDED.structured_data, \
+                        resume_analytics = EXCLUDED.resume_analytics, \
+                        full_resume_embedding = EXCLUDED.full_resume_embedding, \
+                        skills_embedding = EXCLUDED.skills_embedding, \
+                        experience_embedding = EXCLUDED.experience_embedding, \
+                        years_of_experience = EXCLUDED.years_of_experience, \
+                        current_job_title = EXCLUDED.current_job_title, \
+                        top_skills = EXCLUDED.top_skills, \
+                        updated_at = NOW() \
+                        RETURNING id; \
+                    """
+
+            cursor.execute(query, (
+                user_email, resume_text, extracted_entities, structured_data,
+                resume_analytics, full_resume_embedding, skills_embedding,
+                experience_embedding, years_of_experience, current_job_title,
+                top_skills
+            ))
+
+            resume_id = cursor.fetchone()['id']
+            cursor.close()
+
+            logger.info(f"✅ Stored resume for {user_email} (ID: {resume_id})")
+            return resume_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to store resume: {e}")
+            raise
+
+    def get_user_resume(self, user_email: str) -> Optional[Dict]:
+        """Get user resume with embeddings"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    SELECT * \
+                    FROM user_resumes \
+                    WHERE user_email = %s; \
+                    """
+
+            cursor.execute(query, (user_email,))
+            result = cursor.fetchone()
+            cursor.close()
+
+            if not result:
+                return None
+
+            # Convert embeddings back to numpy arrays
+            resume_data = dict(result)
+            resume_data['full_resume_embedding'] = self.db_to_vector(result['full_resume_embedding'])
+            resume_data['skills_embedding'] = self.db_to_vector(result['skills_embedding'])
+            resume_data['experience_embedding'] = self.db_to_vector(result['experience_embedding'])
+
+            return resume_data
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get resume: {e}")
+            return None
+
+    # Job operations
+
+    def store_job_posting(self, job_data: Dict, embeddings: Dict[str, np.ndarray]) -> int:
+        """
+        Store job posting with embeddings
+
+        Args:
+            job_data: Job posting data
+            embeddings: Dict with keys: 'description', 'requirements', 'title'
+
+        Returns:
+            Job ID
+        """
+        try:
+            cursor = self.get_cursor()
+
+            # Convert embeddings
+            description_embedding = self.vector_to_db(embeddings.get('description', np.array([])))
+            requirements_embedding = self.vector_to_db(embeddings.get('requirements', np.array([])))
+            title_embedding = self.vector_to_db(embeddings.get('title', np.array([])))
+
+            query = """
+                    INSERT INTO jobs (title, company, description, requirements, responsibilities, \
+                                      location, remote_allowed, salary_min, salary_max, currency, \
+                                      experience_level, job_type, industry, company_size, \
+                                      benefits, skills_required, skills_preferred, education_required, \
+                                      description_embedding, requirements_embedding, title_embedding, \
+                                      source, job_url, posted_date, is_active) \
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, \
+                            %s, %s, %s, %s, %s, %s, %s) RETURNING id; \
+                    """
+
+            cursor.execute(query, (
+                job_data.get('title'), job_data.get('company'), job_data.get('description'),
+                job_data.get('requirements'), job_data.get('responsibilities'),
+                job_data.get('location'), job_data.get('remote_allowed', False),
+                job_data.get('salary_min'), job_data.get('salary_max'),
+                job_data.get('currency', 'USD'), job_data.get('experience_level'),
+                job_data.get('job_type'), job_data.get('industry'),
+                job_data.get('company_size'), job_data.get('benefits', []),
+                job_data.get('skills_required', []), job_data.get('skills_preferred', []),
+                job_data.get('education_required'), description_embedding,
+                requirements_embedding, title_embedding, job_data.get('source', 'manual'),
+                job_data.get('job_url'), job_data.get('posted_date'), True
+            ))
+
+            job_id = cursor.fetchone()['id']
+            cursor.close()
+
+            logger.info(f"✅ Stored job posting: {job_data.get('title')} (ID: {job_id})")
+            return job_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to store job: {e}")
+            raise
+
+    def get_all_jobs_with_embeddings(self) -> List[Dict]:
+        """Get all active jobs with their embeddings"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    SELECT id, \
+                           title, \
+                           company, \
+                           description, \
+                           requirements, \
+                           location,
+                           salary_min, \
+                           salary_max, \
+                           experience_level, \
+                           skills_required,
+                           description_embedding, \
+                           requirements_embedding, \
+                           title_embedding
+                    FROM jobs
+                    WHERE is_active = true
+                    ORDER BY posted_date DESC; \
+                    """
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
+
+            # Convert embeddings back to numpy arrays
+            jobs = []
+            for result in results:
+                job_data = dict(result)
+                job_data['description_embedding'] = self.db_to_vector(result['description_embedding'])
+                job_data['requirements_embedding'] = self.db_to_vector(result['requirements_embedding'])
+                job_data['title_embedding'] = self.db_to_vector(result['title_embedding'])
+                jobs.append(job_data)
+
+            return jobs
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get jobs: {e}")
+            return []
+
+    # Recommendation operations
+
+    def store_recommendation(self, user_email: str, job_id: int, scores: Dict,
+                             match_reasons: Dict) -> int:
+        """Store job recommendation with scores"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    INSERT INTO job_recommendations (user_email, job_id, semantic_similarity_score, skills_match_score, \
+                                                     experience_match_score, location_match_score, salary_match_score, \
+                                                     overall_score, match_reasons, skill_matches, skill_gaps) \
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (user_email, job_id)
+            DO \
+                    UPDATE SET
+                        semantic_similarity_score = EXCLUDED.semantic_similarity_score, \
+                        skills_match_score = EXCLUDED.skills_match_score, \
+                        experience_match_score = EXCLUDED.experience_match_score, \
+                        location_match_score = EXCLUDED.location_match_score, \
+                        salary_match_score = EXCLUDED.salary_match_score, \
+                        overall_score = EXCLUDED.overall_score, \
+                        match_reasons = EXCLUDED.match_reasons, \
+                        skill_matches = EXCLUDED.skill_matches, \
+                        skill_gaps = EXCLUDED.skill_gaps \
+                        RETURNING id; \
+                    """
+
+            cursor.execute(query, (
+                user_email, job_id, scores.get('semantic_similarity', 0.0),
+                scores.get('skills_match', 0.0), scores.get('experience_match', 0.0),
+                scores.get('location_match', 0.0), scores.get('salary_match', 0.0),
+                scores.get('overall_score', 0.0), json.dumps(match_reasons),
+                match_reasons.get('skill_matches', []), match_reasons.get('skill_gaps', [])
+            ))
+
+            rec_id = cursor.fetchone()['id']
+            cursor.close()
+
+            return rec_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to store recommendation: {e}")
+            raise
+
+    def get_user_recommendations(self, user_email: str, limit: int = 10) -> List[Dict]:
+        """Get user's job recommendations with job details"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    SELECT jr.*, \
+                           j.title, \
+                           j.company, \
+                           j.description, \
+                           j.location, \
+                           j.salary_min, \
+                           j.salary_max, \
+                           j.experience_level, \
+                           j.job_type, \
+                           j.skills_required, \
+                           j.job_url
+                    FROM job_recommendations jr
+                             JOIN jobs j ON jr.job_id = j.id
+                    WHERE jr.user_email = %s \
+                      AND j.is_active = true
+                    ORDER BY jr.overall_score DESC, jr.created_at DESC
+                        LIMIT %s; \
+                    """
+
+            cursor.execute(query, (user_email, limit))
+            results = cursor.fetchall()
+            cursor.close()
+
+            return [dict(result) for result in results]
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get recommendations: {e}")
+            return []
+
+    # Feedback operations
+
+    def store_feedback(self, user_email: str, recommendation_id: int, feedback_data: Dict) -> int:
+        """Store user feedback on job recommendation"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    INSERT INTO recommendation_feedback (user_email, recommendation_id, job_id, overall_rating, \
+                                                         skills_relevance_rating, experience_match_rating, \
+                                                         location_rating, \
+                                                         company_interest_rating, feedback_type, feedback_sentiment, \
+                                                         feedback_text, improvement_suggestions, time_spent_viewing, \
+                                                         clicked_apply_button, visited_company_page, shared_job, \
+                                                         action_taken, application_status) \
+                    VALUES (%s, %s, (SELECT job_id FROM job_recommendations WHERE id = %s), \
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id; \
+                    """
+
+            cursor.execute(query, (
+                user_email, recommendation_id, recommendation_id,
+                feedback_data.get('overall_rating'), feedback_data.get('skills_relevance_rating'),
+                feedback_data.get('experience_match_rating'), feedback_data.get('location_rating'),
+                feedback_data.get('company_interest_rating'), feedback_data.get('feedback_type'),
+                feedback_data.get('feedback_sentiment'), feedback_data.get('feedback_text'),
+                feedback_data.get('improvement_suggestions'), feedback_data.get('time_spent_viewing'),
+                feedback_data.get('clicked_apply_button', False),
+                feedback_data.get('visited_company_page', False),
+                feedback_data.get('shared_job', False), feedback_data.get('action_taken'),
+                feedback_data.get('application_status')
+            ))
+
+            feedback_id = cursor.fetchone()['id']
+            cursor.close()
+
+            logger.info(f"✅ Stored feedback for recommendation {recommendation_id}")
+            return feedback_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to store feedback: {e}")
+            raise
+
+    def get_feedback_analytics(self, days: int = 30) -> Dict:
+        """Get feedback analytics for model improvement"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    SELECT AVG(overall_rating)                                       as avg_rating, \
+                           COUNT(*)                                                  as total_feedback, \
+                           AVG(jr.semantic_similarity_score)                         as avg_semantic_score, \
+                           AVG(jr.skills_match_score)                                as avg_skills_score, \
+                           AVG(jr.experience_match_score)                            as avg_experience_score, \
+                           COUNT(CASE WHEN rf.action_taken = 'applied' THEN 1 END)   as applications, \
+                           COUNT(CASE WHEN rf.action_taken = 'saved' THEN 1 END)     as saves, \
+                           COUNT(CASE WHEN rf.action_taken = 'dismissed' THEN 1 END) as dismissals
+                    FROM recommendation_feedback rf
+                             JOIN job_recommendations jr ON rf.recommendation_id = jr.id
+                    WHERE rf.created_at > NOW() - INTERVAL '%s days'; \
+                    """
+
+            cursor.execute(query, (days,))
+            result = cursor.fetchone()
+            cursor.close()
+
+            return dict(result) if result else {}
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get feedback analytics: {e}")
+            return {}
+
+    # Vector similarity search methods
+
+    def find_similar_jobs_by_vector(self, query_embedding: np.ndarray,
+                                    limit: int = 20, threshold: float = 0.3) -> List[Dict]:
+        """
+        Find similar jobs using vector similarity search
+
+        Args:
+            query_embedding: Resume embedding to match against
+            limit: Number of results to return
+            threshold: Minimum similarity threshold
+
+        Returns:
+            List of job matches with similarity scores
+        """
+        try:
+            cursor = self.get_cursor()
+
+            # Convert embedding to database format
+            query_vector = self.vector_to_db(query_embedding)
+
+            # Use cosine similarity for vector search
+            # Note: This is a simple approach. For production, consider using pgvector indexes
+            query = """
+                    SELECT id, \
+                           title, \
+                           company, \
+                           description, \
+                           location, \
+                           salary_min, \
+                           salary_max,
+                           experience_level, \
+                           skills_required,
+                           (1 - (description_embedding <=> %s::vector)) as similarity_score
+                    FROM jobs
+                    WHERE is_active = true
+                      AND (1 - (description_embedding <=> %s::vector)) > %s
+                    ORDER BY description_embedding <=> %s::vector
+                        LIMIT %s; \
+                    """
+
+            cursor.execute(query, (query_vector, query_vector, threshold, query_vector, limit))
+            results = cursor.fetchall()
+            cursor.close()
+
+            return [dict(result) for result in results]
+
+        except Exception as e:
+            logger.error(f"❌ Vector similarity search failed: {e}")
+            return []
+
+    def bulk_update_recommendations_viewed(self, recommendation_ids: List[int]):
+        """Mark multiple recommendations as viewed"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    UPDATE job_recommendations
+                    SET is_viewed = true, \
+                        viewed_at = NOW()
+                    WHERE id = ANY (%s); \
+                    """
+
+            cursor.execute(query, (recommendation_ids,))
+            cursor.close()
+
+        except Exception as e:
+            logger.error(f"❌ Failed to update viewed status: {e}")
+
+    # Utility methods
+
+    def test_connection(self) -> bool:
+        """Test database connection and vector support"""
+        try:
+            cursor = self.get_cursor()
+
+            # Test basic connection
+            cursor.execute("SELECT version();")
+            version = cursor.fetchone()
+            logger.info(f"PostgreSQL Version: {version['version']}")
+
+            # Test vector extension
+            cursor.execute("SELECT * FROM pg_extension WHERE extname = 'vector';")
+            vector_ext = cursor.fetchone()
+            if vector_ext:
+                logger.info("✅ pgvector extension is available")
+            else:
+                logger.error("❌ pgvector extension not found")
+                return False
+
+            # Test tables exist
+            cursor.execute("""
+                           SELECT table_name
+                           FROM information_schema.tables
+                           WHERE table_schema = 'public'
+                           ORDER BY table_name;
+                           """)
+            tables = cursor.fetchall()
+            logger.info(f"Found {len(tables)} tables")
+
+            # Test vector columns
+            cursor.execute("""
+                           SELECT table_name, column_name
+                           FROM information_schema.columns
+                           WHERE data_type = 'USER-DEFINED'
+                             AND udt_name = 'vector';
+                           """)
+            vector_columns = cursor.fetchall()
+            logger.info(f"Found {len(vector_columns)} vector columns")
+
+            cursor.close()
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Database test failed: {e}")
+            return False
+
+
+# Global database instance
+db = DatabaseConnection()
+
+
+# Test the database connection
+def test_database_operations():
+    """Test database operations with sample data"""
+    logger.info("🧪 Testing Database Operations")
+
+    try:
+        # Test connection
+        if not db.test_connection():
+            logger.error("Database connection test failed")
+            return
+
+        # Test sample data operations
+        from embedding_service import ResumeJobEmbeddingService
+
+        # Initialize embedding service
+        embedding_service = ResumeJobEmbeddingService()
+
+        # Sample resume data
+        sample_resume_data = {
+            "resume_text": "John Doe Software Engineer with Python experience",
+            "structured_data": {
+                "skills": {
+                    "Programming": [{"name": "Python"}, {"name": "JavaScript"}]
+                },
+                "work_experience": [
+                    {"title": "Software Engineer", "company": "Tech Corp"}
+                ]
+            },
+            "extracted_entities": [
+                {"text": "Python", "label": "SKILL"},
+                {"text": "Software Engineer", "label": "TITLE"}
+            ]
+        }
+
+        # Generate embeddings
+        full_resume_embedding = embedding_service.generate_resume_embedding(sample_resume_data)
+        skills_embedding = embedding_service.generate_skills_embedding(["Python", "JavaScript"])
+        experience_embedding = np.random.rand(384)  # Mock experience embedding
+
+        # Test storing resume
+        resume_id = db.store_user_resume(
+            "test@example.com",
+            sample_resume_data,
+            {
+                'full_resume': full_resume_embedding,
+                'skills': skills_embedding,
+                'experience': experience_embedding
+            }
+        )
+
+        logger.info(f"✅ Stored test resume with ID: {resume_id}")
+
+        # Test retrieving resume
+        retrieved_resume = db.get_user_resume("test@example.com")
+        if retrieved_resume:
+            logger.info("✅ Successfully retrieved resume")
+            logger.info(f"Resume embedding shape: {retrieved_resume['full_resume_embedding'].shape}")
+
+        # Test sample job posting
+        sample_job_data = {
+            "title": "Python Developer",
+            "company": "Example Corp",
+            "description": "Looking for Python developer with web experience",
+            "requirements": "3+ years Python, Django, PostgreSQL",
+            "location": "San Francisco, CA",
+            "skills_required": ["Python", "Django", "PostgreSQL"],
+            "experience_level": "mid",
+            "job_type": "full-time",
+            "salary_min": 80000,
+            "salary_max": 120000
+        }
+
+        # Generate job embeddings
+        job_embedding = embedding_service.generate_job_embedding(sample_job_data)
+
+        # Test storing job
+        job_id = db.store_job_posting(
+            sample_job_data,
+            {
+                'description': job_embedding,
+                'requirements': job_embedding,
+                'title': embedding_service.model.encode(sample_job_data['title'])
+            }
+        )
+
+        logger.info(f"✅ Stored test job with ID: {job_id}")
+
+        # Test similarity search
+        similar_jobs = db.find_similar_jobs_by_vector(full_resume_embedding, limit=5)
+        logger.info(f"✅ Found {len(similar_jobs)} similar jobs")
+
+        if similar_jobs:
+            for job in similar_jobs:
+                logger.info(f"   - {job['title']} at {job['company']} (similarity: {job['similarity_score']:.3f})")
+
+        logger.info("🎉 Database operations test completed successfully!")
+
+    except Exception as e:
+        logger.error(f"❌ Database operations test failed: {e}")
+
+
+if __name__ == "__main__":
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+
+    # Run test
+    test_database_operations()
