@@ -25,13 +25,13 @@ class DatabaseConnection:
     def connect(self):
         """Establish database connection"""
         try:
-            # Database configuration from environment variables
+            # Database configuration using Supabase format
             db_config = {
-                'host': os.getenv('DB_HOST', 'localhost'),
-                'port': int(os.getenv('DB_PORT', 5433)),  # Note: using 5433
-                'database': os.getenv('DB_NAME', 'landit_db'),
-                'user': os.getenv('DB_USER', 'landit_user'),
-                'password': os.getenv('DB_PASSWORD', 'landit_secure_2024')
+                'user': os.getenv('user'),
+                'password': os.getenv('password'),
+                'host': os.getenv('host'),
+                'port': int(os.getenv('port', 6543)),
+                'dbname': os.getenv('dbname')
             }
 
             self.connection = psycopg2.connect(**db_config)
