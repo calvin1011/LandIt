@@ -203,8 +203,11 @@ class JobPostingRequest(BaseModel):
 
 class JobMatchRequest(BaseModel):
     user_email: str
-    top_k: int = 10
+    top_k: int = 30
     min_similarity: float = 0.3
+    offset: int = 0
+    exclude_job_ids: List[int] = []
+    randomize: bool = True
 
 class FeedbackRequest(BaseModel):
     user_email: str
@@ -431,12 +434,13 @@ def create_job_posting(job_data: JobPostingRequest):
 @app.post("/jobs/find-matches")
 def find_job_matches(match_request: JobMatchRequest):
     """
-    Find job matches for a user's resume
+    Find job matches for a user's resume with rotation and fresh results
     """
     if not embedding_service:
         raise HTTPException(status_code=503, detail="Embedding service not available")
 
     try:
+        import random
         start_time = time.time()
 
         # Get user's resume
@@ -444,7 +448,7 @@ def find_job_matches(match_request: JobMatchRequest):
         if not user_resume:
             raise HTTPException(status_code=404, detail="User resume not found. Please upload a resume first.")
 
-        # Get all active jobs
+        # Get all active jobs (excluding already shown ones)
         all_jobs = db.get_all_jobs_with_embeddings()
         if not all_jobs:
             return {
@@ -452,6 +456,10 @@ def find_job_matches(match_request: JobMatchRequest):
                 "total_found": 0,
                 "message": "No active job postings available"
             }
+
+        # Filter out excluded jobs
+        if match_request.exclude_job_ids:
+            all_jobs = [job for job in all_jobs if job['id'] not in match_request.exclude_job_ids]
 
         logger.info(f"Finding matches among {len(all_jobs)} jobs for {match_request.user_email}")
 
@@ -473,7 +481,7 @@ def find_job_matches(match_request: JobMatchRequest):
                 job['description_embedding']
             )
 
-            # Calculate experience match (simplified)
+            # Calculate experience match
             user_years = user_resume.get('years_of_experience', 0)
             job_level = job.get('experience_level', 'mid')
             experience_match = calculate_experience_match(user_years, job_level)
@@ -485,10 +493,10 @@ def find_job_matches(match_request: JobMatchRequest):
                 job.get('remote_allowed', False)
             )
 
-            # Calculate overall score with improved weighting
+            # Calculate overall score
             overall_score = (
                     semantic_similarity * 0.25 +
-                    skills_similarity * 0.45 +  # Increased skills weight
+                    skills_similarity * 0.45 +
                     experience_match * 0.20 +
                     location_match * 0.10
             )
@@ -518,7 +526,7 @@ def find_job_matches(match_request: JobMatchRequest):
                     'experience_match': round(experience_match, 3),
                     'location_match': round(location_match, 3),
                     'skill_matches': skill_matches,
-                    'skill_gaps': skill_gaps[:5],  # Top 5 missing skills
+                    'skill_gaps': skill_gaps[:5],
                     'match_explanation': generate_match_explanation(
                         overall_score, skill_matches, skill_gaps, experience_match
                     )
@@ -527,8 +535,46 @@ def find_job_matches(match_request: JobMatchRequest):
         # Sort by overall score
         matches.sort(key=lambda x: x['overall_score'], reverse=True)
 
-        # Limit results
-        matches = matches[:match_request.top_k]
+        # NEW: Implement job rotation logic
+        if match_request.randomize and len(matches) > match_request.top_k:
+            # Get top matches (2x what we need for quality)
+            top_matches = matches[:match_request.top_k * 2]
+
+            # Group by score ranges for intelligent rotation
+            excellent_matches = [m for m in top_matches if m['overall_score'] >= 0.7]
+            good_matches = [m for m in top_matches if 0.5 <= m['overall_score'] < 0.7]
+            fair_matches = [m for m in top_matches if 0.3 <= m['overall_score'] < 0.5]
+
+            # Randomize within each group
+            if excellent_matches:
+                random.shuffle(excellent_matches)
+            if good_matches:
+                random.shuffle(good_matches)
+            if fair_matches:
+                random.shuffle(fair_matches)
+
+            # Recombine with some randomization but maintaining quality
+            final_matches = []
+
+            # Always include some excellent matches
+            final_matches.extend(excellent_matches[:max(1, match_request.top_k // 2)])
+
+            # Fill with good matches
+            remaining_slots = match_request.top_k - len(final_matches)
+            if remaining_slots > 0 and good_matches:
+                final_matches.extend(good_matches[:remaining_slots])
+
+            # Fill any remaining with fair matches
+            remaining_slots = match_request.top_k - len(final_matches)
+            if remaining_slots > 0 and fair_matches:
+                final_matches.extend(fair_matches[:remaining_slots])
+
+            matches = final_matches
+        else:
+            # Standard pagination without randomization
+            start_idx = match_request.offset
+            end_idx = start_idx + match_request.top_k
+            matches = matches[start_idx:end_idx]
 
         # Store recommendations in database for feedback tracking
         recommendation_ids = []
@@ -564,13 +610,14 @@ def find_job_matches(match_request: JobMatchRequest):
             "total_jobs_analyzed": len(all_jobs),
             "user_email": match_request.user_email,
             "processing_time": processing_time,
-            "recommendation_ids": recommendation_ids
+            "recommendation_ids": recommendation_ids,
+            "has_more": len(all_jobs) > (match_request.offset + len(matches)),  # For pagination
+            "next_offset": match_request.offset + len(matches)
         }
 
     except Exception as e:
         logger.error(f"Job matching failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job matching failed: {str(e)}")
-
 
 @app.get("/jobs/recommendations/{user_email}")
 def get_user_recommendations(user_email: str, limit: int = 10):

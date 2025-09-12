@@ -44,22 +44,41 @@ const Refresh = ({ style }) => (
     </svg>
 );
 
+const Plus = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+);
+
 const JobRecommendations = ({ userEmail }) => {
     const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [shownJobIds, setShownJobIds] = useState(new Set()); // Track shown jobs
+    const [hasMore, setHasMore] = useState(true);
+    const [offset, setOffset] = useState(0);
 
     useEffect(() => {
         if (userEmail) {
-            fetchRecommendations();
+            fetchRecommendations(true); // Reset on user change
         }
     }, [userEmail]);
 
-    const fetchRecommendations = async () => {
+    const fetchRecommendations = async (reset = false) => {
         setLoading(true);
         setError('');
 
+        // If resetting, clear previous recommendations
+        if (reset) {
+            setRecommendations([]);
+            setShownJobIds(new Set());
+            setOffset(0);
+            setHasMore(true);
+        }
+
         try {
+            const currentShownIds = reset ? [] : Array.from(shownJobIds);
+
             const response = await fetch('http://localhost:8000/jobs/find-matches', {
                 method: 'POST',
                 headers: {
@@ -68,7 +87,10 @@ const JobRecommendations = ({ userEmail }) => {
                 body: JSON.stringify({
                     user_email: userEmail,
                     top_k: 10,
-                    min_similarity: 0.3
+                    min_similarity: 0.3,
+                    offset: reset ? 0 : offset,
+                    exclude_job_ids: currentShownIds,
+                    randomize: true
                 })
             });
 
@@ -81,12 +103,36 @@ const JobRecommendations = ({ userEmail }) => {
             }
 
             const data = await response.json();
-            setRecommendations(data.matches || []);
+            const newMatches = data.matches || [];
+
+            if (reset) {
+                setRecommendations(newMatches);
+            } else {
+                // Append new matches, avoiding duplicates
+                setRecommendations(prev => {
+                    const existingIds = new Set(prev.map(job => job.job_id));
+                    const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
+                    return [...prev, ...uniqueNewMatches];
+                });
+            }
+
+            // Update tracking
+            const newJobIds = new Set([...shownJobIds, ...newMatches.map(job => job.job_id)]);
+            setShownJobIds(newJobIds);
+            setHasMore(data.has_more || false);
+            setOffset(data.next_offset || 0);
+
         } catch (err) {
             console.error('Error fetching recommendations:', err);
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadMoreJobs = () => {
+        if (!loading && hasMore) {
+            fetchRecommendations(false);
         }
     };
 
@@ -125,13 +171,7 @@ const JobRecommendations = ({ userEmail }) => {
         return '#ef4444'; // Red
     };
 
-    const getMatchQualityLabel = (score) => {
-        if (score >= 0.8) return 'Excellent Match';
-        if (score >= 0.6) return 'Good Match';
-        return 'Fair Match';
-    };
-
-    if (loading) {
+    if (loading && recommendations.length === 0) {
         return (
             <div style={{
                 background: 'rgba(255, 255, 255, 0.95)',
@@ -184,31 +224,36 @@ const JobRecommendations = ({ userEmail }) => {
                         color: '#6b7280',
                         marginTop: '5px'
                     }}>
-                        AI-powered job matches based on your resume
+                        AI-powered job matches based on your resume • {recommendations.length} jobs shown
                     </p>
                 </div>
 
                 <button
-                    onClick={fetchRecommendations}
+                    onClick={() => fetchRecommendations(true)}
+                    disabled={loading}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                         padding: '8px 16px',
-                        background: '#6366f1',
+                        background: loading ? '#9ca3af' : '#6366f1',
                         color: 'white',
                         border: 'none',
                         borderRadius: '8px',
                         fontSize: '14px',
                         fontWeight: '500',
-                        cursor: 'pointer',
+                        cursor: loading ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s'
                     }}
-                    onMouseOver={(e) => e.target.style.background = '#4f46e5'}
-                    onMouseOut={(e) => e.target.style.background = '#6366f1'}
+                    onMouseOver={(e) => {
+                        if (!loading) e.target.style.background = '#4f46e5';
+                    }}
+                    onMouseOut={(e) => {
+                        if (!loading) e.target.style.background = '#6366f1';
+                    }}
                 >
                     <Refresh style={{ width: '14px', height: '14px' }} />
-                    Refresh
+                    {loading ? 'Finding...' : 'Fresh Jobs'}
                 </button>
             </div>
 
@@ -510,15 +555,16 @@ const JobRecommendations = ({ userEmail }) => {
                                 </div>
 
                                 <button
-                                    onClick={() => {handleFeedback(job.recommendation_id, 'applied');
-                                    if (job.job_url){
-                                    window.open(job.job_url, '_blank');
-                                    } else {
+                                    onClick={() => {
+                                        handleFeedback(job.recommendation_id, 'applied');
+                                        if (job.job_url) {
+                                            window.open(job.job_url, '_blank');
+                                        } else {
                                             const searchQuery = `${job.title} ${job.company} careers`;
                                             const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
                                             window.open(searchUrl, '_blank');
-                                    }
-                                }}
+                                        }
+                                    }}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -542,9 +588,67 @@ const JobRecommendations = ({ userEmail }) => {
                             </div>
                         </div>
                     ))}
+
+                    {/* Load More Button */}
+                    {hasMore && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            paddingTop: '20px',
+                            borderTop: '1px solid #e5e7eb'
+                        }}>
+                            <button
+                                onClick={loadMoreJobs}
+                                disabled={loading}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '12px 24px',
+                                    background: loading ? '#9ca3af' : '#f3f4f6',
+                                    color: loading ? 'white' : '#374151',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '12px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => {
+                                    if (!loading) {
+                                        e.target.style.background = '#e5e7eb';
+                                        e.target.style.borderColor = '#9ca3af';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (!loading) {
+                                        e.target.style.background = '#f3f4f6';
+                                        e.target.style.borderColor = '#d1d5db';
+                                    }
+                                }}
+                            >
+                                <Plus style={{ width: '16px', height: '16px' }} />
+                                {loading ? 'Loading more jobs...' : 'Show More Jobs'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* End of results message */}
+                    {!hasMore && recommendations.length > 0 && (
+                        <div style={{
+                            textAlign: 'center',
+                            paddingTop: '20px',
+                            borderTop: '1px solid #e5e7eb',
+                            color: '#6b7280',
+                            fontSize: '14px'
+                        }}>
+                            You've seen all available job matches. Click "Fresh Jobs" to get new recommendations!
+                        </div>
+                    )}
                 </div>
             )}
         </div>
-    );}
+    );
+};
 
 export default JobRecommendations;

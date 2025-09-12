@@ -525,6 +525,53 @@ class DatabaseConnection:
         cursor.execute(query, (title, company))
         return cursor.fetchall()
 
+    def get_jobs_excluding_ids(self, exclude_ids: List[int]) -> List[Dict]:
+        """Get all active jobs excluding specific job IDs"""
+        try:
+            cursor = self.get_cursor()
+
+            if exclude_ids:
+                query = """
+                        SELECT id, \
+                               title, \
+                               company, \
+                               description, \
+                               requirements, \
+                               location,
+                               salary_min, \
+                               salary_max, \
+                               experience_level, \
+                               skills_required,
+                               description_embedding, \
+                               requirements_embedding, \
+                               title_embedding
+                        FROM jobs
+                        WHERE is_active = true \
+                          AND id != ALL(%s)
+                        ORDER BY posted_date DESC; \
+                        """
+                cursor.execute(query, (exclude_ids,))
+            else:
+                # If no exclusions, use existing method
+                return self.get_all_jobs_with_embeddings()
+
+            results = cursor.fetchall()
+            cursor.close()
+
+            jobs = []
+            for result in results:
+                job_data = dict(result)
+                job_data['description_embedding'] = self.db_to_vector(result['description_embedding'])
+                job_data['requirements_embedding'] = self.db_to_vector(result['requirements_embedding'])
+                job_data['title_embedding'] = self.db_to_vector(result['title_embedding'])
+                jobs.append(job_data)
+
+            return jobs
+
+        except Exception as e:
+            logger.error(f"Failed to get jobs excluding IDs: {e}")
+            return []
+
     # Utility methods
 
     def test_connection(self) -> bool:
