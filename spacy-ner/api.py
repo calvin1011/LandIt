@@ -502,6 +502,7 @@ def find_job_matches(match_request: JobMatchRequest):
                     'job_id': job['id'],
                     'title': job['title'],
                     'company': job['company'],
+                    'job_url': job.get('job_url', ''),
                     'location': job.get('location'),
                     'remote_allowed': job.get('remote_allowed', False),
                     'salary_min': job.get('salary_min'),

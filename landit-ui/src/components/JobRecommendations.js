@@ -510,7 +510,15 @@ const JobRecommendations = ({ userEmail }) => {
                                 </div>
 
                                 <button
-                                    onClick={() => handleFeedback(job.recommendation_id, 'applied')}
+                                    onClick={() => {handleFeedback(job.recommendation_id, 'applied');
+                                    if (job.job_url){
+                                    window.open(job.job_url, '_blank');
+                                    } else {
+                                            const searchQuery = `${job.title} ${job.company} careers`;
+                                            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+                                            window.open(searchUrl, '_blank');
+                                    }
+                                }}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
