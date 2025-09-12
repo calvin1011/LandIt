@@ -10,6 +10,7 @@ from pathlib import Path
 import io
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -197,6 +198,11 @@ class FeedbackRequest(BaseModel):
     feedback_type: str  # positive, negative, applied, saved, dismissed
     feedback_text: Optional[str] = ""
     action_taken: Optional[str] = ""
+
+class StoreResumeRequest(BaseModel):
+    user_email: str
+    resume_data: Dict[str, Any]
+    structured_data: Optional[Dict[str, Any]] = None
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
@@ -1318,6 +1324,172 @@ def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, origin
                 "experience_metrics": {"total_years": 0, "companies": 0, "roles": 0, "average_tenure": 0.0}
             }
 
+
+@app.post("/store-resume")
+def store_resume(request: StoreResumeRequest):
+    """
+    Store user resume for job matching
+    """
+    if not embedding_service:
+        raise HTTPException(status_code=503, detail="Embedding service not available")
+
+    try:
+        start_time = time.time()
+
+        logger.info(f"Storing resume for user: {request.user_email}")
+
+        # Prepare resume data for embedding generation
+        resume_data = request.resume_data.copy()
+
+        # If structured_data is provided separately, merge it
+        if request.structured_data:
+            resume_data['structured_data'] = request.structured_data
+
+        # Ensure we have the resume text for embedding
+        if 'resume_text' not in resume_data:
+            # Try to reconstruct from structured data if missing
+            resume_data['resume_text'] = _reconstruct_resume_text(resume_data)
+
+        # Generate embeddings
+        logger.info("Generating resume embeddings...")
+
+        # Full resume embedding
+        full_resume_embedding = embedding_service.generate_resume_embedding(resume_data)
+
+        # Skills-specific embedding
+        skills_list = _extract_skills_list(resume_data)
+        skills_embedding = embedding_service.generate_skills_embedding(skills_list)
+
+        # Experience embedding (using work experience text)
+        experience_text = embedding_service._extract_experience_text(resume_data)
+        experience_embedding = embedding_service.model.encode(experience_text) if experience_text else np.zeros(
+            embedding_service.embedding_dim)
+
+        # Store in database
+        logger.info("Storing resume in database...")
+        resume_id = db.store_user_resume(
+            request.user_email,
+            resume_data,
+            {
+                'full_resume': full_resume_embedding,
+                'skills': skills_embedding,
+                'experience': experience_embedding
+            }
+        )
+
+        processing_time = time.time() - start_time
+
+        logger.info(f"✅ Successfully stored resume for {request.user_email} (ID: {resume_id})")
+
+        return {
+            "success": True,
+            "message": "Resume stored successfully",
+            "resume_id": resume_id,
+            "user_email": request.user_email,
+            "processing_time": processing_time,
+            "embeddings_generated": {
+                "full_resume": list(full_resume_embedding.shape),
+                "skills": list(skills_embedding.shape),
+                "experience": list(experience_embedding.shape)
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to store resume for {request.user_email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to store resume: {str(e)}")
+
+
+def _reconstruct_resume_text(resume_data: Dict) -> str:
+    """Reconstruct resume text from structured data if original text is missing"""
+    try:
+        text_parts = []
+
+        structured = resume_data.get('structured_data', {})
+
+        # Add work experience
+        work_exp = structured.get('work_experience', [])
+        for exp in work_exp:
+            if isinstance(exp, dict):
+                if exp.get('title'):
+                    text_parts.append(exp['title'])
+                if exp.get('company'):
+                    text_parts.append(exp['company'])
+                if exp.get('achievements'):
+                    text_parts.extend(exp['achievements'])
+
+        # Add skills
+        skills = structured.get('skills', {})
+        if isinstance(skills, dict):
+            for category, skill_list in skills.items():
+                for skill in skill_list:
+                    if isinstance(skill, dict):
+                        text_parts.append(skill.get('name', ''))
+                    else:
+                        text_parts.append(str(skill))
+
+        # Add education
+        education = structured.get('education', [])
+        for edu in education:
+            if isinstance(edu, dict):
+                if edu.get('degree'):
+                    text_parts.append(edu['degree'])
+                if edu.get('school'):
+                    text_parts.append(edu['school'])
+
+        # Add entities
+        entities = resume_data.get('entities', [])  # Note: changed from 'extracted_entities'
+        for entity in entities:
+            if isinstance(entity, dict):
+                text_parts.append(entity.get('text', ''))
+
+        return " ".join(filter(None, text_parts))
+
+    except Exception as e:
+        logger.error(f"Failed to reconstruct resume text: {e}")
+        return "Resume content"
+
+
+def _extract_skills_list(resume_data: Dict) -> List[str]:
+    """Extract a simple list of skills from resume data"""
+    try:
+        skills_list = []
+
+        # From structured data
+        structured = resume_data.get('structured_data', {})
+        skills = structured.get('skills', {})
+
+        if isinstance(skills, dict):
+            for category, skill_list in skills.items():
+                for skill in skill_list:
+                    if isinstance(skill, dict):
+                        skill_name = skill.get('name', '')
+                        if skill_name:
+                            skills_list.append(skill_name)
+                    else:
+                        skills_list.append(str(skill))
+
+        # From work experience
+        work_exp = structured.get('work_experience', [])
+        for exp in work_exp:
+            if isinstance(exp, dict) and exp.get('skills'):
+                skills_list.extend(exp['skills'])
+
+        # From entities (changed from 'extracted_entities')
+        entities = resume_data.get('entities', [])
+        for entity in entities:
+            if isinstance(entity, dict) and entity.get('label') in ['SKILL', 'TECHNOLOGY', 'TOOL']:
+                skill_text = entity.get('text', '')
+                if skill_text:
+                    skills_list.append(skill_text)
+
+        # Remove duplicates and clean
+        unique_skills = list(set([skill.strip() for skill in skills_list if skill.strip()]))
+
+        return unique_skills
+
+    except Exception as e:
+        logger.error(f"Failed to extract skills list: {e}")
+        return []
 
 def _generate_improvement_suggestions(results: Dict) -> List[str]:
     """Generate personalized improvement suggestions with error handling"""
