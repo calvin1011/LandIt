@@ -8,11 +8,13 @@ import time
 import json
 from pathlib import Path
 import io
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
 import numpy as np
 from job_data_importer import MuseJobImporter
 from adzuna_job_importer import AdzunaJobImporter
+from jsearch_job_importer import JSearchJobImporter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1253,6 +1255,65 @@ def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location:
     except Exception as e:
         logger.error(f"❌ Adzuna import failed: {e}")
         raise HTTPException(status_code=500, detail=f"Adzuna import failed: {str(e)}")
+
+
+@app.post("/admin/import-jsearch-jobs")
+def import_jsearch_jobs(
+        keywords: List[str] = None,
+        max_jobs: int = 50,
+        location: str = "United States"
+):
+    """
+    Import jobs from JSearch API (aggregates Indeed, LinkedIn, etc.)
+    Admin endpoint with direct apply links
+    """
+    try:
+        # Get RapidAPI key from environment
+        rapidapi_key = os.getenv('RAPIDAPI_KEY')
+        if not rapidapi_key:
+            raise HTTPException(
+                status_code=500,
+                detail="RAPIDAPI_KEY not found in environment variables"
+            )
+
+        start_time = time.time()
+        logger.info("🚀 Starting JSearch job import...")
+
+        # Initialize importer
+        importer = JSearchJobImporter(rapidapi_key)
+
+        # Use default keywords if none provided
+        if keywords is None:
+            keywords = [
+                'software engineer',
+                'data scientist',
+                'product manager',
+                'full stack developer',
+                'machine learning engineer',
+                'frontend developer',
+                'backend developer',
+                'DevOps engineer'
+            ]
+
+        # Import jobs
+        stats = importer.import_jobs(keywords=keywords, max_jobs=max_jobs, location=location)
+
+        processing_time = time.time() - start_time
+
+        logger.info(f"✅ JSearch import completed in {processing_time:.2f}s")
+
+        return {
+            "success": True,
+            "summary": stats,
+            "processing_time": processing_time,
+            "keywords_processed": keywords,
+            "location": location,
+            "message": f"Successfully imported {stats['imported']} jobs from JSearch (Indeed, LinkedIn, etc.)"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ JSearch import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"JSearch import failed: {str(e)}")
 
 
 @app.get("/admin/jobs/stats")

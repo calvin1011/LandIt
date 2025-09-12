@@ -1,0 +1,367 @@
+import requests
+import logging
+import time
+from typing import List, Dict, Any, Optional
+from database import db
+from embedding_service import ResumeJobEmbeddingService
+
+logger = logging.getLogger(__name__)
+
+
+class JSearchJobImporter:
+    def __init__(self, rapidapi_key: str):
+        # JSearch API via RapidAPI
+        self.rapidapi_key = rapidapi_key
+        self.base_url = "https://jsearch.p.rapidapi.com/search"
+
+        self.session = requests.Session()
+        self.session.headers.update({
+            'X-RapidAPI-Key': self.rapidapi_key,
+            'X-RapidAPI-Host': 'jsearch.p.rapidapi.com',
+            'User-Agent': 'LandIt-JobMatcher/1.0'
+        })
+
+        # Initialize embedding service for job processing
+        try:
+            self.embedding_service = ResumeJobEmbeddingService()
+            logger.info("✅ Embedding service ready for JSearch jobs")
+        except Exception as e:
+            logger.error(f"❌ Embedding service failed: {e}")
+            self.embedding_service = None
+
+        self.stats = {
+            'total_fetched': 0,
+            'successfully_imported': 0,
+            'failed_imports': 0,
+            'duplicate_jobs': 0
+        }
+
+    def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
+        """Import jobs from JSearch API"""
+        if keywords is None:
+            keywords = [
+                "software engineer",
+                "data scientist",
+                "product manager",
+                "full stack developer",
+                "machine learning engineer"
+            ]
+
+        logger.info(f"🚀 Starting JSearch job import for {len(keywords)} keywords...")
+
+        for keyword in keywords:
+            try:
+                self._import_jobs_for_keyword(keyword, max_jobs // len(keywords), location)
+                time.sleep(1)  # Rate limiting - be respectful
+            except Exception as e:
+                logger.error(f"❌ Failed to import jobs for '{keyword}': {e}")
+                continue
+
+        logger.info(f"✅ JSearch import completed: {self.stats}")
+        return self.stats
+
+    def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
+        """Import jobs for a specific keyword"""
+        page = 1
+        jobs_imported = 0
+
+        while jobs_imported < max_per_keyword:
+            try:
+                # Build API request parameters
+                params = {
+                    'query': f"{keyword} in {location}",
+                    'page': str(page),
+                    'num_pages': '1',
+                    'date_posted': 'week',  # Get recent jobs
+                    'employment_types': 'FULLTIME,CONTRACTOR',
+                    'job_requirements': 'no_degree,under_3_years_experience,more_than_3_years_experience'
+                }
+
+                logger.info(f"🔍 Fetching JSearch jobs: '{keyword}' page {page}")
+
+                # Make API request
+                response = self.session.get(self.base_url, params=params, timeout=30)
+
+                # Debug logging
+                logger.debug(f"Request URL: {response.url}")
+                logger.debug(f"Response status: {response.status_code}")
+
+                if response.status_code == 429:
+                    logger.warning("Rate limit hit, waiting...")
+                    time.sleep(60)  # Wait 1 minute for rate limit
+                    continue
+
+                if response.status_code != 200:
+                    logger.error(f"API Error {response.status_code}: {response.text[:500]}")
+                    break
+
+                data = response.json()
+
+                # Check for API errors
+                if not data.get('status', '').lower() == 'ok':
+                    logger.error(f"JSearch API Error: {data}")
+                    break
+
+                jobs = data.get('data', [])
+
+                if not jobs:
+                    logger.info(f"No more jobs found for '{keyword}' on page {page}")
+                    break
+
+                # Process each job
+                for job_data in jobs:
+                    if jobs_imported >= max_per_keyword:
+                        break
+
+                    try:
+                        if self._process_job(job_data, keyword):
+                            jobs_imported += 1
+                            self.stats['successfully_imported'] += 1
+                        else:
+                            self.stats['duplicate_jobs'] += 1
+                    except Exception as e:
+                        logger.error(f"❌ Failed to process job: {e}")
+                        self.stats['failed_imports'] += 1
+
+                self.stats['total_fetched'] += len(jobs)
+                page += 1
+
+                # JSearch typically returns 10 jobs per page
+                if len(jobs) < 10:
+                    break
+
+            except requests.exceptions.RequestException as e:
+                logger.error(f"❌ API request failed for '{keyword}' page {page}: {e}")
+                break
+            except Exception as e:
+                logger.error(f"❌ Unexpected error for '{keyword}' page {page}: {e}")
+                break
+
+    def test_api_connection(self):
+        """Test API connection with minimal request"""
+        try:
+            params = {
+                'query': 'software engineer in New York',
+                'page': '1',
+                'num_pages': '1'
+            }
+
+            logger.info(f"Testing JSearch API connection...")
+            logger.info(f"Params: {params}")
+
+            response = self.session.get(self.base_url, params=params, timeout=30)
+
+            logger.info(f"Test response status: {response.status_code}")
+
+            if response.status_code == 401:
+                logger.error("❌ Invalid RapidAPI key")
+                return False
+            elif response.status_code == 403:
+                logger.error("❌ API access forbidden - check subscription")
+                return False
+            elif response.status_code != 200:
+                logger.error(f"Test failed with status {response.status_code}")
+                logger.error(f"Response: {response.text[:1000]}")
+                return False
+
+            data = response.json()
+            jobs_found = len(data.get('data', []))
+            logger.info(f"✅ Test successful! Found {jobs_found} jobs")
+            return True
+
+        except Exception as e:
+            logger.error(f"API test failed: {e}")
+            return False
+
+    def _process_job(self, job_data: Dict[str, Any], search_keyword: str) -> bool:
+        """Process and store a single job"""
+        try:
+            # Extract job details from JSearch response
+            job_dict = self._extract_job_details(job_data, search_keyword)
+
+            # Check for duplicates (by title + company)
+            if self._is_duplicate_job(job_dict['title'], job_dict['company']):
+                return False
+
+            # Generate embeddings if service is available
+            embeddings = {}
+            if self.embedding_service:
+                try:
+                    description_embedding = self.embedding_service.generate_job_embedding(job_dict)
+                    title_embedding = self.embedding_service.model.encode(job_dict['title'])
+                    requirements_embedding = self.embedding_service.model.encode(job_dict.get('requirements', ''))
+
+                    embeddings = {
+                        'description': description_embedding,
+                        'title': title_embedding,
+                        'requirements': requirements_embedding
+                    }
+                except Exception as e:
+                    logger.warning(f"Failed to generate embeddings for job: {e}")
+
+            # Store in database
+            job_id = db.store_job_posting(job_dict, embeddings)
+            logger.debug(f"✅ Stored JSearch job: {job_dict['title']} at {job_dict['company']}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error processing job: {e}")
+            raise
+
+    def _extract_job_details(self, job_data: Dict[str, Any], search_keyword: str) -> Dict[str, Any]:
+        """Extract and normalize job details from JSearch API response"""
+
+        # Extract salary information
+        salary_min = None
+        salary_max = None
+        if job_data.get('job_salary_min'):
+            salary_min = int(job_data['job_salary_min'])
+        if job_data.get('job_salary_max'):
+            salary_max = int(job_data['job_salary_max'])
+
+        # Determine experience level from title/description
+        experience_level = self._determine_experience_level(
+            job_data.get('job_title', ''),
+            job_data.get('job_description', '')
+        )
+
+        # Extract location
+        location = self._format_location(job_data)
+
+        # Extract skills from description
+        skills_required = self._extract_skills_from_description(job_data.get('job_description', ''))
+
+        # Get job type
+        job_type = self._normalize_job_type(job_data.get('job_employment_type', ''))
+
+        return {
+            'title': job_data.get('job_title', '').strip(),
+            'company': job_data.get('employer_name', 'Unknown Company'),
+            'description': job_data.get('job_description', ''),
+            'requirements': job_data.get('job_highlights', {}).get('Qualifications', []),
+            'responsibilities': job_data.get('job_highlights', {}).get('Responsibilities', []),
+            'location': location,
+            'remote_allowed': self._is_remote_job(job_data.get('job_description', '')),
+            'salary_min': salary_min,
+            'salary_max': salary_max,
+            'experience_level': experience_level,
+            'job_type': job_type,
+            'industry': search_keyword,
+            'skills_required': skills_required,
+            'skills_preferred': [],
+            'education_required': '',
+            'job_url': job_data.get('job_apply_link', ''),  # Direct apply link!
+            'source': 'jsearch',
+            'external_id': str(job_data.get('job_id', '')),
+            'posted_date': job_data.get('job_posted_at_datetime_utc', ''),
+            'category': job_data.get('job_publisher', '')
+        }
+
+    def _determine_experience_level(self, title: str, description: str) -> str:
+        """Determine experience level from job title and description"""
+        text = (title + ' ' + description).lower()
+
+        if any(word in text for word in ['senior', 'sr.', 'lead', 'principal', 'architect', 'staff']):
+            return 'senior'
+        elif any(word in text for word in ['junior', 'jr.', 'entry', 'intern', 'graduate', 'trainee']):
+            return 'entry'
+        elif any(word in text for word in ['manager', 'director', 'head of', 'vp', 'chief']):
+            return 'executive'
+        else:
+            return 'mid'
+
+    def _format_location(self, job_data: Dict) -> str:
+        """Format location from JSearch job data"""
+        location_parts = []
+
+        if job_data.get('job_city'):
+            location_parts.append(job_data['job_city'])
+        if job_data.get('job_state'):
+            location_parts.append(job_data['job_state'])
+        if job_data.get('job_country'):
+            location_parts.append(job_data['job_country'])
+
+        return ', '.join(location_parts) if location_parts else ''
+
+    def _normalize_job_type(self, employment_type: str) -> str:
+        """Normalize job type from JSearch format"""
+        type_mapping = {
+            'FULLTIME': 'full-time',
+            'PARTTIME': 'part-time',
+            'CONTRACTOR': 'contract',
+            'INTERN': 'internship'
+        }
+        return type_mapping.get(employment_type.upper(), 'full-time')
+
+    def _is_remote_job(self, description: str) -> bool:
+        """Check if job allows remote work"""
+        if not description:
+            return False
+
+        remote_keywords = ['remote', 'work from home', 'wfh', 'distributed', 'telecommute', 'virtual']
+        description_lower = description.lower()
+        return any(keyword in description_lower for keyword in remote_keywords)
+
+    def _extract_skills_from_description(self, description: str) -> List[str]:
+        """Extract technical skills from job description"""
+        if not description:
+            return []
+
+        # Comprehensive tech skills list
+        tech_skills = [
+            # Programming Languages
+            'python', 'java', 'javascript', 'typescript', 'go', 'rust', 'c++', 'c#', 'php', 'ruby',
+            'swift', 'kotlin', 'scala', 'r', 'matlab', 'perl', 'shell', 'bash', 'powershell',
+
+            # Web Technologies
+            'html', 'css', 'react', 'vue.js', 'angular', 'node.js', 'express', 'django', 'flask',
+            'spring', 'laravel', 'rails', 'asp.net', 'jquery', 'bootstrap', 'sass', 'less',
+
+            # Databases
+            'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch', 'cassandra',
+            'dynamodb', 'oracle', 'sqlite', 'mariadb', 'neo4j', 'influxdb',
+
+            # Cloud & DevOps
+            'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins', 'gitlab',
+            'github actions', 'circleci', 'ansible', 'puppet', 'chef', 'vagrant', 'helm',
+
+            # Data & ML
+            'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn',
+            'pandas', 'numpy', 'jupyter', 'spark', 'hadoop', 'kafka', 'airflow', 'dbt',
+
+            # Tools & Platforms
+            'git', 'linux', 'unix', 'windows', 'macos', 'vim', 'vscode', 'intellij',
+            'eclipse', 'postman', 'swagger', 'jira', 'confluence', 'slack', 'teams',
+
+            # Methodologies
+            'agile', 'scrum', 'kanban', 'ci/cd', 'tdd', 'bdd', 'devops', 'microservices',
+            'restful', 'graphql', 'api', 'oauth', 'jwt', 'ssl', 'https'
+        ]
+
+        description_lower = description.lower()
+        found_skills = []
+
+        for skill in tech_skills:
+            if skill.lower() in description_lower:
+                found_skills.append(skill)
+
+        return found_skills[:15]  # Limit to top 15 skills
+
+    def _is_duplicate_job(self, title: str, company: str) -> bool:
+        """Check if job already exists in database"""
+        try:
+            existing_jobs = db.get_jobs_by_title_company(title, company)
+            return len(existing_jobs) > 0
+        except:
+            return False
+
+    def get_import_summary(self) -> Dict[str, Any]:
+        """Get summary of import statistics"""
+        return {
+            'imported': self.stats['successfully_imported'],
+            'total_fetched': self.stats['total_fetched'],
+            'failed': self.stats['failed_imports'],
+            'duplicates': self.stats['duplicate_jobs'],
+            'source': 'jsearch'
+        }
