@@ -50,6 +50,249 @@ const Plus = ({ style }) => (
     </svg>
 );
 
+// new icon for learning/improvement
+const TrendingUp = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+);
+
+const BookOpen = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.832 18.477 19.246 18 17.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+);
+
+const Clock = ({ style }) => (
+    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+const SkillsGapAnalysis = ({ job, onGenerateLearningPlan }) => {
+    const gapData = job.skill_gaps_detailed || {};
+    const analysis = job.gap_analysis || {};
+
+    const getDifficultyColor = (level) => {
+        switch(level) {
+            case 'high': return '#ef4444';
+            case 'medium': return '#f59e0b';
+            case 'low': return '#10b981';
+            default: return '#6b7280';
+        }
+    };
+
+    const getTimeColor = (weeks) => {
+        if (weeks <= 4) return '#10b981';
+        if (weeks <= 8) return '#f59e0b';
+        return '#ef4444';
+    };
+
+    return (
+        <div style={{
+            background: 'rgba(99, 102, 241, 0.03)',
+            border: '1px solid rgba(99, 102, 241, 0.1)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '16px'
+        }}>
+            {/* Gap Analysis Header */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px'
+            }}>
+                <h4 style={{
+                    margin: 0,
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#4f46e5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                }}>
+                    <TrendingUp style={{ width: '16px', height: '16px' }} />
+                    Skills Gap Analysis
+                </h4>
+
+                <div style={{
+                    background: getDifficultyColor(analysis.difficulty_level),
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase'
+                }}>
+                    {analysis.difficulty_level} Priority
+                </div>
+            </div>
+
+            {/* Summary */}
+            <p style={{
+                margin: '0 0 12px 0',
+                fontSize: '13px',
+                color: '#6b7280',
+                lineHeight: '1.4'
+            }}>
+                {job.improvement_summary}
+            </p>
+
+            {/* Gap Categories */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Critical Skills */}
+                {gapData.critical && gapData.critical.length > 0 && (
+                    <div>
+                        <span style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: '#dc2626',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                        }}>
+                            Critical ({gapData.critical.length})
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {gapData.critical.slice(0, 3).map((skill, index) => (
+                                <span
+                                    key={index}
+                                    style={{
+                                        background: '#fef2f2',
+                                        color: '#dc2626',
+                                        padding: '2px 6px',
+                                        borderRadius: '8px',
+                                        fontSize: '11px',
+                                        fontWeight: '500',
+                                        border: '1px solid #fecaca'
+                                    }}
+                                >
+                                    {skill}
+                                </span>
+                            ))}
+                            {gapData.critical.length > 3 && (
+                                <span style={{ fontSize: '11px', color: '#6b7280', alignSelf: 'center' }}>
+                                    +{gapData.critical.length - 3} more
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Important Skills */}
+                {gapData.important && gapData.important.length > 0 && (
+                    <div>
+                        <span style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: '#d97706',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                        }}>
+                            Important ({gapData.important.length})
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {gapData.important.slice(0, 3).map((skill, index) => (
+                                <span
+                                    key={index}
+                                    style={{
+                                        background: '#fffbeb',
+                                        color: '#d97706',
+                                        padding: '2px 6px',
+                                        borderRadius: '8px',
+                                        fontSize: '11px',
+                                        fontWeight: '500',
+                                        border: '1px solid #fed7aa'
+                                    }}
+                                >
+                                    {skill}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Trending Skills */}
+                {gapData.trending && gapData.trending.length > 0 && (
+                    <div>
+                        <span style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: '#7c3aed',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                        }}>
+                            Trending ({gapData.trending.length})
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {gapData.trending.slice(0, 2).map((skill, index) => (
+                                <span
+                                    key={index}
+                                    style={{
+                                        background: '#faf5ff',
+                                        color: '#7c3aed',
+                                        padding: '2px 6px',
+                                        borderRadius: '8px',
+                                        fontSize: '11px',
+                                        fontWeight: '500',
+                                        border: '1px solid #e9d5ff'
+                                    }}
+                                >
+                                    {skill}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Learning Metrics */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid rgba(99, 102, 241, 0.1)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock style={{ width: '14px', height: '14px', color: getTimeColor(analysis.estimated_learning_weeks) }} />
+                    <span style={{
+                        fontSize: '12px',
+                        color: getTimeColor(analysis.estimated_learning_weeks),
+                        fontWeight: '500'
+                    }}>
+                        ~{analysis.estimated_learning_weeks} weeks to bridge gaps
+                    </span>
+                </div>
+
+                <button
+                    onClick={() => onGenerateLearningPlan(job)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '6px 12px',
+                        background: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = '#4f46e5'}
+                    onMouseOut={(e) => e.target.style.background = '#6366f1'}
+                >
+                    <BookOpen style={{ width: '14px', height: '14px' }} />
+                    Get Learning Plan
+                </button>
+            </div>
+        </div>
+    );
+};
+
 const JobRecommendations = ({ userEmail }) => {
     const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -164,6 +407,11 @@ const JobRecommendations = ({ userEmail }) => {
             console.error('Error submitting feedback:', err);
         }
     };
+
+    const generateLearningPlan = async (job) => {
+            console.log('Generating learning plan for:', job.title);
+            alert(`Learning plan generation for ${job.title} - Coming in next step!`);
+        }
 
     const getMatchQualityColor = (score) => {
         if (score >= 0.8) return '#10b981'; // Green
@@ -406,6 +654,16 @@ const JobRecommendations = ({ userEmail }) => {
                                     {job.match_explanation}
                                 </p>
                             </div>
+
+                            {/* Enhanced Skills Gap Analysis */}
+                            {(job.skill_gaps_detailed &&
+                              (job.skill_gaps_detailed.critical?.length > 0 ||
+                               job.skill_gaps_detailed.important?.length > 0)) && (
+                                <SkillsGapAnalysis
+                                    job={job}
+                                    onGenerateLearningPlan={generateLearningPlan}
+                                />
+                            )}
 
                             {/* Skills Match */}
                             {job.skill_matches && job.skill_matches.length > 0 && (

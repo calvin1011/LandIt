@@ -507,7 +507,23 @@ def find_job_matches(match_request: JobMatchRequest):
                 user_skills = extract_user_skills(user_resume)
                 job_skills = job.get('skills_required', [])
                 skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
-                skill_gaps = list(set([s.lower() for s in job_skills]) - set(user_skills))
+
+                skill_gaps_detailed = categorize_skill_gaps(
+                    user_skills,
+                    job_skills,
+                    job,
+                    user_resume.get('experience_level', 'mid')
+                )
+
+                gap_analysis = calculate_gap_severity(
+                    skill_gaps_detailed,
+                    user_resume.get('experience_level', 'mid')
+                )
+
+                improvement_summary = generate_improvement_summary(
+                    skill_gaps_detailed,
+                    gap_analysis
+                )
 
                 matches.append({
                     'job_id': job['id'],
@@ -526,9 +542,14 @@ def find_job_matches(match_request: JobMatchRequest):
                     'experience_match': round(experience_match, 3),
                     'location_match': round(location_match, 3),
                     'skill_matches': skill_matches,
-                    'skill_gaps': skill_gaps[:5],
-                    'match_explanation': generate_match_explanation(
-                        overall_score, skill_matches, skill_gaps, experience_match
+                    'skill_gaps': skill_gaps_detailed['critical'][:3],  # Keep existing for compatibility
+                    'skill_gaps_detailed': skill_gaps_detailed,
+                    'gap_analysis': gap_analysis,
+                    'improvement_summary': improvement_summary,
+                    'learning_priority': 'high' if gap_analysis['critical_gaps'] >= 2 else 'medium' if gap_analysis['critical_gaps'] >= 1 else 'low',
+
+                    'match_explanation': generate_enhanced_match_explanation(
+                        overall_score, skill_matches, skill_gaps_detailed, experience_match, gap_analysis
                     )
                 })
 
@@ -618,6 +639,43 @@ def find_job_matches(match_request: JobMatchRequest):
     except Exception as e:
         logger.error(f"Job matching failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job matching failed: {str(e)}")
+
+def generate_enhanced_match_explanation(overall_score: float, skill_matches: List[str],
+                                       skill_gaps_detailed: Dict, experience_match: float,
+                                       gap_analysis: Dict) -> str:
+    """
+    Enhanced match explanation with actionable insights
+    """
+    if overall_score >= 0.8:
+        quality = "Excellent"
+    elif overall_score >= 0.6:
+        quality = "Good"
+    elif overall_score >= 0.4:
+        quality = "Fair"
+    else:
+        quality = "Poor"
+
+    explanation = f"{quality} match based on your profile. "
+
+    if skill_matches:
+        explanation += f"Strong alignment in {', '.join(skill_matches[:2])}. "
+
+    critical_gaps = len(skill_gaps_detailed['critical'])
+    if critical_gaps == 0:
+        explanation += "You meet all critical requirements! "
+    elif critical_gaps <= 2:
+        explanation += f"Focus on learning {', '.join(skill_gaps_detailed['critical'][:2])} to become highly competitive. "
+    else:
+        explanation += f"This role requires significant upskilling in {critical_gaps} key areas. "
+
+    if gap_analysis['estimated_learning_weeks'] <= 4:
+        explanation += "Skills gap can be bridged quickly with focused learning."
+    elif gap_analysis['estimated_learning_weeks'] <= 8:
+        explanation += "Moderate learning investment needed for this role."
+    else:
+        explanation += "Consider this a longer-term career goal requiring substantial skill development."
+
+    return explanation
 
 @app.get("/jobs/recommendations/{user_email}")
 def get_user_recommendations(user_email: str, limit: int = 10):
@@ -809,6 +867,141 @@ def format_salary_range(salary_min: Optional[int], salary_max: Optional[int]) ->
         return f"Up to ${salary_max:,}"
     else:
         return "Salary not specified"
+
+
+def categorize_skill_gaps(user_skills: List[str], job_skills: List[str], job_data: Dict,
+                          user_experience_level: str) -> Dict:
+    """
+    Categorize skill gaps by importance and type
+    """
+    user_skills_lower = [skill.lower() for skill in user_skills]
+
+    # Define critical skills by job type and experience level
+    critical_skills_db = {
+        'software': ['programming', 'coding', 'development'],
+        'data': ['python', 'sql', 'analysis', 'statistics'],
+        'web': ['html', 'css', 'javascript'],
+        'cloud': ['aws', 'azure', 'gcp', 'docker'],
+        'mobile': ['ios', 'android', 'react native', 'flutter']
+    }
+
+    # Trending skills (you can update this periodically)
+    trending_skills = [
+        'kubernetes', 'terraform', 'machine learning', 'ai', 'blockchain',
+        'typescript', 'react', 'vue', 'golang', 'rust', 'graphql'
+    ]
+
+    skill_gaps = {
+        'critical': [],
+        'important': [],
+        'nice_to_have': [],
+        'trending': []
+    }
+
+    job_title_lower = job_data.get('title', '').lower()
+    job_desc_lower = job_data.get('description', '').lower()
+
+    for skill in job_skills:
+        skill_lower = skill.lower()
+
+        if skill_lower in user_skills_lower:
+            continue  # User already has this skill
+
+        # Categorize based on various factors
+        is_critical = False
+        is_important = False
+        is_trending = skill_lower in [t.lower() for t in trending_skills]
+
+        # Check if skill appears in job title (usually critical)
+        if skill_lower in job_title_lower:
+            is_critical = True
+
+        # Check against critical skills database
+        for category, critical_list in critical_skills_db.items():
+            if category in job_title_lower or category in job_desc_lower:
+                if any(crit in skill_lower for crit in critical_list):
+                    is_critical = True
+                    break
+
+        # Check frequency in job description
+        skill_mentions = job_desc_lower.count(skill_lower)
+        if skill_mentions >= 3:  # Mentioned multiple times
+            is_important = True
+        elif skill_mentions >= 2:
+            is_important = True
+
+        # Categorize
+        if is_critical:
+            skill_gaps['critical'].append(skill)
+        elif is_important:
+            skill_gaps['important'].append(skill)
+        elif is_trending:
+            skill_gaps['trending'].append(skill)
+        else:
+            skill_gaps['nice_to_have'].append(skill)
+
+    return skill_gaps
+
+
+def calculate_gap_severity(skill_gaps_detailed: Dict, user_experience_level: str) -> Dict:
+    """
+    Calculate severity metrics for skill gaps
+    """
+    total_gaps = sum(len(gaps) for gaps in skill_gaps_detailed.values())
+    critical_count = len(skill_gaps_detailed['critical'])
+
+    # Calculate severity score (0-100, lower is better)
+    severity_score = min(100, (critical_count * 25) + (len(skill_gaps_detailed['important']) * 10))
+
+    # Estimate learning time based on gap types and user experience
+    time_multipliers = {
+        'entry': 1.5,
+        'mid': 1.0,
+        'senior': 0.7,
+        'executive': 0.5
+    }
+
+    base_time = (critical_count * 4) + (len(skill_gaps_detailed['important']) * 2)  # weeks
+    estimated_time = base_time * time_multipliers.get(user_experience_level, 1.0)
+
+    # Calculate potential score improvement
+    current_match = 100 - severity_score
+    potential_improvement = min(25, critical_count * 8 + len(skill_gaps_detailed['important']) * 3)
+
+    return {
+        'total_gaps': total_gaps,
+        'critical_gaps': critical_count,
+        'severity_score': severity_score,
+        'estimated_learning_weeks': round(estimated_time),
+        'potential_score_improvement': potential_improvement,
+        'difficulty_level': 'high' if critical_count >= 3 else 'medium' if critical_count >= 1 else 'low'
+    }
+
+
+def generate_improvement_summary(skill_gaps_detailed: Dict, gap_analysis: Dict) -> str:
+    """
+    Generate human-readable improvement summary
+    """
+    critical_count = len(skill_gaps_detailed['critical'])
+    important_count = len(skill_gaps_detailed['important'])
+
+    if critical_count == 0 and important_count == 0:
+        return "You're well-qualified for this role! Focus on trending skills to stay competitive."
+
+    summary_parts = []
+
+    if critical_count > 0:
+        critical_skills = ', '.join(skill_gaps_detailed['critical'][:3])
+        summary_parts.append(f"Priority focus: {critical_skills}")
+
+    if important_count > 0:
+        important_skills = ', '.join(skill_gaps_detailed['important'][:2])
+        summary_parts.append(f"Secondary skills: {important_skills}")
+
+    time_estimate = gap_analysis['estimated_learning_weeks']
+    summary_parts.append(f"Estimated learning time: {time_estimate} weeks")
+
+    return ". ".join(summary_parts) + "."
 
 @app.get("/")
 def root():
