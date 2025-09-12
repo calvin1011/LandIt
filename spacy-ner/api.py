@@ -11,6 +11,7 @@ import io
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
 import numpy as np
+from job_data_importer import MuseJobImporter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -93,7 +94,7 @@ app.add_middleware(
         "http://127.0.0.1:3003"
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -1207,6 +1208,88 @@ def test_response():
         "message": "Test successful"
     }
 
+
+@app.post("/admin/import-jobs")
+def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
+    """
+    Import jobs from The Muse API
+    Admin endpoint to populate job database
+    """
+    try:
+        start_time = time.time()
+
+        logger.info("🚀 Starting job import from The Muse...")
+
+        # Initialize importer
+        importer = MuseJobImporter()
+
+        # Use default categories if none provided
+        if categories is None:
+            categories = [
+                'Software Engineer',
+                'Data Science',
+                'Product Management',
+                'Engineering',
+                'Design'
+            ]
+
+        # Import jobs
+        importer.import_jobs(categories=categories, max_jobs=max_jobs)
+
+        # Get summary
+        summary = importer.get_import_summary()
+        processing_time = time.time() - start_time
+
+        logger.info(f"✅ Job import completed in {processing_time:.2f}s")
+
+        return {
+            "success": True,
+            "summary": summary,
+            "processing_time": processing_time,
+            "categories_processed": categories,
+            "message": f"Successfully imported {summary['imported']} jobs from The Muse"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Job import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Job import failed: {str(e)}")
+
+
+@app.get("/admin/jobs/stats")
+def get_job_stats():
+    """
+    Get statistics about jobs in the database
+    """
+    try:
+        # Get all jobs
+        all_jobs = db.get_all_jobs_with_embeddings()
+
+        # Calculate stats
+        total_jobs = len(all_jobs)
+        companies = set()
+        sources = {}
+        experience_levels = {}
+
+        for job in all_jobs:
+            companies.add(job.get('company', ''))
+
+            source = job.get('source', 'unknown')
+            sources[source] = sources.get(source, 0) + 1
+
+            exp_level = job.get('experience_level', 'unknown')
+            experience_levels[exp_level] = experience_levels.get(exp_level, 0) + 1
+
+        return {
+            "total_jobs": total_jobs,
+            "unique_companies": len(companies),
+            "jobs_by_source": sources,
+            "jobs_by_experience_level": experience_levels,
+            "sample_companies": list(companies)[:10]  # Show first 10 companies
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to get job stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get job stats: {str(e)}")
 
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
     """

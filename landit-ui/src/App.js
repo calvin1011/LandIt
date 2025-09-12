@@ -7,6 +7,7 @@ import JobCreationForm from './components/JobCreationForm';
 import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
 import Profile from './components/Profile';
+import AdminPanel from './components/AdminPanel';
 import './App.css';
 
 const initialUserInfo = {
@@ -24,8 +25,9 @@ function App() {
     const [loading, setLoading] = useState(true);
     const [firebaseUser, setFirebaseUser] = useState(null);
     const [showUploader, setShowUploader] = useState(false);
-    const [activeTab, setActiveTab] = useState('resume'); // 'resume', 'jobs', 'create-job'
+    const [activeTab, setActiveTab] = useState('resume');
     const [showJobCreation, setShowJobCreation] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         console.log('🔥 Setting up Firebase auth listener...');
@@ -38,6 +40,13 @@ function App() {
                 setFirebaseUser(user);
                 setLoggedIn(true);
                 setUserEmail(email);
+
+                // Simple admin check: if the user email matches a specific one
+                if (email === 'admin@landit.com') {
+                    setIsAdmin(true);
+                } else {
+                    setIsAdmin(false);
+                }
 
                 const savedUserProfile = localStorage.getItem(`userInfo_${email}`);
                 if (savedUserProfile) {
@@ -60,6 +69,7 @@ function App() {
                 setShowUploader(false);
                 setActiveTab('resume');
                 localStorage.removeItem('currentUser');
+                setIsAdmin(false); // Clear admin status on sign out
             }
 
             setLoading(false);
@@ -116,17 +126,13 @@ function App() {
         setActiveTab('resume');
     };
 
-    // The core change to support the new workflow
     const handleUploadSuccess = () => {
-        // We no longer set parsedData as per your request
         setShowUploader(false);
-        // Automatically switch to jobs tab after a small delay
         setTimeout(() => setActiveTab('jobs'), 2000);
     };
 
     const handleJobCreated = (jobData) => {
         setShowJobCreation(false);
-        // Could show a success message or refresh job list
         console.log('Job created:', jobData);
     };
 
@@ -256,6 +262,26 @@ function App() {
                                     🎯 Jobs
                                 </button>
 
+                                {/* ADMIN PANEL BUTTON */}
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => setActiveTab('admin')}
+                                        style={{
+                                            padding: '8px 16px',
+                                            background: activeTab === 'admin' ? '#6366f1' : 'transparent',
+                                            color: activeTab === 'admin' ? 'white' : '#6b7280',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        ⚙️ Admin
+                                    </button>
+                                )}
+
                                 <button
                                     onClick={() => setShowJobCreation(true)}
                                     style={{
@@ -374,6 +400,11 @@ function App() {
 
                         {activeTab === 'jobs' && (
                             <JobRecommendations userEmail={userEmail} />
+                        )}
+
+                        {/* 4. RENDER ADMINPANEL COMPONENT */}
+                        {activeTab === 'admin' && (
+                            <AdminPanel />
                         )}
                     </div>
                 </div>
