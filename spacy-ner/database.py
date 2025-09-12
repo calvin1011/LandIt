@@ -572,6 +572,103 @@ class DatabaseConnection:
             logger.error(f"Failed to get jobs excluding IDs: {e}")
             return []
 
+    def get_job_by_id(self, job_id: int) -> Optional[Dict]:
+        """Get job data by ID"""
+        try:
+            cursor = self.get_cursor()
+            query = "SELECT * FROM jobs WHERE id = %s AND is_active = true"
+            cursor.execute(query, (job_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return dict(result) if result else None
+        except Exception as e:
+            logger.error(f"Failed to get job by ID: {e}")
+            return None
+
+    def store_learning_plan(self, user_email: str, job_id: int, recommendation_id: Optional[int],
+                            learning_plan: Dict) -> int:
+        """Store learning plan in database"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    INSERT INTO learning_plans (user_email, job_id, recommendation_id, plan_data, created_at)
+                    VALUES (%s, %s, %s, %s, NOW()) RETURNING id;
+                    """
+
+            cursor.execute(query, (
+                user_email,
+                job_id,
+                recommendation_id,
+                json.dumps(learning_plan)
+            ))
+
+            plan_id = cursor.fetchone()['id']
+            cursor.close()
+
+            logger.info(f"✅ Stored learning plan for {user_email} (ID: {plan_id})")
+            return plan_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to store learning plan: {e}")
+            raise
+
+    def get_user_learning_plans(self, user_email: str, limit: int = 10) -> List[Dict]:
+        """Get user's learning plans"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    SELECT lp.*, j.title as job_title, j.company
+                    FROM learning_plans lp
+                             LEFT JOIN jobs j ON lp.job_id = j.id
+                    WHERE lp.user_email = %s
+                    ORDER BY lp.created_at DESC
+                        LIMIT %s;
+                    """
+
+            cursor.execute(query, (user_email, limit))
+            results = cursor.fetchall()
+            cursor.close()
+
+            # Parse JSON plan_data for each result
+            plans = []
+            for result in results:
+                plan_dict = dict(result)
+                if plan_dict.get('plan_data'):
+                    try:
+                        plan_dict['plan_data'] = json.loads(plan_dict['plan_data'])
+                    except json.JSONDecodeError:
+                        plan_dict['plan_data'] = {}
+                plans.append(plan_dict)
+
+            return plans
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get learning plans: {e}")
+            return []
+
+    def update_learning_progress(self, plan_id: int, progress_data: Dict) -> int:
+        """Update progress on a learning plan"""
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    INSERT INTO learning_progress (plan_id, progress_data, updated_at)
+                    VALUES (%s, %s, NOW()) RETURNING id;
+                    """
+
+            cursor.execute(query, (plan_id, json.dumps(progress_data)))
+
+            progress_id = cursor.fetchone()['id']
+            cursor.close()
+
+            return progress_id
+
+        except Exception as e:
+            logger.error(f"❌ Failed to update learning progress: {e}")
+            raise
+
     # Utility methods
 
     def test_connection(self) -> bool:

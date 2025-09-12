@@ -15,6 +15,7 @@ import numpy as np
 from job_data_importer import MuseJobImporter
 from adzuna_job_importer import AdzunaJobImporter
 from jsearch_job_importer import JSearchJobImporter
+from ai_project_generator import AIProjectGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -220,6 +221,11 @@ class FeedbackRequest(BaseModel):
     feedback_type: str  # positive, negative, applied, saved, dismissed
     feedback_text: Optional[str] = ""
     action_taken: Optional[str] = ""
+
+class LearningPlanRequest(BaseModel):
+    user_email: str
+    job_id: int
+    recommendation_id: Optional[int] = None
 
 class StoreResumeRequest(BaseModel):
     user_email: str
@@ -1002,6 +1008,166 @@ def generate_improvement_summary(skill_gaps_detailed: Dict, gap_analysis: Dict) 
     summary_parts.append(f"Estimated learning time: {time_estimate} weeks")
 
     return ". ".join(summary_parts) + "."
+
+
+@app.post("/generate-learning-plan")
+def generate_learning_plan(request: LearningPlanRequest):
+    """
+    Generate AI-powered learning plan for a specific job recommendation
+    """
+    try:
+        start_time = time.time()
+
+        # Initialize AI project generator
+        try:
+            ai_generator = AIProjectGenerator()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail="AI service not available. OpenAI API key not configured."
+            )
+
+        # Get user's resume data
+        user_resume = db.get_user_resume(request.user_email)
+        if not user_resume:
+            raise HTTPException(
+                status_code=404,
+                detail="User resume not found. Please upload a resume first."
+            )
+
+        # Get job data
+        job_data = db.get_job_by_id(request.job_id)
+        if not job_data:
+            raise HTTPException(
+                status_code=404,
+                detail="Job not found."
+            )
+
+        # Get or calculate skill gaps for this job
+        user_skills = extract_user_skills(user_resume)
+        job_skills = job_data.get('skills_required', [])
+
+        # Generate detailed skill gap analysis (reusing existing logic)
+        skill_gaps_detailed = categorize_skill_gaps(
+            user_skills,
+            job_skills,
+            job_data,
+            user_resume.get('experience_level', 'mid')
+        )
+
+        gap_analysis = calculate_gap_severity(
+            skill_gaps_detailed,
+            user_resume.get('experience_level', 'mid')
+        )
+
+        # Build user profile for AI
+        user_profile = {
+            'experience_level': user_resume.get('experience_level', 'mid'),
+            'years_of_experience': user_resume.get('years_of_experience', 0),
+            'current_skills': user_skills,
+            'current_job_title': user_resume.get('current_job_title', ''),
+            'top_skills': user_resume.get('top_skills', [])
+        }
+
+        # Generate AI-powered learning plan
+        logger.info(f"Generating learning plan for {request.user_email} -> {job_data.get('title')}")
+
+        learning_plan = ai_generator.generate_learning_plan(
+            user_profile=user_profile,
+            job_data=job_data,
+            skill_gaps_detailed=skill_gaps_detailed,
+            gap_analysis=gap_analysis
+        )
+
+        # Store learning plan in database for future reference
+        plan_id = db.store_learning_plan(
+            user_email=request.user_email,
+            job_id=request.job_id,
+            recommendation_id=request.recommendation_id,
+            learning_plan=learning_plan
+        )
+
+        processing_time = time.time() - start_time
+
+        # Return comprehensive learning plan
+        return {
+            "success": True,
+            "plan_id": plan_id,
+            "learning_plan": learning_plan,
+            "job_info": {
+                "title": job_data.get('title'),
+                "company": job_data.get('company'),
+                "job_id": request.job_id
+            },
+            "user_profile": {
+                "experience_level": user_profile['experience_level'],
+                "current_skills_count": len(user_skills)
+            },
+            "gap_summary": {
+                "critical_gaps": len(skill_gaps_detailed.get('critical', [])),
+                "important_gaps": len(skill_gaps_detailed.get('important', [])),
+                "estimated_weeks": gap_analysis.get('estimated_learning_weeks', 8),
+                "difficulty": gap_analysis.get('difficulty_level', 'medium')
+            },
+            "processing_time": processing_time,
+            "message": f"Generated learning plan with {len(learning_plan.get('critical_projects', []))} critical projects"
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate learning plan: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Learning plan generation failed: {str(e)}"
+        )
+
+
+@app.get("/learning-plans/{user_email}")
+def get_user_learning_plans(user_email: str, limit: int = 10):
+    """
+    Get user's saved learning plans
+    """
+    try:
+        learning_plans = db.get_user_learning_plans(user_email, limit)
+
+        return {
+            "success": True,
+            "learning_plans": learning_plans,
+            "total": len(learning_plans),
+            "user_email": user_email
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get learning plans: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve learning plans: {str(e)}"
+        )
+
+
+@app.post("/learning-plans/{plan_id}/progress")
+def update_learning_progress(plan_id: int, progress_data: Dict[str, Any]):
+    """
+    Update progress on a learning plan
+    """
+    try:
+        # Store progress update
+        progress_id = db.update_learning_progress(plan_id, progress_data)
+
+        return {
+            "success": True,
+            "progress_id": progress_id,
+            "message": "Progress updated successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to update progress: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update progress: {str(e)}"
+        )
 
 @app.get("/")
 def root():

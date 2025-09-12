@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LearningPlan from './LearningPlan';
 
 // Icon Components
 const Briefcase = ({ style }) => (
@@ -301,6 +302,9 @@ const JobRecommendations = ({ userEmail }) => {
     const [hasMore, setHasMore] = useState(true);
     const [offset, setOffset] = useState(0);
 
+    const [showLearningPlan, setShowLearningPlan] = useState(false);
+    const [selectedJob, setSelectedJob] = useState(null);
+
     useEffect(() => {
         if (userEmail) {
             fetchRecommendations(true); // Reset on user change
@@ -409,8 +413,8 @@ const JobRecommendations = ({ userEmail }) => {
     };
 
     const generateLearningPlan = async (job) => {
-            console.log('Generating learning plan for:', job.title);
-            alert(`Learning plan generation for ${job.title} - Coming in next step!`);
+            setSelectedJob(job);
+            setShowLearningPlan(true);
         }
 
     const getMatchQualityColor = (score) => {
@@ -503,6 +507,8 @@ const JobRecommendations = ({ userEmail }) => {
                     <Refresh style={{ width: '14px', height: '14px' }} />
                     {loading ? 'Finding...' : 'Fresh Jobs'}
                 </button>
+
+
             </div>
 
             {/* Error Message */}
@@ -903,6 +909,36 @@ const JobRecommendations = ({ userEmail }) => {
                             You've seen all available job matches. Click "Fresh Jobs" to get new recommendations!
                         </div>
                     )}
+                </div>
+            )}
+
+            {/*Learning Plan Modal*/}
+            {showLearningPlan && selectedJob && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        maxWidth: '1200px',
+                        width: '100%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <LearningPlan
+                            userEmail={userEmail}
+                            jobMatch={selectedJob}
+                            onBack={() => setShowLearningPlan(false)}
+                        />
+                    </div>
                 </div>
             )}
         </div>
