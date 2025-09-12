@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
 import numpy as np
 from job_data_importer import MuseJobImporter
+from adzuna_job_importer import AdzunaJobImporter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1208,6 +1209,50 @@ def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
     except Exception as e:
         logger.error(f"❌ Job import failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job import failed: {str(e)}")
+
+@app.post("/admin/import-adzuna-jobs")
+def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
+    """
+    Import jobs from Adzuna API
+    Admin endpoint with better direct apply links
+    """
+    try:
+        start_time = time.time()
+        logger.info("🚀 Starting Adzuna job import...")
+
+        # Initialize importer
+        importer = AdzunaJobImporter()
+
+        # Use default keywords if none provided
+        if keywords is None:
+            keywords = [
+                'software engineer',
+                'data scientist',
+                'product manager',
+                'full stack developer',
+                'machine learning engineer'
+            ]
+
+        # Import jobs
+        importer.import_jobs(keywords=keywords, max_jobs=max_jobs, location=location)
+
+        # Get summary
+        summary = importer.get_import_summary()
+        processing_time = time.time() - start_time
+
+        logger.info(f"✅ Adzuna import completed in {processing_time:.2f}s")
+
+        return {
+            "success": True,
+            "summary": summary,
+            "processing_time": processing_time,
+            "keywords_processed": keywords,
+            "message": f"Successfully imported {summary['imported']} jobs from Adzuna"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Adzuna import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Adzuna import failed: {str(e)}")
 
 
 @app.get("/admin/jobs/stats")

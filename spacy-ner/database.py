@@ -513,6 +513,18 @@ class DatabaseConnection:
         except Exception as e:
             logger.error(f"❌ Failed to update viewed status: {e}")
 
+    def get_jobs_by_title_company(self, title: str, company: str) -> List[Dict]:
+        """Check for existing jobs by title and company"""
+        query = """
+                SELECT id \
+                FROM jobs
+                WHERE LOWER(title) = LOWER(%s) \
+                  AND LOWER(company) = LOWER(%s) LIMIT 1 \
+                """
+        cursor = self.connection.cursor()
+        cursor.execute(query, (title, company))
+        return cursor.fetchall()
+
     # Utility methods
 
     def test_connection(self) -> bool:
