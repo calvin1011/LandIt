@@ -3,7 +3,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import ResumeUploader from './components/ResumeUploader';
 import JobRecommendations from './components/JobRecommendations';
-import JobCreationForm from './components/JobCreationForm';
 import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
 import Profile from './components/Profile';
@@ -27,7 +26,6 @@ function App() {
     const [firebaseUser, setFirebaseUser] = useState(null);
     const [showUploader, setShowUploader] = useState(false);
     const [activeTab, setActiveTab] = useState('resume');
-    const [showJobCreation, setShowJobCreation] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
     const [learningJobContext, setLearningJobContext] = useState(null);
@@ -45,7 +43,7 @@ function App() {
                 setUserEmail(email);
 
                 // Simple admin check: if the user email matches a specific one
-                if (email === 'admin@landit.com') {
+                if (email === 'admin@landit.com' || email === 'calvinssendawula@gmail.com') {
                     setIsAdmin(true);
                 } else {
                     setIsAdmin(false);
@@ -137,11 +135,6 @@ function App() {
     const handleUploadSuccess = () => {
         setShowUploader(false);
         setTimeout(() => setActiveTab('jobs'), 2000);
-    };
-
-    const handleJobCreated = (jobData) => {
-        setShowJobCreation(false);
-        console.log('Job created:', jobData);
     };
 
     useEffect(() => {
@@ -307,25 +300,6 @@ function App() {
                                         ⚙️ Admin
                                     </button>
                                 )}
-
-                                <button
-                                    onClick={() => setShowJobCreation(true)}
-                                    style={{
-                                        padding: '8px 16px',
-                                        background: '#10b981',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.target.style.background = '#059669'}
-                                    onMouseOut={(e) => e.target.style.background = '#10b981'}
-                                >
-                                    ➕ Post Job
-                                </button>
                             </div>
 
                             {parsedData.length > 0 && !showUploader && activeTab === 'resume' && (
@@ -379,35 +353,6 @@ function App() {
                     <div style={{ padding: '30px 40px', maxWidth: '1400px', margin: '0 auto' }}>
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
-
-                        {/* Job Creation Modal */}
-                        {showJobCreation && (
-                            <div style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                background: 'rgba(0, 0, 0, 0.5)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 1000,
-                                padding: '20px'
-                            }}>
-                                <div style={{
-                                    maxWidth: '800px',
-                                    width: '100%',
-                                    maxHeight: '90vh',
-                                    overflow: 'auto'
-                                }}>
-                                    <JobCreationForm
-                                        onJobCreated={handleJobCreated}
-                                        onCancel={() => setShowJobCreation(false)}
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {/* Main Content Area */}
                         {activeTab === 'resume' && (
