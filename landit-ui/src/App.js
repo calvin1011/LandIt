@@ -9,6 +9,7 @@ import Login from "./components/Login";
 import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
+import Learning from './components/Learning';
 
 const initialUserInfo = {
     fullName: '',
@@ -262,6 +263,24 @@ function App() {
                                     🎯 Jobs
                                 </button>
 
+                                {/*Leaning tab*/}
+                                <button
+                                    onClick={() => setActiveTab('learning')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: activeTab === 'learning' ? '#6366f1' : 'transparent',
+                                        color: activeTab === 'learning' ? 'white' : '#6b7280',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    🧠 Learning
+                                </button>
+
                                 {/* ADMIN PANEL BUTTON */}
                                 {isAdmin && (
                                     <button
@@ -405,6 +424,11 @@ function App() {
                         {/* 4. RENDER ADMINPANEL COMPONENT */}
                         {activeTab === 'admin' && (
                             <AdminPanel />
+                        )}
+
+                        {/*Leaning component*/}
+                        {activeTab === 'learning' && (
+                            <Learning userEmail={userEmail} />
                         )}
                     </div>
                 </div>
