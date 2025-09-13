@@ -30,6 +30,8 @@ function App() {
     const [showJobCreation, setShowJobCreation] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
+    const [learningJobContext, setLearningJobContext] = useState(null);
+
     useEffect(() => {
         console.log('🔥 Setting up Firebase auth listener...');
 
@@ -119,6 +121,11 @@ function App() {
         } else {
             setUserInfo(initialUserInfo);
         }
+    };
+
+    const handleNavigateToLearning = (job) => {
+        setLearningJobContext(job);
+        setActiveTab('learning');
     };
 
     const handleUploadNew = () => {
@@ -418,7 +425,10 @@ function App() {
                         )}
 
                         {activeTab === 'jobs' && (
-                            <JobRecommendations userEmail={userEmail} />
+                            <JobRecommendations
+                                userEmail={userEmail}
+                                onNavigateToLearning={handleNavigateToLearning}
+                            />
                         )}
 
                         {/* 4. RENDER ADMINPANEL COMPONENT */}
@@ -428,7 +438,11 @@ function App() {
 
                         {/*Leaning component*/}
                         {activeTab === 'learning' && (
-                            <Learning userEmail={userEmail} />
+                            <Learning
+                                userEmail={userEmail}
+                                jobContext={learningJobContext}
+                                onClearJobContext={() => setLearningJobContext(null)}
+                            />
                         )}
                     </div>
                 </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Clock, Target, TrendingUp, CheckCircle, AlertCircle, BookOpen, Sparkles, MessageSquare, RefreshCw } from 'lucide-react';
 
-const Learning = ({ userEmail }) => {
+const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,18 +21,40 @@ const Learning = ({ userEmail }) => {
         id: 1,
         type: 'bot',
         content: `Hi! I'm your AI Learning Coach. I can help you create personalized learning plans, suggest projects, and answer questions about skill development.
-
-To get started, you can:
-• Ask me to create a learning plan for a specific job
-• Request project recommendations for certain skills
-• Get advice on career development
-• Modify existing learning plans
-
-What would you like to work on today?`,
+        To get started, you can:
+        • Ask me to create a learning plan for a specific job
+        • Request project recommendations for certain skills
+        • Get advice on career development
+        • Modify existing learning plans
+        What would you like to work on today?`,
         timestamp: new Date()
       }]);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+  if (jobContext && messages.length <= 1) {
+    // Auto-start conversation when job context is provided
+    const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: jobMessage,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+
+    // Clear the context after using it
+    if (onClearJobContext) {
+      onClearJobContext();
+    }
+
+    // Auto-generate the learning plan
+    handleJobBasedLearningPlan(jobContext);
+  }
+}, [jobContext, messages.length, onClearJobContext]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +122,54 @@ What would you like to work on today?`,
     return await getGeneralAdvice(message);
   };
 
+  const handleJobBasedLearningPlan = async (job) => {
+  setIsLoading(true);
+
+  try {
+    // Call your existing learning plan API with job context
+    const response = await fetch('http://localhost:8000/generate-learning-plan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_email: userEmail,
+        job_id: job.job_id,
+        recommendation_id: job.recommendation_id
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate learning plan');
+    }
+
+    const data = await response.json();
+
+    const botMessage = {
+      id: Date.now() + 1,
+      type: 'bot',
+      content: `I've created a personalized learning plan for the ${job.title} role at ${job.company}! Here's your strategic roadmap:`,
+      learningPlan: data.learning_plan,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, botMessage]);
+    setCurrentPlan(data.learning_plan);
+
+  } catch (error) {
+    const errorMessage = {
+      id: Date.now() + 1,
+      type: 'bot',
+      content: `I encountered an error generating your learning plan: ${error.message}. Let me help you in another way - what specific skills would you like to focus on?`,
+      timestamp: new Date(),
+      isError: true
+    };
+    setMessages(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
   const generateLearningPlanFromChat = async (message) => {
     // For now, we'll simulate generating a plan
     // In production, you'd call your learning plan API with the chat context
@@ -129,12 +199,10 @@ What would you like to work on today?`,
       // Fallback response
       return {
         content: `I'd love to help you create a learning plan! However, I need a bit more information:
-
-1. What specific job role are you targeting?
-2. What are your current skills?
-3. Are there particular technologies you want to learn?
-
-You can also get job recommendations first, then I can create a targeted learning plan based on specific job requirements.`
+        1. What specific job role are you targeting?
+        2. What are your current skills?
+        3. Are there particular technologies you want to learn?
+        You can also get job recommendations first, then I can create a targeted learning plan based on specific job requirements.`
       };
     }
   };
@@ -162,23 +230,22 @@ You can also get job recommendations first, then I can create a targeted learnin
     } catch (error) {
       return {
         content: `I can suggest some great project ideas! Here are a few general recommendations:
+        **Beginner Projects:**
+        • Personal portfolio website
+        • Todo list application
+        • Simple blog or content management system  
 
-**Beginner Projects:**
-• Personal portfolio website
-• Todo list application
-• Simple blog or content management system
+        **Intermediate Projects:**
+        • E-commerce application with payment integration
+        • Real-time chat application
+        • API-driven dashboard with data visualization
 
-**Intermediate Projects:**
-• E-commerce application with payment integration
-• Real-time chat application
-• API-driven dashboard with data visualization
+        **Advanced Projects:**
+        • Microservices architecture implementation
+        • Machine learning model deployment
+        • Full-stack application with advanced features
 
-**Advanced Projects:**
-• Microservices architecture implementation
-• Machine learning model deployment
-• Full-stack application with advanced features
-
-What specific technologies or skills would you like to focus on?`
+        What specific technologies or skills would you like to focus on?`
       };
     }
   };
@@ -210,13 +277,13 @@ What specific technologies or skills would you like to focus on?`
       return {
         content: `I'm here to help with your learning journey! I can assist with:
 
-• Creating personalized learning plans
-• Suggesting portfolio projects
-• Career development advice
-• Skill gap analysis
-• Technology recommendations
+        • Creating personalized learning plans
+        • Suggesting portfolio projects
+        • Career development advice
+        • Skill gap analysis
+        • Technology recommendations
 
-What specific aspect of your learning or career development would you like to discuss?`
+        What specific aspect of your learning or career development would you like to discuss?`
       };
     }
   };
