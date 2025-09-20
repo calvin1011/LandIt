@@ -1,10 +1,12 @@
 import spacy
 import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 from enum import Enum
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
 
 class ResumeSection(Enum):
     HEADER = "header"
@@ -15,103 +17,322 @@ class ResumeSection(Enum):
     PROJECTS = "projects"
     CERTIFICATIONS = "certifications"
     CONTACT = "contact"
+    LANGUAGES = "languages"
+    AWARDS = "awards"
+    REFERENCES = "references"
+    VOLUNTEERING = "volunteering"
+    INTERESTS = "interests"
     OTHER = "other"
+
+
+@dataclass
+class SectionBoundary:
+    start: int
+    end: int
+    content: str
+    confidence: float = 1.0
+    detected_by: str = "header"
 
 
 class IntelligentSectionDetector:
     """
-    Detects resume sections using pattern matching and context clues
-    This provides structure context to improve entity extraction
+    Advanced resume section detector using pattern matching, contextual analysis,
+    and structural cues to identify resume sections with high accuracy.
     """
 
     def __init__(self):
-        # Section header patterns (order matters - most specific first)
+        # Load NLP model for advanced text analysis
+        try:
+            self.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            logger.warning("spaCy model 'en_core_web_sm' not found. Using regex-only mode.")
+            self.nlp = None
+
+        # Comprehensive section header patterns with priority ordering
         self.section_patterns = {
             ResumeSection.EXPERIENCE: [
-                r'\b(?:work\s+)?experience\b',
-                r'\bemployment\s+history\b',
-                r'\bprofessional\s+experience\b',
-                r'\bcareer\s+history\b',
-                r'\bwork\s+history\b',
-                r'\bjob\s+history\b'
+                r'^(?:\d+[\.\)]?\s*)?(?:work|professional|relevant)\s+experience(?:\s+&?\s+history)?$',
+                r'^(?:\d+[\.\)]?\s*)?employment(?:\s+history)?$',
+                r'^(?:\d+[\.\)]?\s*)?career(?:\s+(?:history|summary|highlights|progress))?$',
+                r'^(?:\d+[\.\)]?\s*)?work(?:\s+history)?$',
+                r'^(?:\d+[\.\)]?\s*)?professional(?:\s+background|history)?$',
+                r'^(?:\d+[\.\)]?\s*)?job(?:\s+history)?$',
+                r'^(?:\d+[\.\)]?\s*)?experience$',
+                r'^(?:\d+[\.\)]?\s*)?positions?$',
+                r'^(?:\d+[\.\)]?\s*)?employment\s+record$',
+                r'^(?:\d+[\.\)]?\s*)?career\s+chronology$',
             ],
             ResumeSection.EDUCATION: [
-                r'\beducation(?:al\s+background)?\b',
-                r'\bacademic\s+(?:background|history|qualifications)\b',
-                r'\bschooling\b',
-                r'\buniversity\b',
-                r'\bcollege\b',
-                r'\bdegree(?:s)?\b'
+                r'^(?:\d+[\.\)]?\s*)?education(?:\s+(?:background|history|qualifications|credentials))?$',
+                r'^(?:\d+[\.\)]?\s*)?academic(?:\s+(?:background|history|qualifications|credentials))?$',
+                r'^(?:\d+[\.\)]?\s*)?educational(?:\s+background|qualifications)?$',
+                r'^(?:\d+[\.\)]?\s*)?schooling$',
+                r'^(?:\d+[\.\)]?\s*)?(?:university|college)(?:\s+education)?$',
+                r'^(?:\d+[\.\)]?\s*)?degrees?(?:\s+and\s+qualifications)?$',
+                r'^(?:\d+[\.\)]?\s*)?academics$',
+                r'^(?:\d+[\.\)]?\s*)?studies$',
+                r'^(?:\d+[\.\)]?\s*)?qualifications$',
+                r'^(?:\d+[\.\)]?\s*)?courses?$',
             ],
             ResumeSection.SKILLS: [
-                r'\b(?:technical\s+)?skills\b',
-                r'\bcompetencies\b',
-                r'\bexpertise\b',
-                r'\bproficiencies\b',
-                r'\btechnologies\b',
-                r'\btools\s+(?:and\s+technologies|&\s+technologies)\b'
+                r'^(?:\d+[\.\)]?\s*)?(?:technical\s+)?skills(?:\s+&?\s+(?:competencies|abilities))?$',
+                r'^(?:\d+[\.\)]?\s*)?competencies$',
+                r'^(?:\d+[\.\)]?\s*)?expertise$',
+                r'^(?:\d+[\.\)]?\s*)?proficiencies$',
+                r'^(?:\d+[\.\)]?\s*)?technologies$',
+                r'^(?:\d+[\.\)]?\s*)?(?:technical\s+)?abilities$',
+                r'^(?:\d+[\.\)]?\s*)?tools(?:\s+and\s+technologies)?$',
+                r'^(?:\d+[\.\)]?\s*)?(?:software|programming)(?:\s+skills)?$',
+                r'^(?:\d+[\.\)]?\s*)?key\s+skills$',
+                r'^(?:\d+[\.\)]?\s*)?core\s+(?:competencies|skills)$',
             ],
             ResumeSection.PROJECTS: [
-                r'\bprojects?\b',
-                r'\bportfolio\b',
-                r'\bside\s+projects\b',
-                r'\bpersonal\s+projects\b',
-                r'\bnotable\s+projects\b'
+                r'^(?:\d+[\.\)]?\s*)?projects?(?:\s+portfolio)?$',
+                r'^(?:\d+[\.\)]?\s*)?portfolio$',
+                r'^(?:\d+[\.\)]?\s*)?(?:side|personal|notable|key)\s+projects$',
+                r'^(?:\d+[\.\)]?\s*)?selected\s+projects$',
+                r'^(?:\d+[\.\)]?\s*)?project\s+experience$',
+                r'^(?:\d+[\.\)]?\s*)?project\s+portfolio$',
+                r'^(?:\d+[\.\)]?\s*)?project\s+history$',
             ],
             ResumeSection.CERTIFICATIONS: [
-                r'\bcertifications?\b',
-                r'\blicenses?\b',
-                r'\bcredentials\b',
-                r'\bprofessional\s+certifications\b'
+                r'^(?:\d+[\.\)]?\s*)?certifications?(?:\s+and\s+licenses?)?$',
+                r'^(?:\d+[\.\)]?\s*)?licenses?(?:\s+and\s+certifications?)?$',
+                r'^(?:\d+[\.\)]?\s*)?credentials$',
+                r'^(?:\d+[\.\)]?\s*)?professional(?:\s+development|certifications)?$',
+                r'^(?:\d+[\.\)]?\s*)?certificates?$',
+                r'^(?:\d+[\.\)]?\s*)?trainings?$',
+                r'^(?:\d+[\.\)]?\s*)?professional\s+qualifications$',
+                r'^(?:\d+[\.\)]?\s*)?accreditations?$',
             ],
             ResumeSection.SUMMARY: [
-                r'\bsummary\b',
-                r'\bprofile\b',
-                r'\bobject(?:ive)?\b',
-                r'\babout\s+me\b',
-                r'\bprofessional\s+summary\b',
-                r'\bcareer\s+(?:summary|objective)\b'
+                r'^(?:\d+[\.\)]?\s*)?summary$',
+                r'^(?:\d+[\.\)]?\s*)?profile$',
+                r'^(?:\d+[\.\)]?\s*)?objective$',
+                r'^(?:\d+[\.\)]?\s*)?about\s+me$',
+                r'^(?:\d+[\.\)]?\s*)?professional(?:\s+summary|profile)?$',
+                r'^(?:\d+[\.\)]?\s*)?career(?:\s+summary|objective|profile)?$',
+                r'^(?:\d+[\.\)]?\s*)?executive\s+summary$',
+                r'^(?:\d+[\.\)]?\s*)?personal(?:\s+statement|profile)?$',
+                r'^(?:\d+[\.\)]?\s*)?overview$',
             ],
             ResumeSection.CONTACT: [
-                r'\bcontact\s+(?:information|details)\b',
-                r'\bpersonal\s+(?:information|details)\b',
-                r'\bget\s+in\s+touch\b'
+                r'^(?:\d+[\.\)]?\s*)?contact(?:\s+information|details)?$',
+                r'^(?:\d+[\.\)]?\s*)?personal(?:\s+information|details)?$',
+                r'^(?:\d+[\.\)]?\s*)?get\s+in\s+touch$',
+                r'^(?:\d+[\.\)]?\s*)?connect$',
+                r'^(?:\d+[\.\)]?\s*)?(?:how\s+to\s+)?reach\s+me$',
+            ],
+            ResumeSection.LANGUAGES: [
+                r'^(?:\d+[\.\)]?\s*)?languages?$',
+                r'^(?:\d+[\.\)]?\s*)?language\s+proficiency$',
+                r'^(?:\d+[\.\)]?\s*)?linguistic\s+skills$',
+                r'^(?:\d+[\.\)]?\s*)?(?:foreign\s+)?languages$',
+            ],
+            ResumeSection.AWARDS: [
+                r'^(?:\d+[\.\)]?\s*)?awards?(?:\s+and\s+honors?)?$',
+                r'^(?:\d+[\.\)]?\s*)?honors?(?:\s+and\s+awards?)?$',
+                r'^(?:\d+[\.\)]?\s*)?achievements?$',
+                r'^(?:\d+[\.\)]?\s*)?recognitions?$',
+                r'^(?:\d+[\.\)]?\s*)?accolades?$',
+            ],
+            ResumeSection.REFERENCES: [
+                r'^(?:\d+[\.\)]?\s*)?references?$',
+                r'^(?:\d+[\.\)]?\s*)?professional\s+references$',
+                r'^(?:\d+[\.\)]?\s*)?referees?$',
+            ],
+            ResumeSection.VOLUNTEERING: [
+                r'^(?:\d+[\.\)]?\s*)?volunteer(?:\s+experience|work)?$',
+                r'^(?:\d+[\.\)]?\s*)?community\s+service$',
+                r'^(?:\d+[\.\)]?\s*)?volunteering$',
+            ],
+            ResumeSection.INTERESTS: [
+                r'^(?:\d+[\.\)]?\s*)?interests?$',
+                r'^(?:\d+[\.\)]?\s*)?hobbies?$',
+                r'^(?:\d+[\.\)]?\s*)?personal\s+interests$',
             ]
         }
 
-        # Contextual indicators that suggest section boundaries
+        # Contextual indicators with weighted scores
         self.section_indicators = {
             ResumeSection.EXPERIENCE: [
-                r'\b\d{4}\s*[-–—]\s*(?:\d{4}|present|current)\b',  # Date ranges
-                r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b',  # Dates
-                r'\b(?:manager|engineer|analyst|director|coordinator|specialist)\b',  # Job titles
-                r'\b(?:developed|managed|led|created|implemented|designed)\b'  # Action verbs
+                (r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*[-–—]\s*(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+)?\d{4}\b',
+                 2.0),  # Date ranges with months
+                (r'\b\d{4}\s*[-–—]\s*(?:\d{4}|present|current|now)\b', 1.5),  # Date ranges
+                (r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b', 1.0),  # Dates
+                (r'\b(?:manager|engineer|developer|analyst|director|coordinator|specialist|consultant|associate|officer|executive)\b',
+                 1.0),  # Job titles
+                (r'\b(?:developed|managed|led|created|implemented|designed|architected|spearheaded|oversaw|coordinated)\b',
+                 0.8),  # Action verbs
+                (r'\b(?:responsibilities|duties|achievements|key\s+accomplishments)\b', 0.7),
+                (r'\b(?:company|corporation|firm|organization|llc|inc|corp|gmbh)\b', 0.5),
             ],
             ResumeSection.EDUCATION: [
-                r'\b(?:bachelor|master|phd|doctorate|associates?|b\.?[sa]\.?|m\.?[sa]\.?)\b',
-                r'\b(?:university|college|institute|school)\b',
-                r'\bgpa\s*:?\s*\d+\.?\d*\b',
-                r'\b(?:graduated|degree|major|minor)\b'
+                (r'\b(?:bachelor|master|ph\.?d|doctorate|associate|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?a\.?|mba|msc|bsc|ba)\b',
+                 2.0),  # Degrees
+                (r'\b(?:university|college|institute|academy|school|faculty|department)\b', 1.5),  # Institutions
+                (r'\bgpa\s*:?\s*\d+\.\d+\b', 1.5),  # GPA
+                (r'\b(?:graduated|degree|major|minor|concentration|thesis|dissertation)\b', 1.0),  # Keywords
+                (r'\b(?:dean\'?s\s+list|honors?|magna\s+cum\s+laude|cum\s+laude)\b', 1.0),
+                (r'\b(?:coursework|relevant\s+courses|classes)\b', 0.8),
             ],
             ResumeSection.SKILLS: [
-                r'\b(?:python|java|javascript|react|node|sql|aws|docker|kubernetes)\b',
-                r'\b(?:programming|software|technical|analytical)\b',
-                r'\b(?:languages?|frameworks?|libraries|tools)\b'
+                (r'\b(?:python|java|javascript|react|node\.?js|sql|aws|docker|kubernetes|c\+\+|c#|\.net|ruby|php|html|css)\b',
+                 1.0),  # Tech skills
+                (r'\b(?:programming|software|technical|analytical|communication|leadership|problem-solving)\b', 0.8),
+                (r'\b(?:languages?|frameworks?|libraries|tools|platforms|databases|operating\s+systems)\b', 0.7),
+                (r'\b(?:proficient|experienced|skilled|familiar|knowledgeable)\b', 0.6),
+                (r'\b(?:expert|advanced|intermediate|beginner|novice)\s+level\b', 0.6),
+            ],
+            ResumeSection.PROJECTS: [
+                (r'\b(?:github|gitlab|bitbucket|demo|live\s+demo|source\s+code)\b', 1.0),
+                (r'\b(?:built|created|developed|designed|implemented)\s+[a-z]+\s+(?:application|system|tool|website)\b',
+                 1.0),
+                (r'\b(?:technologies? used|tools used|stack)\b', 0.8),
+                (r'\b(?:project|application|system|website|tool|platform)\b', 0.5),
+            ],
+            ResumeSection.CERTIFICATIONS: [
+                (r'\b(?:certified|licensed|accredited|credential|certification)\b', 1.0),
+                (r'\b(?:aws|microsoft|google|cisco|comptia|pmi|pmp)\b', 1.0),  # Common cert providers
+                (r'\b(?:expiration|valid\s+until|issued|completed)\b', 0.7),
+            ],
+            ResumeSection.LANGUAGES: [
+                (r'\b(?:english|spanish|french|german|chinese|japanese|russian|arabic|portuguese|italian)\b', 1.5),
+                (r'\b(?:native|fluent|proficient|intermediate|basic|beginner)\s+(?:speaker|level)\b', 1.0),
+                (r'\b(?:cefr|ielts|toefl|toeic)\b', 1.0),  # Language proficiency tests
             ]
         }
 
-    def detect_sections(self, text: str) -> Dict[ResumeSection, List[Tuple[int, int, str]]]:
+        # Common false positives to avoid
+        self.false_positives = [
+            r'^[0-9\s\.\-\(\)]+$',  # Lines with only numbers and symbols
+            r'^.{1,2}$',  # Very short lines
+            r'^.{100,}$',  # Very long lines (unlikely to be headers)
+            r'^(?:page|resume|cv|curriculum vitae)$',  # Document metadata
+            r'^(?:phone|email|address|linkedin|github)$',  # Contact info elements
+        ]
+
+        # Structural patterns for detecting section boundaries
+        self.structural_patterns = {
+            'bullet_points': r'^(?:\s*[•\-*\d+\.\)]\s+)',  # Bullet points or numbered lists
+            'all_caps': r'^[A-Z][A-Z\s]{5,}$',  # All caps lines (often headers)
+            'underline': r'^.*\n[-=]{3,}\s*$',  # Underlined text
+            'bold_italic': r'(\*\*.+\*\*|_.+_)',  # Markdown-style bold/italic
+        }
+
+    def detect_sections(self, text: str) -> Dict[ResumeSection, List[SectionBoundary]]:
         """
-        Detect resume sections and return their positions and content
-        Returns: {section_type: [(start_pos, end_pos, content), ...]}
+        Detect resume sections and return their positions, content, and confidence scores.
+        Uses multiple strategies: header matching, content analysis, and structural cues.
         """
         sections = {section: [] for section in ResumeSection}
 
-        # Split text into lines for analysis
+        # First pass: detect explicit section headers
+        header_sections = self._detect_sections_by_headers(text)
+
+        # Second pass: detect sections by content patterns
+        content_sections = self._detect_sections_by_content(text)
+
+        # Third pass: detect sections by structural patterns
+        structural_sections = self._detect_sections_by_structure(text)
+
+        # Merge results with confidence weighting
+        merged_sections = self._merge_section_detections(
+            header_sections, content_sections, structural_sections
+        )
+
+        # Fill in gaps for undetected sections
+        final_sections = self._fill_section_gaps(merged_sections, text)
+
+        return final_sections
+
+    def _detect_sections_by_headers(self, text: str) -> Dict[ResumeSection, List[SectionBoundary]]:
+        """Detect sections based on explicit header patterns"""
+        sections = {section: [] for section in ResumeSection}
         lines = text.split('\n')
         current_position = 0
 
-        # Track current section context
+        for i, line in enumerate(lines):
+            line_start = current_position
+            line_end = current_position + len(line)
+
+            # Skip lines that are likely false positives
+            if self._is_false_positive(line):
+                current_position = line_end + 1
+                continue
+
+            # Check if this line matches any section header pattern
+            detected_section, confidence = self._detect_section_header(line)
+
+            if detected_section and confidence > 0.7:
+                # Look ahead to find the section content
+                content_start = line_end + 1
+                content_end = self._find_section_end(lines, i, text, content_start)
+
+                section_content = text[content_start:content_end].strip()
+                if section_content:
+                    sections[detected_section].append(SectionBoundary(
+                        start=content_start,
+                        end=content_end,
+                        content=section_content,
+                        confidence=confidence,
+                        detected_by="header"
+                    ))
+
+            current_position = line_end + 1
+
+        return sections
+
+    def _detect_sections_by_content(self, text: str) -> Dict[ResumeSection, List[SectionBoundary]]:
+        """Detect sections based on content patterns and contextual clues"""
+        sections = {section: [] for section in ResumeSection}
+
+        if self.nlp:
+            # Use spaCy for more sophisticated content analysis
+            doc = self.nlp(text)
+            for sent in doc.sents:
+                sent_text = sent.text.strip()
+                if len(sent_text) < 20:  # Skip very short sentences
+                    continue
+
+                detected_section, confidence = self._detect_section_by_content(sent_text)
+                if detected_section and confidence > 0.6:
+                    sections[detected_section].append(SectionBoundary(
+                        start=sent.start_char,
+                        end=sent.end_char,
+                        content=sent_text,
+                        confidence=confidence,
+                        detected_by="content"
+                    ))
+        else:
+            # Fallback to regex-based content analysis
+            lines = text.split('\n')
+            current_position = 0
+
+            for line in lines:
+                line_start = current_position
+                line_end = current_position + len(line)
+
+                if len(line.strip()) > 20:  # Only consider substantial lines
+                    detected_section, confidence = self._detect_section_by_content(line)
+                    if detected_section and confidence > 0.6:
+                        sections[detected_section].append(SectionBoundary(
+                            start=line_start,
+                            end=line_end,
+                            content=line,
+                            confidence=confidence,
+                            detected_by="content"
+                        ))
+
+                current_position = line_end + 1
+
+        return sections
+
+    def _detect_sections_by_structure(self, text: str) -> Dict[ResumeSection, List[SectionBoundary]]:
+        """Detect sections based on structural patterns like bullet points, formatting, etc."""
+        sections = {section: [] for section in ResumeSection}
+        lines = text.split('\n')
+        current_position = 0
         current_section = ResumeSection.OTHER
         section_start = 0
 
@@ -119,288 +340,295 @@ class IntelligentSectionDetector:
             line_start = current_position
             line_end = current_position + len(line)
 
-            # Check if this line indicates a new section
-            detected_section = self._detect_section_header(line)
+            # Detect structural patterns that indicate section boundaries
+            structural_section = self._detect_section_by_structure(line, lines, i)
 
-            if detected_section and detected_section != current_section:
-                # Save previous section if it has content
+            if structural_section and structural_section != current_section:
+                # Save previous section
                 if current_section != ResumeSection.OTHER and section_start < line_start:
                     section_content = text[section_start:line_start].strip()
                     if section_content:
-                        sections[current_section].append((section_start, line_start, section_content))
+                        sections[current_section].append(SectionBoundary(
+                            start=section_start,
+                            end=line_start,
+                            content=section_content,
+                            confidence=0.7,
+                            detected_by="structure"
+                        ))
 
                 # Start new section
-                current_section = detected_section
+                current_section = structural_section
                 section_start = line_start
-
-            # Also detect sections by content patterns
             elif current_section == ResumeSection.OTHER:
-                content_section = self._detect_section_by_content(line)
-                if content_section:
+                # Try to infer section from content patterns
+                content_section, confidence = self._detect_section_by_content(line)
+                if content_section and confidence > 0.5:
                     current_section = content_section
                     section_start = line_start
 
-            current_position = line_end + 1  # +1 for newline
+            current_position = line_end + 1
 
-        # Don't forget the last section
+        # Save the final section
         if current_section != ResumeSection.OTHER and section_start < len(text):
             section_content = text[section_start:].strip()
             if section_content:
-                sections[current_section].append((section_start, len(text), section_content))
+                sections[current_section].append(SectionBoundary(
+                    start=section_start,
+                    end=len(text),
+                    content=section_content,
+                    confidence=0.7,
+                    detected_by="structure"
+                ))
 
         return sections
 
-    def _detect_section_header(self, line: str) -> Optional[ResumeSection]:
-        """Detect if a line is a section header"""
+    def _detect_section_header(self, line: str) -> Tuple[Optional[ResumeSection], float]:
+        """Detect if a line is a section header and return section type with confidence"""
         line_lower = line.lower().strip()
 
-        # Skip very short lines or lines with too much content
-        if len(line_lower) < 3 or len(line_lower) > 50:
-            return None
+        # Skip lines that are likely false positives
+        if self._is_false_positive(line):
+            return None, 0.0
 
-        # Check against section patterns
+        # Check against section patterns with confidence scoring
+        best_match = None
+        highest_confidence = 0.0
+
         for section, patterns in self.section_patterns.items():
             for pattern in patterns:
-                if re.search(pattern, line_lower, re.IGNORECASE):
-                    return section
+                if re.fullmatch(pattern, line_lower, re.IGNORECASE):
+                    # Calculate confidence based on match specificity
+                    confidence = 1.0
+                    if '.*' in pattern or '.+' in pattern:
+                        confidence = 0.9  # Less specific patterns get slightly lower confidence
+                    if len(line_lower) < 5:
+                        confidence *= 0.8  # Very short headers get lower confidence
 
-        return None
+                    if confidence > highest_confidence:
+                        best_match = section
+                        highest_confidence = confidence
 
-    def _detect_section_by_content(self, line: str) -> Optional[ResumeSection]:
-        """Detect section by content patterns"""
-        line_lower = line.lower().strip()
+        return best_match, highest_confidence
 
-        # Check for strong contextual indicators
+    def _detect_section_by_content(self, text: str) -> Tuple[Optional[ResumeSection], float]:
+        """Detect section by content patterns with weighted confidence scoring"""
+        text_lower = text.lower()
+        section_scores = {section: 0.0 for section in self.section_indicators.keys()}
+
+        # Score based on contextual indicators
         for section, indicators in self.section_indicators.items():
-            matches = 0
-            for indicator in indicators:
-                if re.search(indicator, line_lower, re.IGNORECASE):
-                    matches += 1
+            for pattern, weight in indicators:
+                matches = re.findall(pattern, text_lower, re.IGNORECASE)
+                section_scores[section] += len(matches) * weight
 
-            # If multiple indicators match, likely this section
-            if matches >= 2:
+        # Find the section with the highest score
+        best_section = None
+        highest_score = 0.0
+
+        for section, score in section_scores.items():
+            if score > highest_score:
+                best_section = section
+                highest_score = score
+
+        # Normalize confidence score (0.0 to 1.0)
+        confidence = min(1.0, highest_score / 5.0) if highest_score > 0 else 0.0
+
+        return best_section, confidence
+
+    def _detect_section_by_structure(self, line: str, all_lines: List[str], line_index: int) -> Optional[ResumeSection]:
+        """Detect section based on structural patterns"""
+        line_stripped = line.strip()
+
+        # Check for all-caps lines (often section headers)
+        if re.match(self.structural_patterns['all_caps'], line_stripped):
+            # Try to match with section patterns
+            section, confidence = self._detect_section_header(line_stripped)
+            if section and confidence > 0.7:
                 return section
-            # Or if one very strong indicator matches
-            elif matches == 1 and section == ResumeSection.EXPERIENCE:
-                if re.search(r'\b(?:manager|engineer|analyst|director)\b', line_lower):
+
+        # Check for underlined text
+        if line_index < len(all_lines) - 1:
+            next_line = all_lines[line_index + 1].strip()
+            if re.fullmatch(r'[-=]{3,}', next_line):
+                section, confidence = self._detect_section_header(line_stripped)
+                if section and confidence > 0.7:
+                    return section
+
+        # Check for bullet points that might indicate the start of a new section
+        if re.match(self.structural_patterns['bullet_points'], line):
+            # Look backward to find the most recent section header
+            for i in range(line_index - 1, max(0, line_index - 5), -1):
+                prev_line = all_lines[i].strip()
+                section, confidence = self._detect_section_header(prev_line)
+                if section and confidence > 0.7:
                     return section
 
         return None
 
-    def get_section_context(self, sections: Dict[ResumeSection, List], position: int) -> ResumeSection:
-        """Get the section context for a given text position"""
-        for section, section_list in sections.items():
-            for start, end, _ in section_list:
-                if start <= position <= end:
-                    return section
-        return ResumeSection.OTHER
+    def _is_false_positive(self, line: str) -> bool:
+        """Check if a line is likely a false positive for section headers"""
+        line_stripped = line.strip()
 
+        if not line_stripped:
+            return True
 
-class ContextAwareEntityExtractor:
-    """
-    Enhances entity extraction using section context
-    """
+        for pattern in self.false_positives:
+            if re.fullmatch(pattern, line_stripped, re.IGNORECASE):
+                return True
 
-    def __init__(self, nlp_model):
-        self.nlp = nlp_model
-        self.section_detector = IntelligentSectionDetector()
+        return False
 
-        # Section-specific entity preferences
-        self.section_entity_preferences = {
-            ResumeSection.HEADER: {
-                "prefer": ["NAME", "EMAIL", "PHONE", "LOCATION"],
-                "boost_confidence": 0.2
-            },
-            ResumeSection.EXPERIENCE: {
-                "prefer": ["TITLE", "COMPANY", "DATE", "SKILL"],
-                "boost_confidence": 0.15,
-                "suppress": ["NAME"]  # Names in experience are usually company names
-            },
-            ResumeSection.EDUCATION: {
-                "prefer": ["EDUCATION", "DEGREE", "DATE", "GPA"],
-                "boost_confidence": 0.15
-            },
-            ResumeSection.SKILLS: {
-                "prefer": ["SKILL", "TECHNOLOGY"],
-                "boost_confidence": 0.25,
-                "suppress": ["PERSON", "ORG"]  # These are usually skill names, not people/orgs
-            },
-            ResumeSection.CONTACT: {
-                "prefer": ["EMAIL", "PHONE", "LOCATION", "NAME"],
-                "boost_confidence": 0.3
-            }
-        }
-
-    def extract_with_context(self, text: str) -> Dict:
-        """
-        Extract entities with section context awareness
-        """
-        # First, detect sections
-        sections = self.section_detector.detect_sections(text)
-
-        # Then extract entities with spaCy
-        doc = self.nlp(text)
-
-        # Enhance entities with context
-        enhanced_entities = []
-
-        for ent in doc.ents:
-            # Determine which section this entity is in
-            entity_section = self.section_detector.get_section_context(sections, ent.start_char)
-
-            # Get base confidence
-            base_confidence = self._estimate_confidence(ent)
-
-            # Adjust confidence based on section context
-            adjusted_confidence = self._adjust_confidence_by_context(
-                ent, entity_section, base_confidence
-            )
-
-            # Determine if we should suppress this entity
-            if self._should_suppress_entity(ent, entity_section):
+    def _find_section_end(self, lines: List[str], current_index: int, full_text: str, content_start: int) -> int:
+        """Find the end of a section by looking for the next section header"""
+        for i in range(current_index + 1, len(lines)):
+            line = lines[i].strip()
+            if not line:
                 continue
 
-            enhanced_entities.append({
-                "text": ent.text.strip(),
-                "label": ent.label_,
-                "start": ent.start_char,
-                "end": ent.end_char,
-                "confidence": adjusted_confidence,
-                "section": entity_section.value,
-                "section_boost": adjusted_confidence > base_confidence
-            })
+            # Check if this line is a new section header
+            section, confidence = self._detect_section_header(line)
+            if section and confidence > 0.7:
+                # Calculate the position of this new header
+                position = full_text.find(line, content_start)
+                if position != -1:
+                    return position
 
-        return {
-            "entities": enhanced_entities,
-            "sections": {
-                section.value: [(start, end) for start, end, _ in section_list]
-                for section, section_list in sections.items()
-                if section_list
-            },
-            "section_analysis": self._analyze_sections(sections)
-        }
+        # If no next section found, return end of text
+        return len(full_text)
 
-    def _estimate_confidence(self, ent) -> float:
-        """Base confidence estimation (same as before)"""
-        confidence = 0.8
+    def _merge_section_detections(self, *section_dicts: Dict[ResumeSection, List[SectionBoundary]]) -> Dict[
+        ResumeSection, List[SectionBoundary]]:
+        """Merge multiple section detection results with confidence weighting"""
+        merged = {section: [] for section in ResumeSection}
 
-        if ent.label_ == "EMAIL" and "@" in ent.text and "." in ent.text:
-            confidence = 0.95
-        elif ent.label_ == "PHONE" and re.match(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', ent.text):
-            confidence = 0.95
-        elif ent.label_ in ["NAME", "PERSON"] and 2 <= len(ent.text.split()) <= 3:
-            confidence = 0.9
-        elif ent.label_ in ["SKILL", "TITLE", "COMPANY"] and len(ent.text.split()) <= 4:
-            confidence = 0.85
+        # Collect all boundaries from all detection methods
+        all_boundaries = []
+        for section_dict in section_dicts:
+            for section, boundaries in section_dict.items():
+                all_boundaries.extend(boundaries)
 
-        # Apply penalties
-        if len(ent.text) > 50:
-            confidence *= 0.7
-        if len(ent.text.split()) > 6:
-            confidence *= 0.8
-        if len(ent.text.strip()) < 2:
-            confidence *= 0.5
+        # Sort by start position
+        all_boundaries.sort(key=lambda x: x.start)
 
-        return min(max(confidence, 0.1), 1.0)
+        # Merge overlapping sections
+        i = 0
+        while i < len(all_boundaries):
+            current = all_boundaries[i]
+            j = i + 1
 
-    def _adjust_confidence_by_context(self, ent, section: ResumeSection, base_confidence: float) -> float:
-        """Adjust confidence based on section context"""
-        if section not in self.section_entity_preferences:
-            return base_confidence
+            # Find all overlapping sections
+            while j < len(all_boundaries) and all_boundaries[j].start < current.end:
+                next_boundary = all_boundaries[j]
 
-        prefs = self.section_entity_preferences[section]
+                # Merge based on confidence
+                if next_boundary.confidence > current.confidence:
+                    current = next_boundary
 
-        # Boost confidence for preferred entity types in this section
-        if ent.label_ in prefs.get("prefer", []):
-            boost = prefs.get("boost_confidence", 0.1)
-            return min(base_confidence + boost, 1.0)
+                j += 1
 
-        return base_confidence
+            # Add the merged section
+            merged[current].append(current)
+            i = j
 
-    def _should_suppress_entity(self, ent, section: ResumeSection) -> bool:
-        """Determine if entity should be suppressed based on context"""
-        if section not in self.section_entity_preferences:
-            return False
+        return merged
 
-        prefs = self.section_entity_preferences[section]
-        suppress_list = prefs.get("suppress", [])
+    def _fill_section_gaps(self, sections: Dict[ResumeSection, List[SectionBoundary]], text: str) -> Dict[
+        ResumeSection, List[SectionBoundary]]:
+        """Fill in gaps for undetected sections using contextual analysis"""
+        # Identify covered ranges
+        covered_ranges = []
+        for section_boundaries in sections.values():
+            for boundary in section_boundaries:
+                covered_ranges.append((boundary.start, boundary.end))
 
-        return ent.label_ in suppress_list
+        # Sort covered ranges
+        covered_ranges.sort()
 
-    def _analyze_sections(self, sections: Dict) -> Dict:
-        """Analyze the detected sections for insights"""
-        analysis = {
-            "sections_found": len([s for s in sections.values() if s]),
-            "has_experience": bool(sections[ResumeSection.EXPERIENCE]),
-            "has_education": bool(sections[ResumeSection.EDUCATION]),
-            "has_skills": bool(sections[ResumeSection.SKILLS]),
-            "structure_score": 0
-        }
+        # Find gaps between covered ranges
+        gaps = []
+        current_end = 0
 
-        # Calculate structure score (0-100)
-        essential_sections = [
-            ResumeSection.EXPERIENCE,
-            ResumeSection.EDUCATION,
-            ResumeSection.SKILLS
-        ]
+        for start, end in covered_ranges:
+            if start > current_end:
+                gaps.append((current_end, start))
+            current_end = max(current_end, end)
 
-        found_essential = sum(1 for section in essential_sections if sections[section])
-        analysis["structure_score"] = int((found_essential / len(essential_sections)) * 100)
+        # Check if there's a gap at the end
+        if current_end < len(text):
+            gaps.append((current_end, len(text)))
 
-        return analysis
+        # Analyze each gap to assign to a section
+        for gap_start, gap_end in gaps:
+            gap_text = text[gap_start:gap_end].strip()
+            if not gap_text or len(gap_text) < 20:
+                continue
 
+            # Try to detect section by content
+            section, confidence = self._detect_section_by_content(gap_text)
+            if section and confidence > 0.5:
+                sections[section].append(SectionBoundary(
+                    start=gap_start,
+                    end=gap_end,
+                    content=gap_text,
+                    confidence=confidence,
+                    detected_by="gap_filling"
+                ))
+            else:
+                # Assign to OTHER if no section detected
+                sections[ResumeSection.OTHER].append(SectionBoundary(
+                    start=gap_start,
+                    end=gap_end,
+                    content=gap_text,
+                    confidence=0.3,
+                    detected_by="gap_filling"
+                ))
 
-# Usage example for testing
-def test_intelligent_extraction():
-    """Test the intelligent extraction system"""
-    import spacy
+        return sections
 
-    # Load your hybrid model
-    try:
-        nlp = spacy.load("output_hybrid")
-    except:
-        nlp = spacy.load("en_core_web_sm")
+    def get_section_context(self, sections: Dict[ResumeSection, List[SectionBoundary]], position: int) -> ResumeSection:
+        """Get the section context for a given text position with confidence"""
+        best_section = ResumeSection.OTHER
+        highest_confidence = 0.0
 
-    extractor = ContextAwareEntityExtractor(nlp)
+        for section, boundaries in sections.items():
+            for boundary in boundaries:
+                if boundary.start <= position <= boundary.end:
+                    if boundary.confidence > highest_confidence:
+                        best_section = section
+                        highest_confidence = boundary.confidence
 
-    # Test resume text
-    test_resume = """
-    John Smith
-    Software Engineer
-    john.smith@email.com | (555) 123-4567
+        return best_section
 
-    PROFESSIONAL SUMMARY
-    Experienced software engineer with 5 years in backend development.
+    def visualize_sections(self, text: str, sections: Dict[ResumeSection, List[SectionBoundary]]):
+        """Create a visual representation of detected sections (for debugging)"""
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
 
-    WORK EXPERIENCE
-    Senior Software Engineer | Google | 2021-2023
-    • Developed scalable microservices using Python and Docker
-    • Led team of 5 engineers on cloud migration project
+        fig, ax = plt.subplots(figsize=(12, 6))
 
-    Software Developer | Microsoft | 2019-2021  
-    • Built APIs using Node.js and Express
-    • Worked with React and JavaScript frontend
+        colors = plt.cm.Set3.colors
+        section_colors = {section: colors[i % len(colors)] for i, section in enumerate(ResumeSection)}
 
-    EDUCATION
-    Bachelor of Science in Computer Science | MIT | 2019
-    GPA: 3.8/4.0
+        y_pos = 0
+        for section, boundaries in sections.items():
+            for boundary in boundaries:
+                width = boundary.end - boundary.start
+                ax.add_patch(patches.Rectangle(
+                    (boundary.start, y_pos), width, 1,
+                    facecolor=section_colors[section],
+                    edgecolor='black',
+                    alpha=0.7
+                ))
+                # Add section label
+                ax.text(boundary.start + width / 2, y_pos + 0.5, section.value,
+                        ha='center', va='center', fontsize=8)
+            y_pos += 1.2
 
-    SKILLS
-    Languages: Python, JavaScript, Java
-    Technologies: AWS, Docker, Kubernetes, React
-    """
+        ax.set_xlim(0, len(text))
+        ax.set_ylim(0, y_pos)
+        ax.set_xlabel('Text Position')
+        ax.set_title('Detected Resume Sections')
+        ax.yaxis.set_visible(False)
 
-    results = extractor.extract_with_context(test_resume)
-
-    print("🔍 Intelligent Extraction Results:")
-    print(f"Sections found: {results['section_analysis']['sections_found']}")
-    print(f"Structure score: {results['section_analysis']['structure_score']}/100")
-
-    for entity in results["entities"]:
-        boost_indicator = "📈" if entity["section_boost"] else ""
-        print(f"{boost_indicator} '{entity['text']}' → {entity['label']} "
-              f"({entity['section']}) [{entity['confidence']:.2f}]")
-
-
-if __name__ == "__main__":
-    test_intelligent_extraction()
+        plt.tight_layout()
+        plt.show()

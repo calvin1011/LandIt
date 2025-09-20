@@ -46,7 +46,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
 
     setMessages(prev => [...prev, userMessage]);
 
-    // Clear the context after using it
+    // Clear the context
     if (onClearJobContext) {
       onClearJobContext();
     }
@@ -54,7 +54,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     // Auto-generate the learning plan
     handleJobBasedLearningPlan(jobContext);
   }
-}, [jobContext, messages.length, onClearJobContext]);
+}, [jobContext]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

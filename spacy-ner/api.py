@@ -78,7 +78,7 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to load hybrid model: {e}")
     try:
-        nlp = spacy.load("output")
+        nlp = spacy.load("output_hybrid")
         training_info = {"model_type": "custom_only"}
         logger.warning("⚠️ Using fallback custom model")
     except Exception as e2:

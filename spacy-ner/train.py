@@ -9,9 +9,11 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 
 
+# In your train.py, replace the load_clean_training_data function:
 def load_clean_training_data():
-    """Load only your original clean training data (not Kaggle)"""
+    """Load cleaned training data"""
     training_files = [
+        "train_data_cleaned.json",  # Use cleaned data first
         "train_data.json"
     ]
 
@@ -19,15 +21,18 @@ def load_clean_training_data():
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 training_data = json.load(f)
-            print(f"✅ Loaded {len(training_data)} clean examples from {filename}")
+            print(f"✅ Loaded {len(training_data)} examples from {filename}")
+
+            # Simplify labels further
+            training_data = simplify_training_labels(training_data)
+            print(f"📊 Simplified to {len(training_data)} examples with core labels")
+
             return training_data
         except FileNotFoundError:
             continue
 
-    print("❌ No clean training data file found!")
-    print("   Looking for: train_data_fixed.json or train_data.json")
+    print("❌ No training data file found!")
     return []
-
 
 def filter_quality_examples(training_data, max_examples=200):
     """Filter and limit to highest quality examples"""
@@ -74,6 +79,53 @@ def analyze_labels(training_data):
 
     return all_labels, label_counts
 
+def simplify_training_labels(training_data):
+    """Simplify training data labels to reduce complexity"""
+    simplified_data = []
+
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        simplified_entities = []
+
+        for start, end, label in entities:
+            simplified_label = simplify_label(label)
+            if simplified_label != "OTHER":  # Skip "OTHER" labels
+                simplified_entities.append([start, end, simplified_label])
+
+        if simplified_entities:
+            simplified_data.append([text, {"entities": simplified_entities}])
+
+    return simplified_data
+
+def simplify_label(label: str) -> str:
+    """Simplify labels to core categories"""
+    label = label.upper()
+
+    # Core resume labels
+    core_mapping = {
+        # Personal info
+        'NAME': 'NAME', 'EMAIL': 'EMAIL', 'PHONE': 'PHONE',
+        'LOCATION': 'LOCATION', 'ADDRESS': 'LOCATION',
+
+        # Professional
+        'TITLE': 'TITLE', 'COMPANY': 'COMPANY', 'ORGANIZATION': 'COMPANY',
+        'EXPERIENCE': 'EXPERIENCE', 'INDUSTRY': 'SKILL',
+
+        # Skills
+        'SKILL': 'SKILL', 'TECHNOLOGY': 'SKILL', 'PLATFORM': 'SKILL',
+        'PROGRAMMING_LANGUAGE': 'SKILL', 'TECHNICAL_SKILL': 'SKILL',
+        'LANGUAGE': 'LANGUAGE', 'LANGUAGE_SKILL': 'LANGUAGE',
+
+        # Education
+        'EDUCATION': 'EDUCATION', 'DEGREE': 'DEGREE', 'SCHOOL': 'SCHOOL',
+        'UNIVERSITY': 'SCHOOL', 'COLLEGE': 'SCHOOL', 'GPA': 'EDUCATION',
+
+        # Other
+        'CERTIFICATION': 'CERTIFICATION', 'PROJECT': 'PROJECT',
+        'ACHIEVEMENT': 'ACHIEVEMENT', 'DATE': 'DATE', 'YEAR': 'DATE'
+    }
+
+    return core_mapping.get(label, 'OTHER')
 
 def main():
     print("🚀 HYBRID RESUME NER TRAINING")
@@ -81,7 +133,7 @@ def main():
     print("Using: en_core_web_sm + Your Custom Resume Labels")
     print("=" * 50)
 
-    # 1. Load the pre-trained English model (the hybrid foundation)
+    # Load the pre-trained English model (the hybrid foundation)
     try:
         nlp = spacy.load("en_core_web_sm")
         print("✅ Loaded en_core_web_sm as base model")
@@ -91,16 +143,16 @@ def main():
         print("   Install it with: python -m spacy download en_core_web_sm")
         return
 
-    # 2. Load only your clean training data (skip Kaggle for now)
+    # Load only your clean training data (skip Kaggle for now)
     training_data = load_clean_training_data()
     if not training_data:
         print("❌ No training data available. Exiting.")
         return
 
-    # 3. Filter to highest quality examples for efficient training
+    # Filter to highest quality examples for efficient training
     quality_data = filter_quality_examples(training_data, max_examples=150)
 
-    # 4. Analyze labels
+    # Analyze labels
     custom_labels, label_counts = analyze_labels(quality_data)
     print(f"\n🏷️  Found {len(custom_labels)} custom resume labels:")
 
@@ -126,7 +178,7 @@ def main():
             label_list = [f"{label}({label_counts.get(label, 0)})" for label in labels]
             print(f"   {category}: {', '.join(label_list)}")
 
-    # 5. Add your custom labels to the existing NER pipe
+    # Add your custom labels to the existing NER pipe
     ner = nlp.get_pipe("ner")
     print(f"\n🎯 Adding custom labels to existing NER...")
 
@@ -135,7 +187,7 @@ def main():
 
     print(f"   Total labels now: {len(ner.labels)}")
 
-    # 6. Prepare training examples
+    # Prepare training examples
     print(f"\n📋 Preparing training examples...")
     valid_examples = []
     skipped = 0
@@ -155,7 +207,7 @@ def main():
         print("❌ No valid training examples. Check your data format.")
         return
 
-    # 7. Fine-tune the model (fewer iterations since we have a good base)
+    # Fine-tune the model (fewer iterations since we have a good base)
     print(f"\n🚀 Starting hybrid training with {len(valid_examples)} examples...")
 
     # Get pipes to disable (keep only NER active)
@@ -164,18 +216,19 @@ def main():
 
     # Training loop - fewer iterations since we're fine-tuning
     with nlp.disable_pipes(*other_pipes):
-        # Initialize with existing weights
         optimizer = nlp.resume_training()
 
         # Reduced iterations for fine-tuning
-        n_iter = 10  # Less than from-scratch training
+        n_iter = 15  # less than from-scratch training
 
         for iteration in range(n_iter):
             print(f"\n   📈 Iteration {iteration + 1}/{n_iter}")
 
+            # Initialize losses for this iteration
+            losses = {}
+
             # Shuffle examples
             random.shuffle(valid_examples)
-            losses = {}
 
             # Process in batches
             batch_size = 8
@@ -201,13 +254,18 @@ def main():
 
     print("\n🎉 Hybrid training completed!")
 
-    # 8. Test the hybrid model
+    # Test the hybrid model
     print("\n🧪 Testing hybrid model:")
     test_sentences = [
         "John Smith is a Senior Software Engineer at Google with 5 years experience.",
         "Jane graduated from MIT with a Computer Science degree in 2020.",
         "Skills: Python, JavaScript, React, AWS, Docker, Kubernetes.",
-        "Contact: john.doe@email.com | Phone: (555) 123-4567 | Boston, MA"
+        "Contact: john.doe@email.com | Phone: (555) 123-4567 | Boston, MA",
+        "John Smith is a Senior Software Engineer at Google with Python and JavaScript skills.",
+        "Jane Doe graduated from MIT with a Computer Science degree and knows Python, Java, and React.",
+        "Skills: Python, JavaScript, React, AWS, Docker, Kubernetes, machine learning.",
+        "Contact: john.doe@email.com | Phone: (555) 123-4567 | Location: Boston, MA",
+        "Worked as a Software Developer at Microsoft from 2020 to 2023 building cloud applications."
     ]
 
     for sentence in test_sentences:
@@ -220,7 +278,7 @@ def main():
         else:
             print("      ❌ No entities found")
 
-    # 9. Save the hybrid model
+    # Save the hybrid model
     output_dir = Path("output_hybrid")
     try:
         nlp.to_disk(output_dir)
@@ -245,7 +303,7 @@ def main():
         print(f"❌ Failed to save model: {e}")
         return
 
-    # 10. Update your API to use the hybrid model
+    # Update your API to use the hybrid model
     print(f"\n🔧 Next steps:")
     print(f"   1. Update your api.py to load from 'output_hybrid' instead of 'output'")
     print(f"   2. Restart your FastAPI server")
