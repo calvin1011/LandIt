@@ -13,8 +13,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 def load_clean_training_data():
     """Load cleaned training data"""
     training_files = [
-        "train_data_cleaned.json",  # Use cleaned data first
-        "train_data.json"
+        "train_data_skills.json",
+        "train_data_contacts.json",
+        "train_data_augmented.json",
+        "train_data_cleaned.json",
+
     ]
 
     for filename in training_files:
@@ -43,7 +46,7 @@ def filter_quality_examples(training_data, max_examples=200):
     quality_examples = []
     for text, annotations in training_data:
         entities = annotations.get("entities", [])
-        if 5 <= len(entities) <= 25:  # Sweet spot for learning
+        if 1 <= len(entities) <= 25:  # Changed from 5-25 to 1-25
             quality_examples.append((text, annotations))
 
     # Limit total examples for efficiency
