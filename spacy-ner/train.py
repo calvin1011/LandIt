@@ -20,7 +20,7 @@ def load_clean_training_data():
         "train_data_degrees.json",
         "train_data_experience.json",
         "train_data_fields.json",
-        "train_data_grad_year.json"
+        "train_data_grad_year.json",
         "train_data_augmented.json",
         "train_data_cleaned.json",
     ]
@@ -104,6 +104,66 @@ def analyze_labels(training_data):
 
     return all_labels, label_counts
 
+
+def calculate_class_weights(training_data):
+    """Calculate class weights based on entity frequency"""
+    entity_counts = {}
+    total_entities = 0
+
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        for start, end, label in entities:
+            entity_counts[label] = entity_counts.get(label, 0) + 1
+            total_entities += 1
+
+    # Calculate weights: inverse frequency with smoothing
+    class_weights = {}
+    for label, count in entity_counts.items():
+        # Inverse frequency with smoothing to avoid extreme weights
+        weight = total_entities / (count + 1)  # +1 for smoothing
+        # Cap weights to reasonable range (e.g., 1-10)
+        class_weights[label] = min(max(weight, 1.0), 10.0)
+
+    print("📊 Class weights:")
+    for label, weight in sorted(class_weights.items(), key=lambda x: x[1], reverse=True):
+        print(f"   {label}: {weight:.2f}x (count: {entity_counts[label]})")
+
+    return class_weights
+
+def enhance_minority_classes(training_data, target_min_count=10):
+    """Oversample minority classes to balance the dataset"""
+    # Count entities per class
+    entity_counts = {}
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        for start, end, label in entities:
+            entity_counts[label] = entity_counts.get(label, 0) + 1
+
+    # Identify minority classes
+    minority_classes = [label for label, count in entity_counts.items()
+                        if count < target_min_count]
+
+    if not minority_classes:
+        return training_data
+
+    print(f"🔍 Enhancing minority classes: {minority_classes}")
+
+    enhanced_data = training_data.copy()
+
+    # Oversample examples containing minority classes
+    for text, annotations in training_data:
+        entities = annotations.get("entities", [])
+        has_minority = any(label in minority_classes for _, _, label in entities)
+
+        if has_minority:
+            # Add 2-3 extra copies of minority examples
+            enhancement_factor = 3
+            for _ in range(enhancement_factor):
+                enhanced_data.append((text, annotations))
+
+    print(f"📈 Enhanced dataset: {len(training_data)} → {len(enhanced_data)} examples")
+    return enhanced_data
+
 def simplify_training_labels(training_data):
     """Simplify training data labels to reduce complexity"""
     simplified_data = []
@@ -122,6 +182,26 @@ def simplify_training_labels(training_data):
 
     return simplified_data
 
+def apply_class_weights_to_examples(examples, class_weights):
+    """Apply class weights by duplicating examples with minority classes"""
+    weighted_examples = []
+
+    for example in examples:
+        # Count how many minority classes are in this example
+        minority_count = 0
+        if hasattr(example, 'reference') and hasattr(example.reference, 'ents'):
+            for ent in example.reference.ents:
+                weight = class_weights.get(ent.label_, 1.0)
+                if weight > 1.5:  # Only duplicate for significantly weighted classes
+                    minority_count += 1
+
+        # Add the example multiple times based on minority class count
+        repetitions = max(1, minority_count)
+        for _ in range(repetitions):
+            weighted_examples.append(example)
+
+    print(f"📈 Weighted examples: {len(examples)} → {len(weighted_examples)}")
+    return weighted_examples
 
 def simplify_label(label: str) -> str:
     """Simplify labels to core categories"""
@@ -182,6 +262,15 @@ def main():
 
     # Filter to highest quality examples for efficient training
     quality_data = filter_quality_examples(training_data, max_examples=500)
+
+    # ENHANCE MINORITY CLASSES - ADD THIS
+    print("\n🎯 Enhancing minority classes...")
+    enhanced_data = enhance_minority_classes(quality_data, target_min_count=10)
+    quality_data = filter_quality_examples(enhanced_data, max_examples=600)  # Slightly higher limit
+
+    # CALCULATE CLASS WEIGHTS - ADD THIS
+    print("\n⚖️ Calculating class weights...")
+    class_weights = calculate_class_weights(quality_data)
 
     # Analyze labels
     custom_labels, label_counts = analyze_labels(quality_data)
@@ -245,12 +334,15 @@ def main():
     other_pipes = [pipe for pipe in nlp.pipe_names if pipe != "ner"]
     print(f"   🔇 Disabling pipes: {other_pipes}")
 
+    # Apply class weights by duplicating examples
+    weighted_examples = apply_class_weights_to_examples(valid_examples, class_weights)
+
     # Training loop - fewer iterations since we're fine-tuning
     with nlp.disable_pipes(*other_pipes):
         optimizer = nlp.resume_training()
 
         # Reduced iterations for fine-tuning
-        n_iter = 15  # less than from-scratch training
+        n_iter = 15
 
         for iteration in range(n_iter):
             print(f"\n   📈 Iteration {iteration + 1}/{n_iter}")
@@ -259,19 +351,19 @@ def main():
             losses = {}
 
             # Shuffle examples
-            random.shuffle(valid_examples)
+            random.shuffle(weighted_examples)  # Use weighted examples
 
             # Process in batches
             batch_size = 8
-            batches = [valid_examples[i:i + batch_size]
-                       for i in range(0, len(valid_examples), batch_size)]
+            batches = [weighted_examples[i:i + batch_size]  # Use weighted examples
+                       for i in range(0, len(weighted_examples), batch_size)]
 
             successful_batches = 0
 
             for batch in batches:
                 try:
-                    # Lower dropout for fine-tuning
-                    nlp.update(batch, drop=0.2, losses=losses)
+                    # Use standard update
+                    nlp.update(batch, drop=0.2, losses=losses, sgd=optimizer)
                     successful_batches += 1
                 except Exception as e:
                     print(f"      ⚠️  Batch failed: {str(e)[:50]}...")
