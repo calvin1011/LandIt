@@ -11,43 +11,59 @@ warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 
 # In your train.py, replace the load_clean_training_data function:
 def load_clean_training_data():
-    """Load cleaned training data"""
+    """Load cleaned training data from multiple files"""
     training_files = [
         "train_data_skills.json",
         "train_data_contacts.json",
         "train_data_augmented.json",
         "train_data_cleaned.json",
-
     ]
+
+    all_training_data = []
+    file_stats = {}  # Track examples per file
 
     for filename in training_files:
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 training_data = json.load(f)
             print(f"✅ Loaded {len(training_data)} examples from {filename}")
+            all_training_data.extend(training_data)
+            file_stats[filename] = len(training_data)
 
-            # Simplify labels further
-            training_data = simplify_training_labels(training_data)
-            print(f"📊 Simplified to {len(training_data)} examples with core labels")
-
-            return training_data
         except FileNotFoundError:
+            print(f"⚠️  {filename} not found, skipping")
+            continue
+        except Exception as e:
+            print(f"❌ Error loading {filename}: {e}")
             continue
 
-    print("❌ No training data file found!")
-    return []
+    print(f"📊 Total examples before simplification: {len(all_training_data)}")
+
+    # Show breakdown by file
+    print("📁 File breakdown:")
+    for filename, count in file_stats.items():
+        print(f"   {filename}: {count} examples")
+
+    # Simplify labels for all combined data
+    all_training_data = simplify_training_labels(all_training_data)
+    print(f"📊 Simplified to {len(all_training_data)} examples with core labels")
+
+    return all_training_data
 
 def filter_quality_examples(training_data, max_examples=200):
     """Filter and limit to highest quality examples"""
     if not training_data:
         return []
 
-    # Filter examples with reasonable entity counts (5-25 entities)
     quality_examples = []
+
     for text, annotations in training_data:
         entities = annotations.get("entities", [])
-        if 1 <= len(entities) <= 25:  # Changed from 5-25 to 1-25
+        if 1 <= len(entities) <= 25:
             quality_examples.append((text, annotations))
+
+    # SHUFFLE before limiting to get diverse examples
+    random.shuffle(quality_examples)
 
     # Limit total examples for efficiency
     if len(quality_examples) > max_examples:
@@ -100,32 +116,38 @@ def simplify_training_labels(training_data):
 
     return simplified_data
 
+
 def simplify_label(label: str) -> str:
     """Simplify labels to core categories"""
     label = label.upper()
 
-    # Core resume labels
+    # Core resume labels with comprehensive mapping
     core_mapping = {
         # Personal info
-        'NAME': 'NAME', 'EMAIL': 'EMAIL', 'PHONE': 'PHONE',
-        'LOCATION': 'LOCATION', 'ADDRESS': 'LOCATION',
+        'NAME': 'NAME', 'PERSON': 'NAME', 'FULL_NAME': 'NAME',
+        'EMAIL': 'EMAIL', 'EMAIL_ADDRESS': 'EMAIL', 'CONTACT_EMAIL': 'EMAIL',
+        'PHONE': 'PHONE', 'PHONE_NUMBER': 'PHONE', 'TELEPHONE': 'PHONE', 'MOBILE': 'PHONE',
+        'LOCATION': 'LOCATION', 'ADDRESS': 'LOCATION', 'CITY': 'LOCATION', 'STATE': 'LOCATION',
 
         # Professional
-        'TITLE': 'TITLE', 'COMPANY': 'COMPANY', 'ORGANIZATION': 'COMPANY',
-        'EXPERIENCE': 'EXPERIENCE', 'INDUSTRY': 'SKILL',
+        'TITLE': 'TITLE', 'JOB_TITLE': 'TITLE', 'POSITION': 'TITLE',
+        'COMPANY': 'COMPANY', 'ORGANIZATION': 'COMPANY', 'ORG': 'COMPANY', 'EMPLOYER': 'COMPANY',
+        'EXPERIENCE': 'EXPERIENCE', 'WORK_EXPERIENCE': 'EXPERIENCE',
+        'INDUSTRY': 'SKILL',
 
         # Skills
-        'SKILL': 'SKILL', 'TECHNOLOGY': 'SKILL', 'PLATFORM': 'SKILL',
-        'PROGRAMMING_LANGUAGE': 'SKILL', 'TECHNICAL_SKILL': 'SKILL',
+        'SKILL': 'SKILL', 'SKILLS': 'SKILL', 'TECHNOLOGY': 'SKILL', 'TECHNOLOGIES': 'SKILL',
+        'PLATFORM': 'SKILL', 'PROGRAMMING_LANGUAGE': 'SKILL', 'TECHNICAL_SKILL': 'SKILL',
         'LANGUAGE': 'LANGUAGE', 'LANGUAGE_SKILL': 'LANGUAGE',
 
         # Education
         'EDUCATION': 'EDUCATION', 'DEGREE': 'DEGREE', 'SCHOOL': 'SCHOOL',
         'UNIVERSITY': 'SCHOOL', 'COLLEGE': 'SCHOOL', 'GPA': 'EDUCATION',
+        'FIELD': 'EDUCATION', 'GRAD_YEAR': 'DATE', 'YEAR': 'DATE',
 
         # Other
         'CERTIFICATION': 'CERTIFICATION', 'PROJECT': 'PROJECT',
-        'ACHIEVEMENT': 'ACHIEVEMENT', 'DATE': 'DATE', 'YEAR': 'DATE'
+        'ACHIEVEMENT': 'ACHIEVEMENT', 'DATE': 'DATE'
     }
 
     return core_mapping.get(label, 'OTHER')
@@ -153,7 +175,7 @@ def main():
         return
 
     # Filter to highest quality examples for efficient training
-    quality_data = filter_quality_examples(training_data, max_examples=150)
+    quality_data = filter_quality_examples(training_data, max_examples=500)
 
     # Analyze labels
     custom_labels, label_counts = analyze_labels(quality_data)
