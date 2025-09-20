@@ -15,6 +15,12 @@ def load_clean_training_data():
     training_files = [
         "train_data_skills.json",
         "train_data_contacts.json",
+        "train_data_companies.json",
+        "train_data_schools.json",
+        "train_data_degrees.json",
+        "train_data_experience.json",
+        "train_data_fields.json",
+        "train_data_grad_year.json"
         "train_data_augmented.json",
         "train_data_cleaned.json",
     ]
