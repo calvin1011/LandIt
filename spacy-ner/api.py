@@ -1030,18 +1030,36 @@ def generate_learning_plan(request: LearningPlanRequest):
         # Check if we've processed this exact request recently
         now = datetime.now()
         if request_hash in recent_learning_requests:
-            last_request_time = recent_learning_requests[request_hash]['timestamp']
-            if now - last_request_time < timedelta(seconds=5):  # 5 second window
+            cached_entry = recent_learning_requests[request_hash]
+            last_request_time = cached_entry['timestamp']
+
+            # If request is still processing, wait briefly and return error
+            if cached_entry.get('processing', False):
+                logger.info(f"Request already processing for {request_key}, rejecting duplicate")
+                raise HTTPException(
+                    status_code=429,
+                    detail="Request already being processed. Please wait a moment."
+                )
+
+            # If we have a completed response within 10 seconds, return it
+            if now - last_request_time < timedelta(seconds=10):  # Increased window
                 logger.info(f"Duplicate learning plan request detected for {request_key}, returning cached result")
-                return recent_learning_requests[request_hash]['response']
+                return cached_entry['response']
 
         # Clean old entries (keep cache small)
         keys_to_remove = []
         for key, value in recent_learning_requests.items():
-            if now - value['timestamp'] > timedelta(minutes=1):
+            if now - value['timestamp'] > timedelta(minutes=2):
                 keys_to_remove.append(key)
         for key in keys_to_remove:
             del recent_learning_requests[key]
+
+        # IMPORTANT: Mark this request as processing immediately
+        recent_learning_requests[request_hash] = {
+            'timestamp': now,
+            'processing': True,
+            'response': None
+        }
 
         start_time = time.time()
 
@@ -1049,6 +1067,8 @@ def generate_learning_plan(request: LearningPlanRequest):
         try:
             ai_generator = AIProjectGenerator()
         except ValueError as e:
+            # Clear the processing flag on error
+            del recent_learning_requests[request_hash]
             raise HTTPException(
                 status_code=503,
                 detail="AI service not available. OpenAI API key not configured."
@@ -1057,6 +1077,8 @@ def generate_learning_plan(request: LearningPlanRequest):
         # Get user's resume data
         user_resume = db.get_user_resume(request.user_email)
         if not user_resume:
+            # Clear the processing flag on error
+            del recent_learning_requests[request_hash]
             raise HTTPException(
                 status_code=404,
                 detail="User resume not found. Please upload a resume first."
@@ -1065,6 +1087,8 @@ def generate_learning_plan(request: LearningPlanRequest):
         # Get job data
         job_data = db.get_job_by_id(request.job_id)
         if not job_data:
+            # Clear the processing flag on error
+            del recent_learning_requests[request_hash]
             raise HTTPException(
                 status_code=404,
                 detail="Job not found."
@@ -1140,9 +1164,10 @@ def generate_learning_plan(request: LearningPlanRequest):
             "message": f"Generated learning plan with {len(learning_plan.get('critical_projects', []))} critical projects"
         }
 
-        # Cache the response
+        # Update cache with completed response
         recent_learning_requests[request_hash] = {
             'timestamp': now,
+            'processing': False,
             'response': response
         }
 
@@ -1153,11 +1178,13 @@ def generate_learning_plan(request: LearningPlanRequest):
         raise
     except Exception as e:
         logger.error(f"Failed to generate learning plan: {e}")
+        # Clear the processing flag on error
+        if request_hash in recent_learning_requests:
+            del recent_learning_requests[request_hash]
         raise HTTPException(
             status_code=500,
             detail=f"Learning plan generation failed: {str(e)}"
         )
-
 
 @app.get("/learning-plans/{user_email}")
 def get_user_learning_plans(user_email: str, limit: int = 10):
