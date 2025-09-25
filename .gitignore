@@ -8,6 +8,8 @@ FrontEnd/
 
 spacy-ner/env/
 
+backend/
+
 data/
 spacy-ner/output/
 spacy-ner/output_hybrid/

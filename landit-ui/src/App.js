@@ -31,10 +31,10 @@ function App() {
     const [learningJobContext, setLearningJobContext] = useState(null);
 
     useEffect(() => {
-        console.log('🔥 Setting up Firebase auth listener...');
+        console.log('Setting up Firebase auth listener...');
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log('🔥 Firebase auth state changed:', user ? user.email : 'No user');
+            console.log(' Firebase auth state changed:', user ? user.email : 'No user');
 
             if (user) {
                 const email = user.email;
@@ -61,7 +61,7 @@ function App() {
                 localStorage.setItem('currentUser', email);
 
             } else {
-                console.log('🚪 User signed out, clearing state');
+                console.log(' User signed out, clearing state');
                 setFirebaseUser(null);
                 setLoggedIn(false);
                 setUserEmail('');
@@ -77,20 +77,20 @@ function App() {
         });
 
         return () => {
-            console.log('🧹 Cleaning up Firebase auth listener');
+            console.log(' Cleaning up Firebase auth listener');
             unsubscribe();
         };
     }, []);
 
     const handleLoginSuccess = (email, user = null) => {
-        console.log('✅ Login successful for:', email);
+        console.log(' Login successful for:', email);
         setParsedData([]);
         setShowUploader(false);
         setActiveTab('resume');
     };
 
     const handleLogout = async () => {
-        console.log('🚪 Logging out...');
+        console.log(' Logging out...');
 
         try {
             await auth.signOut();
@@ -103,7 +103,7 @@ function App() {
     };
 
     const handleAccountSwitch = (newEmail) => {
-        console.log('🔄 Account switch detected:', userEmail, '→', newEmail);
+        console.log(' Account switch detected:', userEmail, '→', newEmail);
 
         if (userEmail && userEmail !== newEmail) {
             localStorage.setItem(`userInfo_${userEmail}`, JSON.stringify(userInfo));
@@ -139,7 +139,7 @@ function App() {
 
     useEffect(() => {
         if (loggedIn && userEmail && !loading) {
-            console.log('💾 Saving profile data for:', userEmail);
+            console.log(' Saving profile data for:', userEmail);
             localStorage.setItem(`userInfo_${userEmail}`, JSON.stringify(userInfo));
         }
     }, [userInfo, loggedIn, userEmail, loading]);

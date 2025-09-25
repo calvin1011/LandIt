@@ -62,7 +62,7 @@ class AIProjectGenerator:
         self.max_tokens = 2000
         self.temperature = 0.7  # Balance creativity and consistency
 
-        logger.info("✅ AI Project Generator initialized")
+        logger.info(" AI Project Generator initialized")
 
     def generate_learning_plan(self,
                                user_profile: Dict[str, Any],
@@ -137,11 +137,11 @@ class AIProjectGenerator:
                 "user_experience_level": user_profile.get('experience_level', 'mid')
             }
 
-            logger.info(f"✅ Generated learning plan in {processing_time:.2f}s")
+            logger.info(f" Generated learning plan in {processing_time:.2f}s")
             return learning_plan
 
         except Exception as e:
-            logger.error(f"❌ Failed to generate learning plan: {e}")
+            logger.error(f" Failed to generate learning plan: {e}")
             return self._generate_fallback_plan(skill_gaps_detailed, gap_analysis)
 
     def _generate_projects_for_skills(self,
@@ -174,7 +174,7 @@ class AIProjectGenerator:
             return projects[:max_projects]  # Limit number of projects
 
         except Exception as e:
-            logger.error(f"❌ Failed to generate projects for {skills}: {e}")
+            logger.error(f" Failed to generate projects for {skills}: {e}")
             return self._generate_fallback_projects(skills, category, max_projects)
 
     def _build_project_prompt(self,
@@ -189,33 +189,33 @@ class AIProjectGenerator:
         current_skills = user_profile.get('current_skills', [])
 
         prompt = f"""
-I need {max_projects} practical project recommendations for a {user_experience}-level developer to learn these {category.value} skills: {', '.join(skills)}
-
-TARGET ROLE: {job_data.get('title', 'Software Engineer')} at {job_data.get('company', 'tech company')}
-CURRENT SKILLS: {', '.join(current_skills[:10])}
-EXPERIENCE LEVEL: {user_experience}
-
-For each project, provide:
-1. Project Title (specific and engaging)
-2. Description (2-3 sentences explaining what they'll build)
-3. Skills Addressed (which missing skills this project teaches)
-4. Difficulty Level (beginner/intermediate/advanced)
-5. Estimated Timeline (in weeks)
-6. Learning Outcomes (3-4 specific things they'll learn)
-7. Resources (2-3 helpful learning resources)
-8. Milestones (3-4 progress checkpoints)
-9. Portfolio Value (how this helps job applications)
-10. Market Relevance (why these skills matter in 2024)
-
-REQUIREMENTS:
-- Projects should be portfolio-worthy and job-relevant
-- Focus on practical, hands-on learning
-- Include real-world applications they can showcase
-- Projects should build on their existing {user_experience}-level knowledge
-- Consider what {job_data.get('company', 'hiring companies')} values
-
-FORMAT: Return as valid JSON array with each project as an object with the above fields.
-"""
+        I need {max_projects} practical project recommendations for a {user_experience}-level developer to learn these {category.value} skills: {', '.join(skills)}
+        
+        TARGET ROLE: {job_data.get('title', 'Software Engineer')} at {job_data.get('company', 'tech company')}
+        CURRENT SKILLS: {', '.join(current_skills[:10])}
+        EXPERIENCE LEVEL: {user_experience}
+        
+        For each project, provide:
+        1. Project Title (specific and engaging)
+        2. Description (2-3 sentences explaining what they'll build)
+        3. Skills Addressed (which missing skills this project teaches)
+        4. Difficulty Level (beginner/intermediate/advanced)
+        5. Estimated Timeline (in weeks)
+        6. Learning Outcomes (3-4 specific things they'll learn)
+        7. Resources (2-3 helpful learning resources)
+        8. Milestones (3-4 progress checkpoints)
+        9. Portfolio Value (how this helps job applications)
+        10. Market Relevance (why these skills matter in 2024)
+        
+        REQUIREMENTS:
+        - Projects should be portfolio-worthy and job-relevant
+        - Focus on practical, hands-on learning
+        - Include real-world applications they can showcase
+        - Projects should build on their existing {user_experience}-level knowledge
+        - Consider what {job_data.get('company', 'hiring companies')} values
+        
+        FORMAT: Return as valid JSON array with each project as an object with the above fields.
+        """
 
         return prompt
 
@@ -223,15 +223,15 @@ FORMAT: Return as valid JSON array with each project as an object with the above
         """Get the system prompt for GPT to ensure consistent project recommendations"""
         return """You are an expert software engineering mentor and career advisor. You specialize in creating practical, portfolio-worthy project recommendations that help developers bridge skill gaps and land their target jobs.
 
-Your project recommendations should be:
-- Practical and immediately actionable
-- Portfolio-worthy (something they can showcase to employers)
-- Appropriately scoped for the timeframe
-- Industry-relevant and current with 2024 standards
-- Building on existing skills rather than starting from zero
-- Focused on real-world applications companies actually use
-
-Always consider the user's experience level and current skills when recommending projects. Make sure projects are challenging but achievable, and clearly explain the career value of each project."""
+        Your project recommendations should be:
+        - Practical and immediately actionable
+        - Portfolio-worthy (something they can showcase to employers)
+        - Appropriately scoped for the timeframe
+        - Industry-relevant and current with 2024 standards
+        - Building on existing skills rather than starting from zero
+        - Focused on real-world applications companies actually use
+        
+        Always consider the user's experience level and current skills when recommending projects. Make sure projects are challenging but achievable, and clearly explain the career value of each project."""
 
     def _parse_gpt_response(self, gpt_content: str, category: SkillCategory) -> List[Dict[str, Any]]:
         """Parse GPT response into structured project data"""
@@ -341,20 +341,20 @@ Always consider the user's experience level and current skills when recommending
         """Generate an AI-powered overview of the learning plan"""
         try:
             prompt = f"""
-Create a motivational and strategic overview for a learning plan:
-
-USER: {user_profile.get('experience_level', 'mid')}-level developer
-TARGET: {job_data.get('title')} at {job_data.get('company')}
-GAPS: {gap_analysis.get('critical_gaps', 0)} critical skills, {gap_analysis.get('estimated_learning_weeks', 8)} weeks estimated
-DIFFICULTY: {gap_analysis.get('difficulty_level', 'medium')}
-
-Write 2-3 sentences that:
-1. Acknowledge their current strengths
-2. Outline the strategic approach to bridging gaps
-3. Motivate them about the outcome
-
-Tone: Professional but encouraging, like a mentor
-"""
+            Create a motivational and strategic overview for a learning plan:
+            
+            USER: {user_profile.get('experience_level', 'mid')}-level developer
+            TARGET: {job_data.get('title')} at {job_data.get('company')}
+            GAPS: {gap_analysis.get('critical_gaps', 0)} critical skills, {gap_analysis.get('estimated_learning_weeks', 8)} weeks estimated
+            DIFFICULTY: {gap_analysis.get('difficulty_level', 'medium')}
+            
+            Write 2-3 sentences that:
+            1. Acknowledge their current strengths
+            2. Outline the strategic approach to bridging gaps
+            3. Motivate them about the outcome
+            
+            Tone: Professional but encouraging, like a mentor
+            """
 
             response = openai.ChatCompletion.create(
                 model=self.model,

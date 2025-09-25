@@ -63,7 +63,7 @@ const AdminPanel = () => {
 
 const findMatches = async () => {
     try {
-        const userEmail = "test@example.com"; // ⚠️ IMPORTANT: Replace with a dynamic user email from your application state
+        const userEmail = "test@example.com"; //Replace with a dynamic user email from your application state
 
         const response = await fetch('http://localhost:8000/jobs/find-matches', {
             method: 'POST',
@@ -295,7 +295,7 @@ const findMatches = async () => {
                         fontWeight: '600',
                         color: importResult.success ? '#166534' : '#dc2626'
                     }}>
-                        {importResult.success ? '✅ Import Successful!' : '❌ Import Failed'}
+                        {importResult.success ? 'Import Successful!' : ' Import Failed'}
                     </h3>
 
                     {importResult.success ? (

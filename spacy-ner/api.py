@@ -42,9 +42,9 @@ try:
     from embedding_service import ResumeJobEmbeddingService
     from database import db
     embedding_service = ResumeJobEmbeddingService()
-    logger.info("✅ Embedding service initialized for job matching")
+    logger.info(" Embedding service initialized for job matching")
 except Exception as e:
-    logger.error(f"❌ Failed to initialize embedding service: {e}")
+    logger.error(f" Failed to initialize embedding service: {e}")
     embedding_service = None
 
 # Import our intelligence modules with error handling
@@ -53,9 +53,9 @@ try:
     from relationship_extractor import ResumeIntelligenceAnalyzer
 
     INTELLIGENT_MODULES_AVAILABLE = True
-    print("✅ Intelligent modules loaded successfully")
+    print(" Intelligent modules loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Intelligent modules not available: {e}")
+    print(f" Intelligent modules not available: {e}")
     INTELLIGENT_MODULES_AVAILABLE = False
 
 semantic_extractor = SemanticResumeExtractor()
@@ -64,28 +64,28 @@ semantic_extractor = SemanticResumeExtractor()
 try:
     model_path = "output_hybrid"
     nlp = spacy.load(model_path)
-    logger.info(f"✅ Successfully loaded HYBRID model from: {model_path}")
+    logger.info(f" Successfully loaded HYBRID model from: {model_path}")
 
     metadata_path = Path(model_path) / "training_info.json"
     if metadata_path.exists():
         with open(metadata_path, 'r') as f:
             training_info = json.load(f)
         logger.info(
-            f"📊 Model info: {training_info.get('model_type', 'unknown')} with {training_info.get('total_labels', 'unknown')} labels")
+            f" Model info: {training_info.get('model_type', 'unknown')} with {training_info.get('total_labels', 'unknown')} labels")
     else:
         training_info = {}
 
 except Exception as e:
-    logger.error(f"❌ Failed to load hybrid model: {e}")
+    logger.error(f" Failed to load hybrid model: {e}")
     try:
         nlp = spacy.load("output_hybrid")
         training_info = {"model_type": "custom_only"}
-        logger.warning("⚠️ Using fallback custom model")
+        logger.warning(" Using fallback custom model")
     except Exception as e2:
-        logger.error(f"❌ Failed to load any model: {e2}")
+        logger.error(f" Failed to load any model: {e2}")
         nlp = spacy.load("en_core_web_sm")
         training_info = {"model_type": "pretrained_only"}
-        logger.warning("⚠️ Using pretrained model only")
+        logger.warning(" Using pretrained model only")
 
 app = FastAPI(title="LandIt Intelligent Resume Parser", version="3.0.0")
 
@@ -122,9 +122,9 @@ intelligence_analyzer = None
 if INTELLIGENT_MODULES_AVAILABLE:
     try:
         intelligence_analyzer = ResumeIntelligenceAnalyzer(nlp)
-        logger.info("✅ Intelligence analyzer initialized")
+        logger.info(" Intelligence analyzer initialized")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize intelligence analyzer: {e}")
+        logger.error(f" Failed to initialize intelligence analyzer: {e}")
         intelligence_analyzer = None
 
 
@@ -1262,7 +1262,7 @@ async def parse_resume_file(
     start_time = time.time()
 
     try:
-        logger.info(f"📄 Processing file: {file.filename} ({file.content_type})")
+        logger.info(f" Processing file: {file.filename} ({file.content_type})")
 
         # Validate file type
         allowed_types = [
@@ -1298,21 +1298,21 @@ async def parse_resume_file(
         if not text.strip():
             raise HTTPException(status_code=400, detail="No text could be extracted from the file")
 
-        logger.info(f"✅ Extracted {len(text)} characters from {file.filename}")
+        logger.info(f" Extracted {len(text)} characters from {file.filename}")
 
         # Choose processing method based on use_hybrid parameter
         if use_hybrid and semantic_extractor:
             # Use hybrid processing for optimal results
-            logger.info("🔀 Using hybrid processing for optimal extraction")
+            logger.info("Using hybrid processing for optimal extraction")
 
             try:
                 # Get spaCy results (intelligent analysis)
                 if intelligence_analyzer:
                     spacy_results = intelligence_analyzer.analyze_resume(text)
-                    logger.info(f"📊 spaCy analysis: {len(spacy_results.get('entities', []))} entities")
+                    logger.info(f" spaCy analysis: {len(spacy_results.get('entities', []))} entities")
                 else:
                     spacy_results = safe_context_extraction(text)
-                    logger.info(f"📊 Basic spaCy analysis: {len(spacy_results.get('entities', []))} entities")
+                    logger.info(f" Basic spaCy analysis: {len(spacy_results.get('entities', []))} entities")
             except Exception as e:
                 logger.error(f"spaCy analysis failed: {str(e)}")
                 spacy_results = {"entities": [], "experience_metrics": {"average_tenure": 0.0}}
@@ -1320,7 +1320,7 @@ async def parse_resume_file(
             # Get semantic results
             try:
                 semantic_results = semantic_extractor.extract_semantic_entities(text)
-                logger.info(f"🎯 Semantic analysis: {len(semantic_results.get('entities', []))} entities")
+                logger.info(f" Semantic analysis: {len(semantic_results.get('entities', []))} entities")
             except Exception as e:
                 logger.error(f"Semantic analysis failed: {str(e)}")
                 semantic_results = {"entities": []}
@@ -1328,7 +1328,7 @@ async def parse_resume_file(
             # Merge results intelligently
             try:
                 merged_results = merge_extraction_results(spacy_results, semantic_results, text)
-                logger.info(f"✅ Hybrid merge: {len(merged_results.get('entities', []))} total entities")
+                logger.info(f" Hybrid merge: {len(merged_results.get('entities', []))} total entities")
             except Exception as e:
                 logger.error(f"Merge failed: {str(e)}")
                 # Fallback: use spaCy results only
@@ -1369,7 +1369,7 @@ async def parse_resume_file(
 
         else:
             # Use standard intelligent processing
-            logger.info("🧠 Using standard intelligent processing")
+            logger.info(" Using standard intelligent processing")
             data = ResumeText(text=text, analysis_level=analysis_level, include_suggestions=include_suggestions)
             response = parse_resume_intelligent(data)
 
@@ -1382,14 +1382,14 @@ async def parse_resume_file(
             }
 
         processing_time = time.time() - start_time
-        logger.info(f"🎉 Successfully processed {file.filename} in {processing_time:.2f}s")
+        logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
         return response
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        logger.error(f"❌ File processing error: {e}")
+        logger.error(f" File processing error: {e}")
         raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
 
@@ -1582,7 +1582,7 @@ def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
     try:
         start_time = time.time()
 
-        logger.info("🚀 Starting job import from The Muse...")
+        logger.info(" Starting job import from The Muse...")
 
         # Initialize importer
         importer = MuseJobImporter()
@@ -1604,7 +1604,7 @@ def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
         summary = importer.get_import_summary()
         processing_time = time.time() - start_time
 
-        logger.info(f"✅ Job import completed in {processing_time:.2f}s")
+        logger.info(f" Job import completed in {processing_time:.2f}s")
 
         return {
             "success": True,
@@ -1615,7 +1615,7 @@ def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
         }
 
     except Exception as e:
-        logger.error(f"❌ Job import failed: {e}")
+        logger.error(f" Job import failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job import failed: {str(e)}")
 
 @app.post("/admin/import-adzuna-jobs")
@@ -1626,7 +1626,7 @@ def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location:
     """
     try:
         start_time = time.time()
-        logger.info("🚀 Starting Adzuna job import...")
+        logger.info(" Starting Adzuna job import...")
 
         # Initialize importer
         importer = AdzunaJobImporter()
@@ -1648,7 +1648,7 @@ def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location:
         summary = importer.get_import_summary()
         processing_time = time.time() - start_time
 
-        logger.info(f"✅ Adzuna import completed in {processing_time:.2f}s")
+        logger.info(f" Adzuna import completed in {processing_time:.2f}s")
 
         return {
             "success": True,
@@ -1659,7 +1659,7 @@ def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location:
         }
 
     except Exception as e:
-        logger.error(f"❌ Adzuna import failed: {e}")
+        logger.error(f" Adzuna import failed: {e}")
         raise HTTPException(status_code=500, detail=f"Adzuna import failed: {str(e)}")
 
 
@@ -1683,7 +1683,7 @@ def import_jsearch_jobs(
             )
 
         start_time = time.time()
-        logger.info("🚀 Starting JSearch job import...")
+        logger.info(" Starting JSearch job import...")
 
         # Initialize importer
         importer = JSearchJobImporter(rapidapi_key)
@@ -1706,7 +1706,7 @@ def import_jsearch_jobs(
 
         processing_time = time.time() - start_time
 
-        logger.info(f"✅ JSearch import completed in {processing_time:.2f}s")
+        logger.info(f" JSearch import completed in {processing_time:.2f}s")
 
         return {
             "success": True,
@@ -1718,7 +1718,7 @@ def import_jsearch_jobs(
         }
 
     except Exception as e:
-        logger.error(f"❌ JSearch import failed: {e}")
+        logger.error(f" JSearch import failed: {e}")
         raise HTTPException(status_code=500, detail=f"JSearch import failed: {str(e)}")
 
 
@@ -1755,7 +1755,7 @@ def get_job_stats():
         }
 
     except Exception as e:
-        logger.error(f"❌ Failed to get job stats: {e}")
+        logger.error(f" Failed to get job stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get job stats: {str(e)}")
 
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
@@ -1929,7 +1929,7 @@ def store_resume(request: StoreResumeRequest):
 
         processing_time = time.time() - start_time
 
-        logger.info(f"✅ Successfully stored resume for {request.user_email} (ID: {resume_id})")
+        logger.info(f" Successfully stored resume for {request.user_email} (ID: {resume_id})")
 
         return {
             "success": True,
@@ -1945,7 +1945,7 @@ def store_resume(request: StoreResumeRequest):
         }
 
     except Exception as e:
-        logger.error(f"❌ Failed to store resume for {request.user_email}: {e}")
+        logger.error(f" Failed to store resume for {request.user_email}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to store resume: {str(e)}")
 
 

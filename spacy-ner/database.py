@@ -41,14 +41,14 @@ class DatabaseConnection:
             cursor = self.get_cursor()
             cursor.execute("SELECT * FROM pg_extension WHERE extname = 'vector';")
             if cursor.fetchone():
-                logger.info("✅ Database connection established with vector support")
+                logger.info(" Database connection established with vector support")
             else:
-                logger.warning("⚠️ Database connected but vector extension not found")
+                logger.warning(" Database connected but vector extension not found")
 
             cursor.close()
 
         except Exception as e:
-            logger.error(f"❌ Database connection failed: {e}")
+            logger.error(f" Database connection failed: {e}")
             raise
 
     def get_cursor(self):
@@ -158,11 +158,11 @@ class DatabaseConnection:
             resume_id = cursor.fetchone()['id']
             cursor.close()
 
-            logger.info(f"✅ Stored resume for {user_email} (ID: {resume_id})")
+            logger.info(f" Stored resume for {user_email} (ID: {resume_id})")
             return resume_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to store resume: {e}")
+            logger.error(f" Failed to store resume: {e}")
             raise
 
     def get_user_resume(self, user_email: str) -> Optional[Dict]:
@@ -192,7 +192,7 @@ class DatabaseConnection:
             return resume_data
 
         except Exception as e:
-            logger.error(f"❌ Failed to get resume: {e}")
+            logger.error(f" Failed to get resume: {e}")
             return None
 
     # Job operations
@@ -244,11 +244,11 @@ class DatabaseConnection:
             job_id = cursor.fetchone()['id']
             cursor.close()
 
-            logger.info(f"✅ Stored job posting: {job_data.get('title')} (ID: {job_id})")
+            logger.info(f" Stored job posting: {job_data.get('title')} (ID: {job_id})")
             return job_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to store job: {e}")
+            logger.error(f" Failed to store job: {e}")
             raise
 
     def get_all_jobs_with_embeddings(self) -> List[Dict]:
@@ -291,7 +291,7 @@ class DatabaseConnection:
             return jobs
 
         except Exception as e:
-            logger.error(f"❌ Failed to get jobs: {e}")
+            logger.error(f" Failed to get jobs: {e}")
             return []
 
     # Recommendation operations
@@ -335,7 +335,7 @@ class DatabaseConnection:
             return rec_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to store recommendation: {e}")
+            logger.error(f" Failed to store recommendation: {e}")
             raise
 
     def get_user_recommendations(self, user_email: str, limit: int = 10) -> List[Dict]:
@@ -370,7 +370,7 @@ class DatabaseConnection:
             return [dict(result) for result in results]
 
         except Exception as e:
-            logger.error(f"❌ Failed to get recommendations: {e}")
+            logger.error(f" Failed to get recommendations: {e}")
             return []
 
     # Feedback operations
@@ -408,11 +408,11 @@ class DatabaseConnection:
             feedback_id = cursor.fetchone()['id']
             cursor.close()
 
-            logger.info(f"✅ Stored feedback for recommendation {recommendation_id}")
+            logger.info(f" Stored feedback for recommendation {recommendation_id}")
             return feedback_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to store feedback: {e}")
+            logger.error(f" Failed to store feedback: {e}")
             raise
 
     def get_feedback_analytics(self, days: int = 30) -> Dict:
@@ -441,7 +441,7 @@ class DatabaseConnection:
             return dict(result) if result else {}
 
         except Exception as e:
-            logger.error(f"❌ Failed to get feedback analytics: {e}")
+            logger.error(f" Failed to get feedback analytics: {e}")
             return {}
 
     # Vector similarity search methods
@@ -492,7 +492,7 @@ class DatabaseConnection:
             return [dict(result) for result in results]
 
         except Exception as e:
-            logger.error(f"❌ Vector similarity search failed: {e}")
+            logger.error(f" Vector similarity search failed: {e}")
             return []
 
     def bulk_update_recommendations_viewed(self, recommendation_ids: List[int]):
@@ -511,7 +511,7 @@ class DatabaseConnection:
             cursor.close()
 
         except Exception as e:
-            logger.error(f"❌ Failed to update viewed status: {e}")
+            logger.error(f" Failed to update viewed status: {e}")
 
     def get_jobs_by_title_company(self, title: str, company: str) -> List[Dict]:
         """Check for existing jobs by title and company"""
@@ -606,11 +606,11 @@ class DatabaseConnection:
             plan_id = cursor.fetchone()['id']
             cursor.close()
 
-            logger.info(f"✅ Stored learning plan for {user_email} (ID: {plan_id})")
+            logger.info(f" Stored learning plan for {user_email} (ID: {plan_id})")
             return plan_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to store learning plan: {e}")
+            logger.error(f" Failed to store learning plan: {e}")
             raise
 
     def get_user_learning_plans(self, user_email: str, limit: int = 10) -> List[Dict]:
@@ -645,7 +645,7 @@ class DatabaseConnection:
             return plans
 
         except Exception as e:
-            logger.error(f"❌ Failed to get learning plans: {e}")
+            logger.error(f" Failed to get learning plans: {e}")
             return []
 
     def update_learning_progress(self, plan_id: int, progress_data: Dict) -> int:
@@ -666,7 +666,7 @@ class DatabaseConnection:
             return progress_id
 
         except Exception as e:
-            logger.error(f"❌ Failed to update learning progress: {e}")
+            logger.error(f" Failed to update learning progress: {e}")
             raise
 
     # Utility methods
@@ -685,9 +685,9 @@ class DatabaseConnection:
             cursor.execute("SELECT * FROM pg_extension WHERE extname = 'vector';")
             vector_ext = cursor.fetchone()
             if vector_ext:
-                logger.info("✅ pgvector extension is available")
+                logger.info(" pgvector extension is available")
             else:
-                logger.error("❌ pgvector extension not found")
+                logger.error(" pgvector extension not found")
                 return False
 
             # Test tables exist
@@ -714,7 +714,7 @@ class DatabaseConnection:
             return True
 
         except Exception as e:
-            logger.error(f"❌ Database test failed: {e}")
+            logger.error(f" Database test failed: {e}")
             return False
 
 
@@ -725,7 +725,7 @@ db = DatabaseConnection()
 # Test the database connection
 def test_database_operations():
     """Test database operations with sample data"""
-    logger.info("🧪 Testing Database Operations")
+    logger.info(" Testing Database Operations")
 
     try:
         # Test connection
@@ -772,12 +772,12 @@ def test_database_operations():
             }
         )
 
-        logger.info(f"✅ Stored test resume with ID: {resume_id}")
+        logger.info(f" Stored test resume with ID: {resume_id}")
 
         # Test retrieving resume
         retrieved_resume = db.get_user_resume("test@example.com")
         if retrieved_resume:
-            logger.info("✅ Successfully retrieved resume")
+            logger.info(" Successfully retrieved resume")
             logger.info(f"Resume embedding shape: {retrieved_resume['full_resume_embedding'].shape}")
 
         # Test sample job posting
@@ -807,20 +807,20 @@ def test_database_operations():
             }
         )
 
-        logger.info(f"✅ Stored test job with ID: {job_id}")
+        logger.info(f" Stored test job with ID: {job_id}")
 
         # Test similarity search
         similar_jobs = db.find_similar_jobs_by_vector(full_resume_embedding, limit=5)
-        logger.info(f"✅ Found {len(similar_jobs)} similar jobs")
+        logger.info(f" Found {len(similar_jobs)} similar jobs")
 
         if similar_jobs:
             for job in similar_jobs:
                 logger.info(f"   - {job['title']} at {job['company']} (similarity: {job['similarity_score']:.3f})")
 
-        logger.info("🎉 Database operations test completed successfully!")
+        logger.info(" Database operations test completed successfully!")
 
     except Exception as e:
-        logger.error(f"❌ Database operations test failed: {e}")
+        logger.error(f" Database operations test failed: {e}")
 
 
 if __name__ == "__main__":

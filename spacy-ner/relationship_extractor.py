@@ -795,35 +795,35 @@ def test_intelligent_resume_analysis():
 
     results = analyzer.analyze_resume(test_resume)
 
-    print("🧠 INTELLIGENT RESUME ANALYSIS")
+    print(" INTELLIGENT RESUME ANALYSIS")
     print("=" * 50)
 
-    print(f"\n📊 OVERALL SCORES:")
+    print(f"\n OVERALL SCORES:")
     analytics = results["resume_analytics"]
     print(f"   Overall Quality: {analytics['overall_quality_score']}/100")
     print(f"   Completeness: {analytics['completeness_score']}/100")
     print(f"   ATS Compatibility: {analytics['ats_compatibility_score']}/100")
 
-    print(f"\n💼 WORK EXPERIENCE ({len(results['work_experience'])} jobs):")
+    print(f"\ WORK EXPERIENCE ({len(results['work_experience'])} jobs):")
     for exp in results["work_experience"]:
         print(f"   • {exp['title']} at {exp['company']} ({exp['start_date']}-{exp['end_date']})")
         if exp["skills"]:
             print(f"     Skills: {', '.join(exp['skills'][:3])}{'...' if len(exp['skills']) > 3 else ''}")
 
-    print(f"\n🎓 EDUCATION:")
+    print(f"\ EDUCATION:")
     for edu in results["education"]:
         print(f"   • {edu['degree']} from {edu['school']} ({edu['year']})")
         if edu["gpa"]:
             print(f"     GPA: {edu['gpa']}")
 
-    print(f"\n🛠️ SKILLS BY CATEGORY:")
+    print(f"\n SKILLS BY CATEGORY:")
     for category, skills in results["skills"].items():
         print(f"   {category}: {len(skills)} skills")
         for skill in skills[:3]:  # Show first 3
             proficiency = f" ({skill['proficiency']})" if skill.get('proficiency') else ""
             print(f"     • {skill['name']}{proficiency}")
 
-    print(f"\n📈 CAREER INSIGHTS:")
+    print(f"\n CAREER INSIGHTS:")
     exp_metrics = results["experience_metrics"]
     career_prog = results["career_progression"]
     print(f"   • Total Experience: {exp_metrics['total_years']} years")
@@ -831,16 +831,16 @@ def test_intelligent_resume_analysis():
     print(f"   • Career Trend: {career_prog['trend']}")
     print(f"   • Progression Score: {career_prog['progression_score']}/10")
 
-    print(f"\n✅ STRENGTHS:")
+    print(f"\n STRENGTHS:")
     for strength in analytics["strengths"]:
         print(f"   • {strength}")
 
     if analytics["red_flags"]:
-        print(f"\n⚠️ AREAS FOR IMPROVEMENT:")
+        print(f"\n AREAS FOR IMPROVEMENT:")
         for flag in analytics["red_flags"]:
             print(f"   • {flag}")
 
-    print(f"\n🎯 ACHIEVEMENTS:")
+    print(f"\n ACHIEVEMENTS:")
     for achievement in results["achievements"][:3]:
         print(f"   • {achievement}")
 

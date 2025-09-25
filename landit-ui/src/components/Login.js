@@ -32,13 +32,13 @@ const Login = ({ onLoginSuccess }) => {
             const result = await authPromise;
             const user = result.user;
 
-            console.log('✅ Firebase auth successful:', user.email);
+            console.log('Firebase auth successful:', user.email);
 
             // Call success handler
             onLoginSuccess(user.email, user);
 
         } catch (error) {
-            console.error('❌ Firebase auth error:', error);
+            console.error('Firebase auth error:', error);
 
             // User-friendly error messages
             let errorMessage = 'Authentication failed. Please try again.';

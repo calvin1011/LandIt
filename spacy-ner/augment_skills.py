@@ -1,4 +1,4 @@
-# augment_skills.py
+
 import random
 import json
 from typing import List
@@ -131,7 +131,7 @@ def augment_skills_data() -> List:
         ]
     }
 
-    print("🧠 Generating comprehensive tech skills training data...")
+    print(" Generating comprehensive tech skills training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -165,7 +165,7 @@ def augment_skills_data() -> List:
 
 def main():
     """Main function to generate and save skills training data"""
-    print("🚀 Generating Comprehensive Tech Skills Training Data")
+    print(" Generating Comprehensive Tech Skills Training Data")
     print("=" * 60)
     print("Covering: Full Stack, Cloud, DevOps, Cybersecurity, AI/ML, and more!")
     print("=" * 60)
@@ -178,8 +178,8 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(skills_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(skills_data)} skills-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(skills_data)} skills-focused examples")
+    print(f" Saved to {output_file}")
 
     # Define samples here for the summary (same as inside augment_skills_data)
     samples = {
@@ -232,15 +232,10 @@ def main():
                    "UI/UX Design Figma Adobe XD Prototyping", "Agile Scrum Kanban Project Management"]
     }
 
-    print(f"🎯 Covered {len(samples)} different tech categories")
-    print("\n📊 Categories included:")
+    print(f" Covered {len(samples)} different tech categories")
+    print("\n Categories included:")
     for category in samples.keys():
         print(f"   • {category}: {len(samples[category])} skills")
-
-    print("\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this data")
-    print("   2. Your model will now recognize 200+ tech skills!")
-    print("   3. Combine with other data files for complete coverage")
 
 
 if __name__ == "__main__":

@@ -23,9 +23,9 @@ class AdzunaJobImporter:
         # Initialize embedding service for job processing
         try:
             self.embedding_service = ResumeJobEmbeddingService()
-            logger.info("✅ Embedding service ready for Adzuna jobs")
+            logger.info(" Embedding service ready for Adzuna jobs")
         except Exception as e:
-            logger.error(f"❌ Embedding service failed: {e}")
+            logger.error(f" Embedding service failed: {e}")
             self.embedding_service = None
 
         self.stats = {
@@ -46,17 +46,17 @@ class AdzunaJobImporter:
                 "machine learning engineer"
             ]
 
-        logger.info(f"🚀 Starting Adzuna job import for {len(keywords)} keywords...")
+        logger.info(f" Starting Adzuna job import for {len(keywords)} keywords...")
 
         for keyword in keywords:
             try:
                 self._import_jobs_for_keyword(keyword, max_jobs // len(keywords), location)
                 time.sleep(1)  # Rate limiting - be respectful
             except Exception as e:
-                logger.error(f"❌ Failed to import jobs for '{keyword}': {e}")
+                logger.error(f" Failed to import jobs for '{keyword}': {e}")
                 continue
 
-        logger.info(f"✅ Adzuna import completed: {self.stats}")
+        logger.info(f" Adzuna import completed: {self.stats}")
         return self.stats
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
@@ -77,7 +77,7 @@ class AdzunaJobImporter:
                     'content-type': 'application/json'  # Added this
                 }
 
-                logger.info(f"🔍 Fetching Adzuna jobs: '{keyword}' page {page}")
+                logger.info(f" Fetching Adzuna jobs: '{keyword}' page {page}")
 
                 # FIXED URL - page number goes in the URL path
                 url = f"{self.base_url}/{page}"
@@ -120,7 +120,7 @@ class AdzunaJobImporter:
                         else:
                             self.stats['duplicate_jobs'] += 1
                     except Exception as e:
-                        logger.error(f"❌ Failed to process job: {e}")
+                        logger.error(f" Failed to process job: {e}")
                         self.stats['failed_imports'] += 1
 
                 self.stats['total_fetched'] += len(jobs)
@@ -131,14 +131,14 @@ class AdzunaJobImporter:
                     break
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"❌ API request failed for '{keyword}' page {page}: {e}")
+                logger.error(f" API request failed for '{keyword}' page {page}: {e}")
                 # Log response details if available
                 if hasattr(e, 'response') and e.response is not None:
                     logger.error(f"Response status: {e.response.status_code}")
                     logger.error(f"Response text: {e.response.text[:500]}")
                 break
             except Exception as e:
-                logger.error(f"❌ Unexpected error for '{keyword}' page {page}: {e}")
+                logger.error(f" Unexpected error for '{keyword}' page {page}: {e}")
                 break
 
     def test_api_connection(self):
@@ -203,12 +203,12 @@ class AdzunaJobImporter:
 
             # Store in database
             job_id = db.store_job_posting(job_dict, embeddings)
-            logger.debug(f"✅ Stored Adzuna job: {job_dict['title']} at {job_dict['company']}")
+            logger.debug(f" Stored Adzuna job: {job_dict['title']} at {job_dict['company']}")
 
             return True
 
         except Exception as e:
-            logger.error(f"❌ Error processing job: {e}")
+            logger.error(f" Error processing job: {e}")
             raise
 
     def _extract_job_details(self, job_data: Dict[str, Any], search_keyword: str) -> Dict[str, Any]:

@@ -34,14 +34,14 @@ class ResumeJobEmbeddingService:
             # Set device (GPU if available)
             if torch.cuda.is_available():
                 self.model = self.model.cuda()
-                logger.info("✅ Using GPU for embeddings")
+                logger.info(" Using GPU for embeddings")
             else:
-                logger.info("✅ Using CPU for embeddings")
+                logger.info(" Using CPU for embeddings")
 
-            logger.info(f"✅ Embedding service initialized with {self.embedding_dim}D vectors")
+            logger.info(f" Embedding service initialized with {self.embedding_dim}D vectors")
 
         except Exception as e:
-            logger.error(f"❌ Failed to load embedding model: {e}")
+            logger.error(f" Failed to load embedding model: {e}")
             raise
 
     def generate_resume_embedding(self, resume_data: Dict) -> np.ndarray:
@@ -403,7 +403,7 @@ class EmbeddingCache:
 # Test the embedding service
 def test_embedding_service():
     """Test the embedding service with sample data"""
-    logger.info("🧪 Testing Embedding Service")
+    logger.info(" Testing Embedding Service")
 
     # Initialize service
     embedding_service = ResumeJobEmbeddingService()
@@ -470,7 +470,7 @@ def test_embedding_service():
     skills_embedding = embedding_service.generate_skills_embedding(["Python", "React", "PostgreSQL"])
     print(f"Skills embedding shape: {skills_embedding.shape}")
 
-    print("✅ Embedding service test completed!")
+    print(" Embedding service test completed!")
 
 
 if __name__ == "__main__":

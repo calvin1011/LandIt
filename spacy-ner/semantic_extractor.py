@@ -12,7 +12,7 @@ class SemanticResumeExtractor:
     """
 
     def __init__(self):
-        logger.info("✅ SemanticResumeExtractor initialized")
+        logger.info(" SemanticResumeExtractor initialized")
 
     def extract_semantic_entities(self, text: str) -> Dict:
         """Extract entities using advanced pattern matching"""
@@ -266,29 +266,29 @@ if __name__ == "__main__":
 
     results = extractor.extract_semantic_entities(test_text)
 
-    print("🧪 SemanticResumeExtractor Test Results:")
+    print(" SemanticResumeExtractor Test Results:")
     print(f"Entities found: {len(results['entities'])}")
     print(f"Overall confidence: {results['confidence']}")
 
-    print("\n📋 Extracted Entities:")
+    print("\n Extracted Entities:")
     for entity in results['entities']:
         source = entity.get('source', 'unknown')
         confidence = entity.get('confidence', 0.0)
         category = f" ({entity['category']})" if entity.get('category') else ""
         print(f"• {entity['text']} → {entity['label']}{category} [{source}, {confidence:.2f}]")
 
-    print("\n📊 Structured Data:")
+    print("\n Structured Data:")
     structured = results['structured_data']
 
     contact = structured.get('contact_info', {})
     if contact:
-        print("👤 Contact Info:")
+        print(" Contact Info:")
         for field, value in contact.items():
             print(f"   {field}: {value}")
 
     skills = structured.get('skills', [])
     if skills:
-        print(f"🛠️ Skills by Category:")
+        print(f"️ Skills by Category:")
         skill_categories = {}
         for skill in skills:
             category = skill['category']

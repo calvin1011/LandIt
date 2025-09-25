@@ -41,16 +41,16 @@ class MuseJobImporter:
                 'Marketing'
             ]
 
-        logger.info(f"🚀 Starting The Muse import for {len(categories)} categories")
+        logger.info(f" Starting The Muse import for {len(categories)} categories")
 
         for category in categories:
             try:
-                logger.info(f"📥 Importing jobs for category: {category}")
+                logger.info(f" Importing jobs for category: {category}")
                 self._import_category(category, locations, max_jobs)
                 time.sleep(1)  # Rate limiting - be nice to the API
 
             except Exception as e:
-                logger.error(f"❌ Error importing category '{category}': {e}")
+                logger.error(f" Error importing category '{category}': {e}")
                 self.error_count += 1
 
     def _import_category(self, category: str, locations: List[str] = None, max_jobs: int = 100):
@@ -83,7 +83,7 @@ class MuseJobImporter:
                     logger.info(f"No more jobs found for {category} on page {page}")
                     break
 
-                logger.info(f"📄 Found {len(jobs)} jobs for '{category}' (page {page})")
+                logger.info(f" Found {len(jobs)} jobs for '{category}' (page {page})")
 
                 for job in jobs:
                     if jobs_imported_for_category >= max_jobs:
@@ -95,13 +95,13 @@ class MuseJobImporter:
                         time.sleep(0.1)  # Small delay between processing jobs
 
                     except Exception as e:
-                        logger.error(f"❌ Error processing job: {e}")
+                        logger.error(f" Error processing job: {e}")
                         self.error_count += 1
 
                 page += 1
 
             except Exception as e:
-                logger.error(f"❌ Error fetching page {page} for {category}: {e}")
+                logger.error(f" Error fetching page {page} for {category}: {e}")
                 break
 
     def _process_job(self, job: Dict) -> bool:
@@ -406,10 +406,10 @@ class MuseJobImporter:
             )
 
             self.imported_count += 1
-            logger.info(f"✅ Imported: {job_data['title']} at {job_data['company']} (ID: {job_id})")
+            logger.info(f" Imported: {job_data['title']} at {job_data['company']} (ID: {job_id})")
 
         except Exception as e:
-            logger.error(f"❌ Failed to store job '{job_data.get('title', 'Unknown')}': {e}")
+            logger.error(f" Failed to store job '{job_data.get('title', 'Unknown')}': {e}")
             self.error_count += 1
 
     def get_import_summary(self) -> Dict:
@@ -438,8 +438,8 @@ def main():
 
     importer = MuseJobImporter()
 
-    print("🚀 Starting The Muse job import...")
-    print("📡 No API key required - using public API")
+    print(" Starting The Muse job import...")
+    print(" No API key required - using public API")
 
     # Define categories to import
     categories = [
@@ -465,22 +465,22 @@ def main():
 
         # Print summary
         summary = importer.get_import_summary()
-        print(f"\n📊 Import Summary:")
-        print(f"   ✅ Imported: {summary['imported']}")
-        print(f"   ⏭️  Skipped: {summary['skipped']}")
-        print(f"   ❌ Errors: {summary['errors']}")
-        print(f"   📈 Total Processed: {summary['total_processed']}")
-        print(f"   🎯 Success Rate: {summary['success_rate']:.1f}%")
+        print(f"\n Import Summary:")
+        print(f"    Imported: {summary['imported']}")
+        print(f"     Skipped: {summary['skipped']}")
+        print(f"    Errors: {summary['errors']}")
+        print(f"    Total Processed: {summary['total_processed']}")
+        print(f"    Success Rate: {summary['success_rate']:.1f}%")
 
         if summary['imported'] > 0:
-            print(f"\n🎉 Successfully imported {summary['imported']} real jobs from The Muse!")
-            print("💼 Your resume builder now has real job opportunities!")
+            print(f"\n Successfully imported {summary['imported']} real jobs from The Muse!")
+            print(" Your resume builder now has real job opportunities!")
         else:
-            print(f"\n⚠️ No jobs were imported. Check the logs for details.")
+            print(f"\n No jobs were imported. Check the logs for details.")
 
     except Exception as e:
-        logger.error(f"❌ Import failed: {e}")
-        print(f"\n❌ Import failed: {e}")
+        logger.error(f" Import failed: {e}")
+        print(f"\n Import failed: {e}")
 
 
 if __name__ == "__main__":

@@ -182,7 +182,7 @@ def augment_degree_data() -> List:
 
 def main():
     """Main function to generate and save degree training data"""
-    print("🚀 Generating Degree & Educational Details Training Data")
+    print(" Generating Degree & Educational Details Training Data")
     print("=" * 70)
     print("Covering: Degrees, Fields, GPAs, Honors, Specializations, and more!")
     print("=" * 70)
@@ -195,11 +195,11 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(degree_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(degree_data)} degree-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(degree_data)} degree-focused examples")
+    print(f" Saved to {output_file}")
 
     # Show sample statistics
-    print(f"\n📊 Covering comprehensive educational details:")
+    print(f"\n Covering comprehensive educational details:")
     categories = [
         "Degree types", "Academic fields", "GPA formats", "Honors designations",
         "Specializations", "Research areas", "Coursework examples"
@@ -207,12 +207,6 @@ def main():
 
     for category in categories:
         print(f"   • {category}")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_degrees.json")
-    print("   3. Your model will better understand educational details")
-    print("   4. Expect improved FIELD, EDUCATION, and academic label recognition")
 
 
 if __name__ == "__main__":

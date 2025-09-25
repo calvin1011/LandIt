@@ -58,7 +58,7 @@ def augment_gpa_data() -> List:
         ]
     }
 
-    print("📊 Generating GPA training data...")
+    print(" Generating GPA training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -103,7 +103,7 @@ def augment_gpa_data() -> List:
 
 def main():
     """Main function to generate and save GPA training data"""
-    print("🚀 Generating GPA Training Data")
+    print(" Generating GPA Training Data")
     print("=" * 50)
     print("Covering: GPA formats, scales, and academic contexts!")
     print("=" * 50)
@@ -116,19 +116,14 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(gpa_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(gpa_data)} GPA examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(gpa_data)} GPA examples")
+    print(f" Saved to {output_file}")
 
-    print(f"\n📊 Coverage includes:")
+    print(f"\n Coverage includes:")
     print("   • Various GPA formats (3.8, 3.75, etc.)")
     print("   • Scale mentions (/4.0, on 4.0 scale)")
     print("   • Cumulative and major-specific GPA")
     print("   • Resume-style formatting")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_gpa.json")
-    print("   3. Your model will better understand GPA formats and contexts")
 
 
 if __name__ == "__main__":

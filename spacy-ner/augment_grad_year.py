@@ -52,7 +52,7 @@ def augment_grad_year_data() -> List:
         ]
     }
 
-    print("🎓 Generating graduation year training data...")
+    print(" Generating graduation year training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -99,7 +99,7 @@ def augment_grad_year_data() -> List:
 
 def main():
     """Main function to generate and save graduation year training data"""
-    print("🚀 Generating Graduation Year Training Data")
+    print(" Generating Graduation Year Training Data")
     print("=" * 60)
     print("Covering: Graduation years, class years, completion dates!")
     print("=" * 60)
@@ -112,19 +112,14 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(grad_year_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(grad_year_data)} graduation year examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(grad_year_data)} graduation year examples")
+    print(f" Saved to {output_file}")
 
-    print(f"\n📊 Coverage includes:")
+    print(f"\n Coverage includes:")
     print("   • Graduation years (1990-2030)")
     print("   • Class year mentions")
     print("   • Degree completion dates")
     print("   • Various formatting styles")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_grad_year.json")
-    print("   3. Your model will better understand graduation year formats")
 
 
 if __name__ == "__main__":

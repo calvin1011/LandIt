@@ -147,7 +147,7 @@ def augment_experience_data() -> List:
         ]
     }
 
-    print("💼 Generating experience-focused training data...")
+    print(" Generating experience-focused training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -216,7 +216,7 @@ def augment_experience_data() -> List:
 
 def main():
     """Main function to generate and save experience training data"""
-    print("🚀 Generating Work Experience & Duration Training Data")
+    print(" Generating Work Experience & Duration Training Data")
     print("=" * 70)
     print("Covering: Experience durations, industries, roles, technologies, and more!")
     print("=" * 70)
@@ -229,11 +229,11 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(experience_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(experience_data)} experience-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(experience_data)} experience-focused examples")
+    print(f" Saved to {output_file}")
 
     # Show sample statistics
-    print(f"\n📊 Covering comprehensive experience contexts:")
+    print(f"\n Covering comprehensive experience contexts:")
     categories = [
         "Experience durations", "Industry sectors", "Technical roles",
         "Technologies & skills", "Project types", "Achievement areas",
@@ -242,13 +242,6 @@ def main():
 
     for category in categories:
         print(f"   • {category}")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_experience.json")
-    print("   3. Your model will better understand experience contexts")
-    print("   4. Expect improved EXPERIENCE label recognition and duration parsing")
-
 
 if __name__ == "__main__":
     main()

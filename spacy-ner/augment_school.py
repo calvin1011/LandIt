@@ -190,7 +190,7 @@ def augment_school_data() -> List:
 
 def main():
     """Main function to generate and save school training data"""
-    print("🚀 Generating Educational Institutions Training Data")
+    print(" Generating Educational Institutions Training Data")
     print("=" * 60)
     print("Covering: Ivy League, Top Universities, Public Universities, and more!")
     print("=" * 60)
@@ -203,11 +203,11 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(school_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(school_data)} school-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(school_data)} school-focused examples")
+    print(f" Saved to {output_file}")
 
     # Show sample statistics
-    print(f"\n📊 Covering {len(samples['school'])}+ educational institutions:")
+    print(f"\n Covering {len(samples['school'])}+ educational institutions:")
     categories = [
         "Ivy League", "Top US Universities", "Public Universities", "Liberal Arts Colleges",
         "International Universities", "Technical Institutes", "Business Schools"
@@ -215,12 +215,6 @@ def main():
 
     for category in categories:
         print(f"   • {category}")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_schools.json")
-    print("   3. Your model will better distinguish schools from companies")
-    print("   4. Expect improved SCHOOL and DEGREE label recognition")
 
 
 if __name__ == "__main__":

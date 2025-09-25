@@ -226,7 +226,7 @@ def augment_field_data() -> List:
                              "Big Data Analytics"]
     }
 
-    print("📚 Generating field/specialization training data...")
+    print(" Generating field/specialization training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -270,7 +270,7 @@ def augment_field_data() -> List:
 
 def main():
     """Main function to generate and save field training data"""
-    print("🚀 Generating Academic & Professional Fields Training Data")
+    print(" Generating Academic & Professional Fields Training Data")
     print("=" * 75)
     print("Covering: Academic majors, specializations, research areas, professional domains!")
     print("=" * 75)
@@ -283,11 +283,11 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(field_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(field_data)} field-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(field_data)} field-focused examples")
+    print(f" Saved to {output_file}")
 
     # Show sample statistics
-    print(f"\n📊 Covering comprehensive field contexts:")
+    print(f"\n Covering comprehensive field contexts:")
     categories = [
         "Academic majors", "Technical specializations", "Research areas",
         "Professional domains", "Industry focuses", "Interdisciplinary fields",
@@ -296,12 +296,6 @@ def main():
 
     for category in categories:
         print(f"   • {category}")
-
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Update train.py to include train_data_fields.json")
-    print("   3. Your model will better understand academic and professional fields")
-    print("   4. Expect improved FIELD label recognition (currently 0 examples)")
 
 
 if __name__ == "__main__":

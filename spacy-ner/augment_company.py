@@ -125,7 +125,7 @@ def augment_company_data() -> List:
         ]
     }
 
-    print("🏢 Generating company-focused training data...")
+    print(" Generating company-focused training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -172,7 +172,7 @@ def augment_company_data() -> List:
 
 def main():
     """Main function to generate and save company training data"""
-    print("🚀 Generating Company & Organization Training Data")
+    print(" Generating Company & Organization Training Data")
     print("=" * 60)
     print("Covering: Tech Giants, Finance, Consulting, Healthcare, Startups, and more!")
     print("=" * 60)
@@ -185,11 +185,11 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(company_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(company_data)} company-focused examples")
-    print(f"💾 Saved to {output_file}")
+    print(f" Generated {len(company_data)} company-focused examples")
+    print(f" Saved to {output_file}")
 
     # Show sample statistics
-    print(f"\n📊 Covering {len(samples['company'])}+ real companies across industries:")
+    print(f"\n Covering {len(samples['company'])}+ real companies across industries:")
     industries = [
         "Tech Giants", "Finance & Banking", "Consulting", "Healthcare",
         "Retail", "Startups", "Automotive", "Media & Entertainment"
@@ -198,11 +198,6 @@ def main():
     for industry in industries:
         print(f"   • {industry}")
 
-    print(f"\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this additional data")
-    print("   2. Create similar scripts for SCHOOL and DEGREE labels")
-    print("   3. Your model will better distinguish companies from other entities")
-    print("   4. Expect improved COMPANY label recognition in test results")
 
 
 if __name__ == "__main__":

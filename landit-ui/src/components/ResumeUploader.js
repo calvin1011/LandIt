@@ -155,7 +155,6 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 await storeResumeForMatching(data);
             }
 
-            // You no longer need to format the data and render it.
             // Just transition to success state.
             setTimeout(() => {
                 setExtractedData([]); // Set extractedData to empty array or null
@@ -235,7 +234,6 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 await storeResumeForMatching(data);
             }
 
-            // You no longer need to format the data and render it.
             // Just transition to success state.
             setTimeout(() => {
                 setExtractedData([]); // Set extractedData to empty array or null
@@ -548,7 +546,6 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                         </div>
                     )}
 
-                    {/* Quick Preview - this section is now hidden */}
                 </div>
             )}
 

@@ -24,9 +24,9 @@ class JSearchJobImporter:
         # Initialize embedding service for job processing
         try:
             self.embedding_service = ResumeJobEmbeddingService()
-            logger.info("✅ Embedding service ready for JSearch jobs")
+            logger.info(" Embedding service ready for JSearch jobs")
         except Exception as e:
-            logger.error(f"❌ Embedding service failed: {e}")
+            logger.error(f" Embedding service failed: {e}")
             self.embedding_service = None
 
         self.stats = {
@@ -47,17 +47,17 @@ class JSearchJobImporter:
                 "machine learning engineer"
             ]
 
-        logger.info(f"🚀 Starting JSearch job import for {len(keywords)} keywords...")
+        logger.info(f" Starting JSearch job import for {len(keywords)} keywords...")
 
         for keyword in keywords:
             try:
                 self._import_jobs_for_keyword(keyword, max_jobs // len(keywords), location)
                 time.sleep(1)  # Rate limiting - be respectful
             except Exception as e:
-                logger.error(f"❌ Failed to import jobs for '{keyword}': {e}")
+                logger.error(f" Failed to import jobs for '{keyword}': {e}")
                 continue
 
-        logger.info(f"✅ JSearch import completed: {self.stats}")
+        logger.info(f" JSearch import completed: {self.stats}")
         return self.stats
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
@@ -77,7 +77,7 @@ class JSearchJobImporter:
                     'job_requirements': 'no_degree,under_3_years_experience,more_than_3_years_experience'
                 }
 
-                logger.info(f"🔍 Fetching JSearch jobs: '{keyword}' page {page}")
+                logger.info(f" Fetching JSearch jobs: '{keyword}' page {page}")
 
                 # Make API request
                 response = self.session.get(self.base_url, params=params, timeout=30)
@@ -120,7 +120,7 @@ class JSearchJobImporter:
                         else:
                             self.stats['duplicate_jobs'] += 1
                     except Exception as e:
-                        logger.error(f"❌ Failed to process job: {e}")
+                        logger.error(f" Failed to process job: {e}")
                         self.stats['failed_imports'] += 1
 
                 self.stats['total_fetched'] += len(jobs)
@@ -131,10 +131,10 @@ class JSearchJobImporter:
                     break
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"❌ API request failed for '{keyword}' page {page}: {e}")
+                logger.error(f" API request failed for '{keyword}' page {page}: {e}")
                 break
             except Exception as e:
-                logger.error(f"❌ Unexpected error for '{keyword}' page {page}: {e}")
+                logger.error(f" Unexpected error for '{keyword}' page {page}: {e}")
                 break
 
     def test_api_connection(self):
@@ -154,10 +154,10 @@ class JSearchJobImporter:
             logger.info(f"Test response status: {response.status_code}")
 
             if response.status_code == 401:
-                logger.error("❌ Invalid RapidAPI key")
+                logger.error(" Invalid RapidAPI key")
                 return False
             elif response.status_code == 403:
-                logger.error("❌ API access forbidden - check subscription")
+                logger.error(" API access forbidden - check subscription")
                 return False
             elif response.status_code != 200:
                 logger.error(f"Test failed with status {response.status_code}")
@@ -166,7 +166,7 @@ class JSearchJobImporter:
 
             data = response.json()
             jobs_found = len(data.get('data', []))
-            logger.info(f"✅ Test successful! Found {jobs_found} jobs")
+            logger.info(f" Test successful! Found {jobs_found} jobs")
             return True
 
         except Exception as e:
@@ -201,12 +201,12 @@ class JSearchJobImporter:
 
             # Store in database
             job_id = db.store_job_posting(job_dict, embeddings)
-            logger.debug(f"✅ Stored JSearch job: {job_dict['title']} at {job_dict['company']}")
+            logger.debug(f" Stored JSearch job: {job_dict['title']} at {job_dict['company']}")
 
             return True
 
         except Exception as e:
-            logger.error(f"❌ Error processing job: {e}")
+            logger.error(f" Error processing job: {e}")
             raise
 
     def _extract_job_details(self, job_data: Dict[str, Any], search_keyword: str) -> Dict[str, Any]:

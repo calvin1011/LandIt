@@ -79,7 +79,7 @@ def augment_contact_data() -> List:
         ]
     }
 
-    print("🧪 Generating contact-focused training data...")
+    print(" Generating contact-focused training data...")
 
     # Generate examples from templates
     for template, labels in templates:
@@ -113,7 +113,7 @@ def augment_contact_data() -> List:
 
 def main():
     """Main function to generate and save contact training data"""
-    print("🚀 Generating Contact Information Training Data")
+    print(" Generating Contact Information Training Data")
     print("=" * 50)
 
     # Generate contact-focused data
@@ -124,12 +124,8 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(contact_data, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Generated {len(contact_data)} contact-focused examples")
-    print(f"💾 Saved to {output_file}")
-    print("\n🎯 Next steps:")
-    print("   1. Run 'python train.py' to train with this data")
-    print("   2. Create other specialized augmentation scripts")
-    print("   3. Modify train.py to load multiple data files")
+    print(f" Generated {len(contact_data)} contact-focused examples")
+    print(f" Saved to {output_file}")
 
 
 if __name__ == "__main__":

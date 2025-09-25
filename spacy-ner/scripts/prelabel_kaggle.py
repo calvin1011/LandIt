@@ -117,19 +117,19 @@ def main():
     # Load your trained spaCy model
     try:
         nlp = spacy.load(str(model_path))
-        print("✅ Successfully loaded your trained spaCy model")
+        print(" Successfully loaded your trained spaCy model")
     except Exception as e:
-        print(f"❌ Error loading spaCy model: {e}")
+        print(f" Error loading spaCy model: {e}")
         print("Make sure your model is trained and saved in spacy-ner/output/")
         return
 
     # Load the Kaggle dataset
     try:
         df = pd.read_csv(csv_path)
-        print(f"✅ Successfully loaded CSV with {len(df)} rows")
+        print(f" Successfully loaded CSV with {len(df)} rows")
         print(f"Columns: {list(df.columns)}")
     except Exception as e:
-        print(f"❌ Error loading CSV: {e}")
+        print(f" Error loading CSV: {e}")
         return
 
     # Inspect the data structure
@@ -155,7 +155,7 @@ def main():
             break
 
     if not resume_column:
-        print("❌ Could not find resume text column. Available columns:")
+        print(" Could not find resume text column. Available columns:")
         for i, col in enumerate(df.columns):
             print(f"  {i}: {col}")
         choice = input("Enter the number of the column containing resume text: ")
@@ -174,7 +174,7 @@ def main():
     successful_count = 0
     failed_count = 0
 
-    print(f"\n🔄 Processing {len(df)} resumes...")
+    print(f"\n Processing {len(df)} resumes...")
 
     for index, row in df.iterrows():
         if index % 100 == 0:
@@ -204,19 +204,19 @@ def main():
         else:
             failed_count += 1
 
-    print(f"\n✅ Processing complete!")
+    print(f"\n Processing complete!")
     print(f"Successfully processed: {successful_count} resumes")
     print(f"Failed/filtered out: {failed_count} resumes")
 
     if successful_count == 0:
-        print("❌ No training data generated. Check your data and model.")
+        print(" No training data generated. Check your data and model.")
         return
 
     # Save the pre-labeled training data
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(training_data, f, indent=2, ensure_ascii=False)
 
-    print(f"💾 Saved pre-labeled training data to: {output_path}")
+    print(f" Saved pre-labeled training data to: {output_path}")
 
     # Print some statistics
     entity_counts = {}
@@ -224,12 +224,12 @@ def main():
         for start, end, label in annotations['entities']:
             entity_counts[label] = entity_counts.get(label, 0) + 1
 
-    print(f"\n📊 Entity distribution in pre-labeled data:")
+    print(f"\n Entity distribution in pre-labeled data:")
     for label, count in sorted(entity_counts.items(), key=lambda x: x[1], reverse=True):
         print(f"  {label}: {count}")
 
     # Show a few examples
-    print(f"\n🔍 Sample pre-labeled examples:")
+    print(f"\n Sample pre-labeled examples:")
     for i in range(min(3, len(training_data))):
         text, annotations = training_data[i]
         print(f"\nExample {i + 1}:")
