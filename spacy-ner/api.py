@@ -16,6 +16,13 @@ from job_data_importer import MuseJobImporter
 from adzuna_job_importer import AdzunaJobImporter
 from jsearch_job_importer import JSearchJobImporter
 from ai_project_generator import AIProjectGenerator
+from functools import lru_cache
+import hashlib
+from datetime import datetime, timedelta
+
+# simple in memory cache for requests
+recent_learning_requests = {}
+recent_match_requests = {}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1016,6 +1023,26 @@ def generate_learning_plan(request: LearningPlanRequest):
     Generate AI-powered learning plan for a specific job recommendation
     """
     try:
+        # Create a unique key for this request
+        request_key = f"{request.user_email}_{request.job_id}_{request.recommendation_id}"
+        request_hash = hashlib.md5(request_key.encode()).hexdigest()
+
+        # Check if we've processed this exact request recently
+        now = datetime.now()
+        if request_hash in recent_learning_requests:
+            last_request_time = recent_learning_requests[request_hash]['timestamp']
+            if now - last_request_time < timedelta(seconds=5):  # 5 second window
+                logger.info(f"Duplicate learning plan request detected for {request_key}, returning cached result")
+                return recent_learning_requests[request_hash]['response']
+
+        # Clean old entries (keep cache small)
+        keys_to_remove = []
+        for key, value in recent_learning_requests.items():
+            if now - value['timestamp'] > timedelta(minutes=1):
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del recent_learning_requests[key]
+
         start_time = time.time()
 
         # Initialize AI project generator
@@ -1090,7 +1117,7 @@ def generate_learning_plan(request: LearningPlanRequest):
         processing_time = time.time() - start_time
 
         # Return comprehensive learning plan
-        return {
+        response = {
             "success": True,
             "plan_id": plan_id,
             "learning_plan": learning_plan,
@@ -1112,6 +1139,14 @@ def generate_learning_plan(request: LearningPlanRequest):
             "processing_time": processing_time,
             "message": f"Generated learning plan with {len(learning_plan.get('critical_projects', []))} critical projects"
         }
+
+        # Cache the response
+        recent_learning_requests[request_hash] = {
+            'timestamp': now,
+            'response': response
+        }
+
+        return response
 
     except HTTPException:
         # Re-raise HTTP exceptions
