@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Target, TrendingUp, CheckCircle, AlertCircle, BookOpen, ExternalLink, Calendar, Star, Award, ChevronRight, ChevronDown, Play, Pause, RotateCcw } from 'lucide-react';
 
-const LearningPlan = ({ userEmail, jobMatch, onBack }) => {
-  const [learningPlan, setLearningPlan] = useState(null);
+const LearningPlan = ({ userEmail, jobMatch, onBack, existingPlan = null }) => {
+  const [learningPlan, setLearningPlan] = useState(existingPlan);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [expandedProject, setExpandedProject] = useState(null);
@@ -11,12 +11,12 @@ const LearningPlan = ({ userEmail, jobMatch, onBack }) => {
 
   // Generate learning plan when component mounts
   useEffect(() => {
-    if (jobMatch && userEmail) {
-      generateLearningPlan();
+    if (existingPlan) {
+      setLearningPlan(existingPlan);
     }
-  }, [jobMatch, userEmail]);
+  }, [existingPlan]);
 
-  const generateLearningPlan = async () => {
+  /*const generateLearningPlan = async () => {
     setLoading(true);
     setError(null);
 
@@ -45,7 +45,7 @@ const LearningPlan = ({ userEmail, jobMatch, onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
+  };*/
 
   const updateProgress = async (planId, progressData) => {
     try {
@@ -265,16 +265,10 @@ const LearningPlan = ({ userEmail, jobMatch, onBack }) => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center gap-3 mb-3">
             <AlertCircle className="w-6 h-6 text-red-600" />
-            <h3 className="text-lg font-medium text-red-900">Failed to Generate Learning Plan</h3>
+            <h3 className="text-lg font-medium text-red-900">Error Loading Learning Plan</h3>
           </div>
           <p className="text-red-700 mb-4">{error}</p>
           <div className="flex gap-3">
-            <button
-              onClick={generateLearningPlan}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Try Again
-            </button>
             <button
               onClick={onBack}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -288,7 +282,19 @@ const LearningPlan = ({ userEmail, jobMatch, onBack }) => {
   }
 
   if (!learningPlan) {
-    return null;
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center py-12">
+          <p className="text-gray-600">No learning plan available. Please generate one from the Learning Coach.</p>
+          <button
+            onClick={onBack}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const projectCounts = {
