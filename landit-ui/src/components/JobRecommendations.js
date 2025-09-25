@@ -338,6 +338,11 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
             });
 
             if (!response.ok) {
+                if (response.status === 429) {
+                    console.log('Duplicate request ignored - already processing');
+                    return;
+                }
+
                 if (response.status === 404) {
                     throw new Error('Please upload your resume first to get job recommendations.');
                 } else {
