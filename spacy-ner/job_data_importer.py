@@ -430,6 +430,21 @@ class MuseJobImporter:
         self.skipped_count = 0
         self.error_count = 0
 
+    def test_api_connection(self):
+        """Test API connection with minimal request"""
+        try:
+            params = {
+                'category': 'Software Engineer',
+                'page_size': 1,
+                'page': 0
+            }
+
+            response = requests.get(self.base_url, params=params, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"Muse API test failed: {e}")
+            return False
+
 
 # Main function to run the importer
 def main():

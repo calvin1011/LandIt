@@ -10,15 +10,33 @@ from pathlib import Path
 import io
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional, Dict, Any
 import numpy as np
 from job_data_importer import MuseJobImporter
 from adzuna_job_importer import AdzunaJobImporter
 from jsearch_job_importer import JSearchJobImporter
+from remotive_job_importer import RemotiveJobImporter
 from ai_project_generator import AIProjectGenerator
 from functools import lru_cache
 import hashlib
 from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+import requests
+from contextlib import asynccontextmanager
+
+# Scheduler for automated job imports
+scheduler = BackgroundScheduler()
+
+def run_all_job_imports():
+    """Function to be called by the scheduler to run all job imports."""
+    logger.info("SCHEDULER: Kicking off automated job import.")
+    try:
+        result = import_all_jobs_direct()
+        logger.info(f"SCHEDULER: Automated job import successful: {result}")
+    except Exception as e:
+        logger.error(f"SCHEDULER: Exception during automated job import: {e}")
+
+# Schedule job imports every 6 hours
+scheduler.add_job(run_all_job_imports, 'interval', hours=6, next_run_time=datetime.now() + timedelta(seconds=10))
 
 # simple in memory cache for requests
 recent_learning_requests = {}
@@ -94,7 +112,30 @@ except Exception as e:
         training_info = {"model_type": "pretrained_only"}
         logger.warning(" Using pretrained model only")
 
-app = FastAPI(title="LandIt Intelligent Resume Parser", version="3.0.0")
+
+# --- NEW LIFESPAN MANAGER ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handles startup and shutdown events for the FastAPI application.
+    This replaces the deprecated on_event handlers.
+    """
+    # Code to run on startup
+    scheduler.start()
+    logger.info("APScheduler started... will run job imports every 6 hours.")
+
+    yield  # The application runs here
+
+    # Code to run on shutdown
+    scheduler.shutdown()
+    logger.info("APScheduler shut down.")
+
+# --- CORRECT APP INITIALIZATION ---
+app = FastAPI(
+    title="LandIt Intelligent Resume Parser",
+    version="3.1.0",
+    lifespan=lifespan  # Attach the new lifespan manager here
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,7 +174,6 @@ if INTELLIGENT_MODULES_AVAILABLE:
     except Exception as e:
         logger.error(f" Failed to initialize intelligence analyzer: {e}")
         intelligence_analyzer = None
-
 
 class ResumeText(BaseModel):
     text: str
@@ -1639,6 +1679,52 @@ def _perform_standard_analysis(text: str) -> Dict:
         logger.error(f"Standard analysis failed: {e}")
         return _fallback_basic_extraction(text)
 
+@app.post("/parse-resume-hybrid")
+def parse_resume_hybrid(data: ResumeText):
+    """
+    Combined spaCy + semantic parsing for optimal results
+    """
+    start_time = time.time()
+
+    try:
+        text = data.text.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+        logger.info("Processing resume with hybrid extraction")
+
+        # Get spaCy results
+        spacy_results = safe_context_extraction(text)
+
+        # Get semantic results
+        semantic_results = semantic_extractor.extract_semantic_entities(text)
+
+        # Merge results
+        merged_results = merge_extraction_results(spacy_results, semantic_results, text)
+
+        processing_time = time.time() - start_time
+
+        return {
+            "success": True,
+            "method": "hybrid_extraction",
+            "entities": merged_results.get("entities", []),
+            "structured_data": {
+                "personal_info": merged_results.get("personal_info", {}),
+                "work_experience": merged_results.get("work_experience", []),
+                "education": merged_results.get("education", []),
+                "skills": merged_results.get("skills", {})
+            },
+            "processing_time": processing_time,
+            "total_entities": len(merged_results.get("entities", [])),
+            "components": {
+                "spacy_entities": len(spacy_results.get("entities", [])),
+                "semantic_entities": len(semantic_results.get("entities", []))
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error in hybrid parsing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Hybrid processing failed: {str(e)}")
 
 @app.post("/parse-resume-semantic")
 def parse_resume_semantic(data: ResumeText):
@@ -1686,6 +1772,182 @@ def test_response():
         "message": "Test successful"
     }
 
+# endpoint to test all importers
+@app.post("/admin/test-all-importers")
+def test_all_importers():
+    """Tests the connection for all available job importers."""
+    results = {}
+
+    # Test The Muse
+    try:
+        # The Muse doesn't have an explicit test, so we assume it's okay if the class inits
+        results['muse'] = {'status': 'ok', 'message': 'Assumed OK. No API key needed.'}
+    except Exception as e:
+        results['muse'] = {'status': 'error', 'message': str(e)}
+
+    # Test Adzuna
+    try:
+        adzuna_importer = AdzunaJobImporter()
+        if adzuna_importer.test_api_connection():
+            results['adzuna'] = {'status': 'ok', 'message': 'Connection successful.'}
+        else:
+            results['adzuna'] = {'status': 'error', 'message': 'Connection test failed.'}
+    except Exception as e:
+        results['adzuna'] = {'status': 'error', 'message': str(e)}
+
+    # Test JSearch
+    try:
+        rapidapi_key = os.getenv('RAPIDAPI_KEY')
+        if not rapidapi_key:
+            raise ValueError("RAPIDAPI_KEY not found in environment variables")
+        jsearch_importer = JSearchJobImporter(rapidapi_key)
+        if jsearch_importer.test_api_connection():
+            results['jsearch'] = {'status': 'ok', 'message': 'Connection successful.'}
+        else:
+            results['jsearch'] = {'status': 'error', 'message': 'Connection test failed.'}
+    except Exception as e:
+        results['jsearch'] = {'status': 'error', 'message': str(e)}
+
+    # Test Remotive
+    try:
+        # Remotive is simple, we'll just try a quick fetch
+        response = requests.get("https://remotive.com/api/remote-jobs?limit=1", timeout=10)
+        response.raise_for_status()
+        results['remotive'] = {'status': 'ok', 'message': 'Connection successful.'}
+    except Exception as e:
+        results['remotive'] = {'status': 'error', 'message': str(e)}
+
+    return results
+
+
+# Add this function to handle direct imports (add it near your other import functions)
+def import_all_jobs_direct(max_jobs_per_source: int = 25):
+    """Direct function to run all job imports (for scheduler use)"""
+    summaries = {}
+
+    # Muse Importer
+    try:
+        muse_importer = MuseJobImporter()
+        muse_importer.import_jobs(max_jobs=max_jobs_per_source)
+        summaries['muse'] = muse_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"Muse import failed: {e}")
+        summaries['muse'] = {'error': str(e)}
+
+    # Adzuna Importer
+    try:
+        adzuna_importer = AdzunaJobImporter()
+        adzuna_importer.import_jobs(max_jobs=max_jobs_per_source)
+        summaries['adzuna'] = adzuna_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"Adzuna import failed: {e}")
+        summaries['adzuna'] = {'error': str(e)}
+
+    # JSearch Importer
+    try:
+        rapidapi_key = os.getenv('RAPIDAPI_KEY')
+        if rapidapi_key:
+            jsearch_importer = JSearchJobImporter(rapidapi_key)
+            jsearch_importer.import_jobs(max_jobs=max_jobs_per_source)
+            summaries['jsearch'] = jsearch_importer.get_import_summary()
+        else:
+            summaries['jsearch'] = {'error': 'RAPIDAPI_KEY not set.'}
+    except Exception as e:
+        logger.error(f"JSearch import failed: {e}")
+        summaries['jsearch'] = {'error': str(e)}
+
+    # Remotive Importer
+    try:
+        remotive_importer = RemotiveJobImporter()
+        remotive_importer.import_jobs(limit=max_jobs_per_source)
+        summaries['remotive'] = remotive_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"Remotive import failed: {e}")
+        summaries['remotive'] = {'error': str(e)}
+
+    return {"status": "completed", "summaries": summaries}
+
+
+@app.post("/admin/test-job-apis-comprehensive")
+def test_job_apis_comprehensive():
+    """Comprehensive test of all job APIs with detailed logging"""
+    test_results = {
+        "timestamp": datetime.now().isoformat(),
+        "environment_check": {},
+        "api_tests": {},
+        "database_check": {},
+        "recommendations": []
+    }
+
+    # Environment Check
+    try:
+        test_results["environment_check"]["rapidapi_key"] = bool(os.getenv('RAPIDAPI_KEY'))
+        test_results["environment_check"]["adzuna_app_id"] = bool(os.getenv('ADZUNA_APP_ID', '091309e2'))
+        test_results["environment_check"]["adzuna_app_key"] = bool(
+            os.getenv('ADZUNA_APP_KEY', 'dc9d659bbbb55ce320190bf9954f8f06'))
+    except Exception as e:
+        test_results["environment_check"]["error"] = str(e)
+
+    # Test each API individually with more details
+    apis_to_test = [
+        ("muse", "The Muse API", lambda: MuseJobImporter().test_api_connection() if hasattr(MuseJobImporter,
+                                                                                            'test_api_connection') else "No test method"),
+        ("adzuna", "Adzuna API", lambda: AdzunaJobImporter().test_api_connection()),
+        ("jsearch", "JSearch API",
+         lambda: JSearchJobImporter(os.getenv('RAPIDAPI_KEY', '')).test_api_connection() if os.getenv(
+             'RAPIDAPI_KEY') else "No RAPIDAPI_KEY"),
+        ("remotive", "Remotive API", lambda: test_remotive_api())
+    ]
+
+    for api_key, api_name, test_func in apis_to_test:
+        try:
+            logger.info(f"Testing {api_name}...")
+            result = test_func()
+            test_results["api_tests"][api_key] = {
+                "name": api_name,
+                "status": "success" if result else "failed",
+                "result": str(result)
+            }
+            logger.info(f"{api_name}: {'SUCCESS' if result else 'FAILED'}")
+        except Exception as e:
+            test_results["api_tests"][api_key] = {
+                "name": api_name,
+                "status": "error",
+                "error": str(e)
+            }
+            logger.error(f"{api_name} test error: {e}")
+
+    # Test database connection
+    try:
+        db_status = db.test_connection()
+        test_results["database_check"] = {
+            "status": "connected" if db_status else "failed",
+            "message": "Database connection successful" if db_status else "Database connection failed"
+        }
+    except Exception as e:
+        test_results["database_check"] = {
+            "status": "error",
+            "error": str(e)
+        }
+
+    # Generate recommendations
+    failed_apis = [k for k, v in test_results["api_tests"].items() if v.get("status") in ["failed", "error"]]
+    if failed_apis:
+        test_results["recommendations"].append(f"Fix these APIs: {', '.join(failed_apis)}")
+
+    if not test_results["environment_check"].get("rapidapi_key"):
+        test_results["recommendations"].append("Set RAPIDAPI_KEY environment variable for JSearch API")
+
+    return test_results
+
+
+def test_remotive_api():
+    """Test Remotive API connection"""
+    try:
+        response = requests.get("https://remotive.com/api/remote-jobs?limit=1", timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        return False
 
 @app.post("/admin/import-jobs")
 def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
@@ -1731,6 +1993,11 @@ def import_jobs_from_muse(categories: List[str] = None, max_jobs: int = 50):
     except Exception as e:
         logger.error(f" Job import failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job import failed: {str(e)}")
+
+@app.post("/admin/import-all-jobs")
+def import_all_jobs(max_jobs_per_source: int = 25):
+    """Import jobs from all available sources"""
+    return import_all_jobs_direct(max_jobs_per_source)
 
 @app.post("/admin/import-adzuna-jobs")
 def import_adzuna_jobs(keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
@@ -1835,6 +2102,23 @@ def import_jsearch_jobs(
         logger.error(f" JSearch import failed: {e}")
         raise HTTPException(status_code=500, detail=f"JSearch import failed: {str(e)}")
 
+@app.post("/admin/import-remotive-jobs")
+def trigger_remotive_import():
+    """Import jobs from Remotive API"""
+    try:
+        importer = RemotiveJobImporter()
+        importer.import_jobs(limit=20) # Process up to 20 jobs
+        summary = importer.get_import_summary()
+
+        return {
+            "success": True,
+            "message": f"Successfully imported {summary['successfully_imported']} jobs from Remotive.",
+            "summary": summary
+        }
+
+    except Exception as e:
+        logger.error(f"Remotive import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Remotive import failed: {str(e)}")
 
 @app.get("/admin/jobs/stats")
 def get_job_stats():

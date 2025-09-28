@@ -210,53 +210,77 @@ class JSearchJobImporter:
             raise
 
     def _extract_job_details(self, job_data: Dict[str, Any], search_keyword: str) -> Dict[str, Any]:
-        """Extract and normalize job details from JSearch API response"""
+        """Extract and normalize job details from JSearch API response with better error handling"""
 
-        # Extract salary information
-        salary_min = None
-        salary_max = None
-        if job_data.get('job_salary_min'):
-            salary_min = int(job_data['job_salary_min'])
-        if job_data.get('job_salary_max'):
-            salary_max = int(job_data['job_salary_max'])
+        try:
+            # Extract salary information with safe conversion
+            salary_min = None
+            salary_max = None
+            try:
+                if job_data.get('job_salary_min'):
+                    salary_min = int(float(job_data['job_salary_min']))
+                if job_data.get('job_salary_max'):
+                    salary_max = int(float(job_data['job_salary_max']))
+            except (ValueError, TypeError):
+                logger.debug("Could not parse salary information")
 
-        # Determine experience level from title/description
-        experience_level = self._determine_experience_level(
-            job_data.get('job_title', ''),
-            job_data.get('job_description', '')
-        )
+            # Determine experience level from title/description
+            experience_level = self._determine_experience_level(
+                job_data.get('job_title', ''),
+                job_data.get('job_description', '')
+            )
 
-        # Extract location
-        location = self._format_location(job_data)
+            # Extract location
+            location = self._format_location(job_data)
 
-        # Extract skills from description
-        skills_required = self._extract_skills_from_description(job_data.get('job_description', ''))
+            # Extract skills from description
+            skills_required = self._extract_skills_from_description(job_data.get('job_description', ''))
 
-        # Get job type
-        job_type = self._normalize_job_type(job_data.get('job_employment_type', ''))
+            # Get job type
+            job_type = self._normalize_job_type(job_data.get('job_employment_type', ''))
 
-        return {
-            'title': job_data.get('job_title', '').strip(),
-            'company': job_data.get('employer_name', 'Unknown Company'),
-            'description': job_data.get('job_description', ''),
-            'requirements': job_data.get('job_highlights', {}).get('Qualifications', []),
-            'responsibilities': job_data.get('job_highlights', {}).get('Responsibilities', []),
-            'location': location,
-            'remote_allowed': self._is_remote_job(job_data.get('job_description', '')),
-            'salary_min': salary_min,
-            'salary_max': salary_max,
-            'experience_level': experience_level,
-            'job_type': job_type,
-            'industry': search_keyword,
-            'skills_required': skills_required,
-            'skills_preferred': [],
-            'education_required': '',
-            'job_url': job_data.get('job_apply_link', ''),  # Direct apply link!
-            'source': 'jsearch',
-            'external_id': str(job_data.get('job_id', '')),
-            'posted_date': job_data.get('job_posted_at_datetime_utc', ''),
-            'category': job_data.get('job_publisher', '')
-        }
+            # Handle requirements and responsibilities - convert lists to strings
+            requirements = job_data.get('job_highlights', {}).get('Qualifications', [])
+            responsibilities = job_data.get('job_highlights', {}).get('Responsibilities', [])
+
+            if isinstance(requirements, list):
+                requirements = ' '.join(requirements)
+            if isinstance(responsibilities, list):
+                responsibilities = ' '.join(responsibilities)
+
+            # Ensure all required fields have safe defaults
+            job_dict = {
+                'title': job_data.get('job_title', '').strip() or 'Unknown Position',
+                'company': job_data.get('employer_name', '').strip() or 'Unknown Company',
+                'description': job_data.get('job_description', '') or '',
+                'requirements': requirements or '',
+                'responsibilities': responsibilities or '',
+                'location': location,
+                'remote_allowed': self._is_remote_job(job_data.get('job_description', '')),
+                'salary_min': salary_min,
+                'salary_max': salary_max,
+                'experience_level': experience_level,
+                'job_type': job_type,
+                'industry': search_keyword,
+                'skills_required': skills_required,
+                'skills_preferred': [],
+                'education_required': '',
+                'job_url': job_data.get('job_apply_link', ''),
+                'source': 'jsearch',
+                'external_id': str(job_data.get('job_id', '')),
+                'posted_date': job_data.get('job_posted_at_datetime_utc', ''),
+                'category': job_data.get('job_publisher', '')
+            }
+
+            # Log the extracted data for debugging
+            logger.debug(f"Extracted job: {job_dict['title']} at {job_dict['company']}")
+
+            return job_dict
+
+        except Exception as e:
+            logger.error(f"Error extracting job details: {e}")
+            logger.error(f"Problematic job data: {job_data}")
+            raise
 
     def _determine_experience_level(self, title: str, description: str) -> str:
         """Determine experience level from job title and description"""
