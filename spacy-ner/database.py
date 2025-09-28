@@ -198,16 +198,7 @@ class DatabaseConnection:
     # Job operations
 
     def store_job_posting(self, job_data: Dict, embeddings: Dict[str, np.ndarray]) -> int:
-        """
-        Store job posting with embeddings
-
-        Args:
-            job_data: Job posting data
-            embeddings: Dict with keys: 'description', 'requirements', 'title'
-
-        Returns:
-            Job ID
-        """
+        """Store job posting with embeddings - with better null handling"""
         try:
             cursor = self.get_cursor()
 
@@ -216,15 +207,18 @@ class DatabaseConnection:
             requirements_embedding = self.vector_to_db(embeddings.get('requirements', np.array([])))
             title_embedding = self.vector_to_db(embeddings.get('title', np.array([])))
 
+            # Use COALESCE to handle None values
             query = """
                     INSERT INTO jobs (title, company, description, requirements, responsibilities, \
                                       location, remote_allowed, salary_min, salary_max, currency, \
                                       experience_level, job_type, industry, company_size, \
                                       benefits, skills_required, skills_preferred, education_required, \
                                       description_embedding, requirements_embedding, title_embedding, \
-                                      source, job_url, posted_date, is_active) \
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, \
-                            %s, %s, %s, %s, %s, %s, %s) RETURNING id; \
+                                      source, job_url, posted_date, is_active, external_job_id) \
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, 'USD'), \
+                            %s, %s, %s, %s, COALESCE(%s, '{}'), \
+                            COALESCE(%s, '{}'), COALESCE(%s, '{}'), %s, \
+                            %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
                     """
 
             cursor.execute(query, (
@@ -232,13 +226,15 @@ class DatabaseConnection:
                 job_data.get('requirements'), job_data.get('responsibilities'),
                 job_data.get('location'), job_data.get('remote_allowed', False),
                 job_data.get('salary_min'), job_data.get('salary_max'),
-                job_data.get('currency', 'USD'), job_data.get('experience_level'),
-                job_data.get('job_type'), job_data.get('industry'),
-                job_data.get('company_size'), job_data.get('benefits', []),
-                job_data.get('skills_required', []), job_data.get('skills_preferred', []),
+                job_data.get('currency'),  # Will use 'USD' if None
+                job_data.get('experience_level'), job_data.get('job_type'),
+                job_data.get('industry'), job_data.get('company_size'),
+                job_data.get('benefits'),  # Will use empty array if None
+                job_data.get('skills_required'), job_data.get('skills_preferred'),
                 job_data.get('education_required'), description_embedding,
                 requirements_embedding, title_embedding, job_data.get('source', 'manual'),
-                job_data.get('job_url'), job_data.get('posted_date'), True
+                job_data.get('job_url'), job_data.get('posted_date'), True,
+                job_data.get('external_job_id') or job_data.get('external_id')  # Handle both
             ))
 
             job_id = cursor.fetchone()['id']
@@ -249,6 +245,7 @@ class DatabaseConnection:
 
         except Exception as e:
             logger.error(f" Failed to store job: {e}")
+            logger.error(f" Job data: {job_data}")
             raise
 
     def get_all_jobs_with_embeddings(self) -> List[Dict]:
