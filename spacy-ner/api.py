@@ -1820,8 +1820,7 @@ def test_all_importers():
     return results
 
 
-# Add this function to handle direct imports (add it near your other import functions)
-def import_all_jobs_direct(max_jobs_per_source: int = 25):
+def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from potentially unlimited
     """Direct function to run all job imports (for scheduler use)"""
     summaries = {}
 
@@ -1834,10 +1833,10 @@ def import_all_jobs_direct(max_jobs_per_source: int = 25):
         logger.error(f"Muse import failed: {e}")
         summaries['muse'] = {'error': str(e)}
 
-    # Adzuna Importer
+    # Adzuna Importer (with fixed limits)
     try:
         adzuna_importer = AdzunaJobImporter()
-        adzuna_importer.import_jobs(max_jobs=max_jobs_per_source)
+        adzuna_importer.import_jobs(max_jobs=max_jobs_per_source)  # Now has proper limits
         summaries['adzuna'] = adzuna_importer.get_import_summary()
     except Exception as e:
         logger.error(f"Adzuna import failed: {e}")

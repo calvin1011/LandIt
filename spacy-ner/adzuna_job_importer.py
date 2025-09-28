@@ -13,7 +13,7 @@ class AdzunaJobImporter:
         # Your Adzuna API credentials
         self.app_id = "091309e2"
         self.app_key = "dc9d659bbbb55ce320190bf9954f8f06"
-        self.base_url = "https://api.adzuna.com/v1/api/jobs/us/search"  # Removed the page number
+        self.base_url = "https://api.adzuna.com/v1/api/jobs/us/search"
 
         self.session = requests.Session()
         self.session.headers.update({
@@ -36,7 +36,7 @@ class AdzunaJobImporter:
         }
 
     def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
-        """Import jobs from Adzuna API"""
+        """Import jobs from Adzuna API with proper limits"""
         if keywords is None:
             keywords = [
                 "software engineer",
@@ -46,12 +46,14 @@ class AdzunaJobImporter:
                 "machine learning engineer"
             ]
 
-        logger.info(f" Starting Adzuna job import for {len(keywords)} keywords...")
+        logger.info(f" Starting Adzuna job import for {len(keywords)} keywords, max {max_jobs} total jobs...")
+
+        jobs_per_keyword = max(5, max_jobs // len(keywords))  # Ensure at least 5 per keyword
 
         for keyword in keywords:
             try:
-                self._import_jobs_for_keyword(keyword, max_jobs // len(keywords), location)
-                time.sleep(1)  # Rate limiting - be respectful
+                self._import_jobs_for_keyword(keyword, jobs_per_keyword, location)
+                time.sleep(2)  # Increased rate limiting between keywords
             except Exception as e:
                 logger.error(f" Failed to import jobs for '{keyword}': {e}")
                 continue
@@ -60,24 +62,32 @@ class AdzunaJobImporter:
         return self.stats
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
-        """Import jobs for a specific keyword"""
+        """Import jobs for a specific keyword with safety limits"""
         page = 1
         jobs_imported = 0
+        max_pages = 5  # SAFETY LIMIT: Don't fetch more than 5 pages per keyword
+        consecutive_empty_pages = 0
 
-        while jobs_imported < max_per_keyword:
+        logger.info(f"Importing up to {max_per_keyword} jobs for '{keyword}' (max {max_pages} pages)")
+
+        while jobs_imported < max_per_keyword and page <= max_pages:
             try:
-                # Build API request - FIXED PARAMETERS
+                # Calculate how many more jobs we need
+                jobs_needed = max_per_keyword - jobs_imported
+                results_per_page = min(20, jobs_needed)  # Don't fetch more than needed
+
+                # Build API request
                 params = {
                     'app_id': self.app_id,
                     'app_key': self.app_key,
-                    'results_per_page': min(20, max_per_keyword - jobs_imported),
+                    'results_per_page': results_per_page,
                     'what': keyword,
                     'where': location,
-                    'sort_by': 'date',  # Get newest jobs first
-                    'content-type': 'application/json'  # Added this
+                    'sort_by': 'date',
+                    'content-type': 'application/json'
                 }
 
-                logger.info(f" Fetching Adzuna jobs: '{keyword}' page {page}")
+                logger.info(f" Fetching Adzuna jobs: '{keyword}' page {page} (need {jobs_needed} more)")
 
                 # FIXED URL - page number goes in the URL path
                 url = f"{self.base_url}/{page}"
@@ -88,6 +98,12 @@ class AdzunaJobImporter:
                 # Debug logging
                 logger.debug(f"Request URL: {response.url}")
                 logger.debug(f"Response status: {response.status_code}")
+
+                # Handle rate limiting
+                if response.status_code == 429:
+                    logger.warning("Rate limit hit, waiting 60 seconds...")
+                    time.sleep(60)
+                    continue  # Retry the same page
 
                 if response.status_code == 400:
                     logger.error(f"Bad Request (400) for keyword '{keyword}' page {page}")
@@ -105,17 +121,28 @@ class AdzunaJobImporter:
                 jobs = data.get('results', [])
 
                 if not jobs:
-                    logger.info(f"No more jobs found for '{keyword}' on page {page}")
-                    break
+                    consecutive_empty_pages += 1
+                    logger.info(f"No jobs found for '{keyword}' on page {page}")
+
+                    # If we get 2 consecutive empty pages, stop
+                    if consecutive_empty_pages >= 2:
+                        logger.info(f"Stopping after {consecutive_empty_pages} consecutive empty pages")
+                        break
+                else:
+                    consecutive_empty_pages = 0  # Reset counter
+                    logger.info(f"Page {page}: Found {len(jobs)} jobs")
 
                 # Process each job
+                page_jobs_processed = 0
                 for job_data in jobs:
                     if jobs_imported >= max_per_keyword:
+                        logger.info(f"Reached max jobs per keyword ({max_per_keyword})")
                         break
 
                     try:
                         if self._process_job(job_data, keyword):
                             jobs_imported += 1
+                            page_jobs_processed += 1
                             self.stats['successfully_imported'] += 1
                         else:
                             self.stats['duplicate_jobs'] += 1
@@ -124,11 +151,19 @@ class AdzunaJobImporter:
                         self.stats['failed_imports'] += 1
 
                 self.stats['total_fetched'] += len(jobs)
+
+                logger.info(
+                    f"Page {page} completed: processed {page_jobs_processed} jobs, total imported: {jobs_imported}")
+
+                # Safety check: if we processed 0 jobs on this page, stop
+                if page_jobs_processed == 0 and len(jobs) == 0:
+                    logger.info(f"No jobs processed on page {page}, stopping")
+                    break
+
                 page += 1
 
-                # Check if we've reached the last page
-                if len(jobs) < params['results_per_page']:
-                    break
+                # Rate limiting between pages
+                time.sleep(1)
 
             except requests.exceptions.RequestException as e:
                 logger.error(f" API request failed for '{keyword}' page {page}: {e}")
@@ -140,6 +175,8 @@ class AdzunaJobImporter:
             except Exception as e:
                 logger.error(f" Unexpected error for '{keyword}' page {page}: {e}")
                 break
+
+        logger.info(f"Completed '{keyword}': imported {jobs_imported} jobs over {page - 1} pages")
 
     def test_api_connection(self):
         """Test API connection with minimal request"""
