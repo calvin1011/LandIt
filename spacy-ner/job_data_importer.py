@@ -134,6 +134,7 @@ class MuseJobImporter:
 
         except Exception as e:
             logger.error(f"Error processing job: {e}")
+            logger.error(f"Problematic job data: {job_data}")
             self.error_count += 1
             return False
 
@@ -377,14 +378,13 @@ class MuseJobImporter:
         return clean_text.strip()
 
     def _job_exists(self, title: str, company: str) -> bool:
-        """Check if job already exists in database (simple implementation)"""
-        # This is a simplified check - you might want to implement a more sophisticated
-        # duplicate detection system
+        """Check if job already exists in database"""
         try:
-            # For now, we'll assume jobs don't exist and let the database handle duplicates
-            return False
-        except Exception:
-            return False
+            existing_jobs = db.get_jobs_by_title_company(title, company)
+            return len(existing_jobs) > 0
+        except Exception as e:
+            logger.error(f"Error checking duplicate job: {e}")
+            return False  # If we can't check, assume it's not a duplicate
 
     def _store_job(self, job_data: Dict):
         """Store job in database with embeddings"""

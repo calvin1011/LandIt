@@ -62,7 +62,10 @@ class RemotiveJobImporter:
                         self.stats['failed_imports'] += 1
                         continue
 
-                    if db.get_jobs_by_title_company(title, company):
+                    existing_jobs = db.get_jobs_by_title_company(title, company)
+                    logger.info(f"Duplicate check: '{title}' at '{company}' -> {len(existing_jobs)} existing jobs")
+
+                    if existing_jobs:
                         logger.info(f"Skipping duplicate job: {title} at {company}")
                         self.stats['duplicates_skipped'] += 1
                         continue
