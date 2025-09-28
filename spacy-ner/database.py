@@ -198,7 +198,7 @@ class DatabaseConnection:
     # Job operations
 
     def store_job_posting(self, job_data: Dict, embeddings: Dict[str, np.ndarray]) -> int:
-        """Store job posting with embeddings - with better null handling"""
+        """Store job posting with embeddings - with better array handling"""
         try:
             cursor = self.get_cursor()
 
@@ -207,7 +207,36 @@ class DatabaseConnection:
             requirements_embedding = self.vector_to_db(embeddings.get('requirements', np.array([])))
             title_embedding = self.vector_to_db(embeddings.get('title', np.array([])))
 
-            # Use COALESCE to handle None values
+            # Ensure arrays are properly formatted
+            def safe_parse_array(data, default=[]):
+                """Safely parse data into a list, handling strings, JSON strings, and lists"""
+                if data is None:
+                    return default
+                if isinstance(data, list):
+                    return data
+                if isinstance(data, str):
+                    try:
+                        # Try to parse as JSON array
+                        parsed = json.loads(data)
+                        if isinstance(parsed, list):
+                            return parsed
+                        else:
+                            # If it's a single value in JSON, wrap in array
+                            return [parsed]
+                    except (json.JSONDecodeError, TypeError):
+                        # If it's a plain string, treat as single-item array
+                        return [data]
+                # For any other type, try to convert to list
+                try:
+                    return list(data)
+                except (TypeError, ValueError):
+                    return [str(data)]
+
+            # Apply safe parsing to all array fields
+            benefits = safe_parse_array(job_data.get('benefits', []))
+            skills_required = safe_parse_array(job_data.get('skills_required', []))
+            skills_preferred = safe_parse_array(job_data.get('skills_preferred', []))
+
             query = """
                     INSERT INTO jobs (title, company, description, requirements, responsibilities, \
                                       location, remote_allowed, salary_min, salary_max, currency, \
@@ -216,8 +245,8 @@ class DatabaseConnection:
                                       description_embedding, requirements_embedding, title_embedding, \
                                       source, job_url, posted_date, is_active, external_job_id) \
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, 'USD'), \
-                            %s, %s, %s, %s, COALESCE(%s, '{}'), \
-                            COALESCE(%s, '{}'), COALESCE(%s, '{}'), %s, \
+                            %s, %s, %s, %s, %s, \
+                            %s, %s, %s, \
                             %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
                     """
 
@@ -229,12 +258,12 @@ class DatabaseConnection:
                 job_data.get('currency'),  # Will use 'USD' if None
                 job_data.get('experience_level'), job_data.get('job_type'),
                 job_data.get('industry'), job_data.get('company_size'),
-                job_data.get('benefits'),  # Will use empty array if None
-                job_data.get('skills_required'), job_data.get('skills_preferred'),
+                benefits,  # Now properly formatted as array
+                skills_required, skills_preferred,
                 job_data.get('education_required'), description_embedding,
                 requirements_embedding, title_embedding, job_data.get('source', 'manual'),
                 job_data.get('job_url'), job_data.get('posted_date'), True,
-                job_data.get('external_job_id') or job_data.get('external_id')  # Handle both
+                job_data.get('external_job_id')
             ))
 
             job_id = cursor.fetchone()['id']

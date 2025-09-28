@@ -12,7 +12,7 @@ class JSearchJobImporter:
     def __init__(self, rapidapi_key: str):
         # JSearch API via RapidAPI
         self.rapidapi_key = rapidapi_key
-        self.base_url = "https://jsearch.p.rapidapi.com/search"
+        self.base_url = "https://jsearch.p.rapidapi.com"
 
         self.session = requests.Session()
         self.session.headers.update({
@@ -49,10 +49,12 @@ class JSearchJobImporter:
 
         logger.info(f" Starting JSearch job import for {len(keywords)} keywords...")
 
+        jobs_per_keyword = max(10, max_jobs // len(keywords))
+
         for keyword in keywords:
             try:
-                self._import_jobs_for_keyword(keyword, max_jobs // len(keywords), location)
-                time.sleep(1)  # Rate limiting - be respectful
+                self._import_jobs_for_keyword(keyword, jobs_per_keyword, location)
+                time.sleep(2)  # Rate limiting between keywords
             except Exception as e:
                 logger.error(f" Failed to import jobs for '{keyword}': {e}")
                 continue
@@ -64,31 +66,34 @@ class JSearchJobImporter:
         """Import jobs for a specific keyword"""
         page = 1
         jobs_imported = 0
+        max_pages = 3  # Safety limit
 
-        while jobs_imported < max_per_keyword:
+        while jobs_imported < max_per_keyword and page <= max_pages:
             try:
-                # Build API request parameters
+                # Build API request parameters - CORRECTED based on documentation
                 params = {
                     'query': f"{keyword} in {location}",
                     'page': str(page),
                     'num_pages': '1',
-                    'date_posted': 'week',  # Get recent jobs
+                    'date_posted': 'all',  # Changed from 'week' to get more results
                     'employment_types': 'FULLTIME,CONTRACTOR',
-                    'job_requirements': 'no_degree,under_3_years_experience,more_than_3_years_experience'
+                    'job_requirements': 'under_3_years_experience,more_than_3_years_experience',
+                    'country': 'us'  # Added country parameter
                 }
 
                 logger.info(f" Fetching JSearch jobs: '{keyword}' page {page}")
 
-                # Make API request
-                response = self.session.get(self.base_url, params=params, timeout=30)
+                # CORRECTED ENDPOINT: /search not base_url
+                response = self.session.get(f"{self.base_url}/search", params=params, timeout=30)
 
                 # Debug logging
                 logger.debug(f"Request URL: {response.url}")
                 logger.debug(f"Response status: {response.status_code}")
 
+                # Handle rate limiting
                 if response.status_code == 429:
-                    logger.warning("Rate limit hit, waiting...")
-                    time.sleep(60)  # Wait 1 minute for rate limit
+                    logger.warning("Rate limit hit, waiting 60 seconds...")
+                    time.sleep(60)
                     continue
 
                 if response.status_code != 200:
@@ -109,6 +114,7 @@ class JSearchJobImporter:
                     break
 
                 # Process each job
+                page_jobs_processed = 0
                 for job_data in jobs:
                     if jobs_imported >= max_per_keyword:
                         break
@@ -116,6 +122,7 @@ class JSearchJobImporter:
                     try:
                         if self._process_job(job_data, keyword):
                             jobs_imported += 1
+                            page_jobs_processed += 1
                             self.stats['successfully_imported'] += 1
                         else:
                             self.stats['duplicate_jobs'] += 1
@@ -126,9 +133,14 @@ class JSearchJobImporter:
                 self.stats['total_fetched'] += len(jobs)
                 page += 1
 
+                logger.info(f"Page {page - 1}: Processed {page_jobs_processed} jobs, total: {jobs_imported}")
+
                 # JSearch typically returns 10 jobs per page
                 if len(jobs) < 10:
                     break
+
+                # Rate limiting between pages
+                time.sleep(1)
 
             except requests.exceptions.RequestException as e:
                 logger.error(f" API request failed for '{keyword}' page {page}: {e}")
@@ -143,13 +155,12 @@ class JSearchJobImporter:
             params = {
                 'query': 'software engineer in New York',
                 'page': '1',
-                'num_pages': '1'
+                'num_pages': '1',
+                'country': 'us'
             }
 
             logger.info(f"Testing JSearch API connection...")
-            logger.info(f"Params: {params}")
-
-            response = self.session.get(self.base_url, params=params, timeout=30)
+            response = self.session.get(f"{self.base_url}/search", params=params, timeout=30)
 
             logger.info(f"Test response status: {response.status_code}")
 
@@ -161,7 +172,6 @@ class JSearchJobImporter:
                 return False
             elif response.status_code != 200:
                 logger.error(f"Test failed with status {response.status_code}")
-                logger.error(f"Response: {response.text[:1000]}")
                 return False
 
             data = response.json()
@@ -174,13 +184,14 @@ class JSearchJobImporter:
             return False
 
     def _process_job(self, job_data: Dict[str, Any], search_keyword: str) -> bool:
-        """Process and store a single job"""
+        """Process and store a single job with better error handling"""
         try:
             # Extract job details from JSearch response
             job_dict = self._extract_job_details(job_data, search_keyword)
 
             # Check for duplicates (by title + company)
             if self._is_duplicate_job(job_dict['title'], job_dict['company']):
+                logger.debug(f"Duplicate job: {job_dict['title']} at {job_dict['company']}")
                 return False
 
             # Generate embeddings if service is available
@@ -201,26 +212,25 @@ class JSearchJobImporter:
 
             # Store in database
             job_id = db.store_job_posting(job_dict, embeddings)
-            logger.debug(f" Stored JSearch job: {job_dict['title']} at {job_dict['company']}")
+            logger.info(f" Stored JSearch job: {job_dict['title']} at {job_dict['company']} (ID: {job_id})")
 
             return True
 
         except Exception as e:
             logger.error(f" Error processing job: {e}")
-            raise
+            return False
 
     def _extract_job_details(self, job_data: Dict[str, Any], search_keyword: str) -> Dict[str, Any]:
-        """Extract and normalize job details from JSearch API response with better error handling"""
-
+        """Extract and normalize job details from JSearch API response"""
         try:
             # Extract salary information with safe conversion
             salary_min = None
             salary_max = None
             try:
-                if job_data.get('job_salary_min'):
-                    salary_min = int(float(job_data['job_salary_min']))
-                if job_data.get('job_salary_max'):
-                    salary_max = int(float(job_data['job_salary_max']))
+                if job_data.get('job_min_salary'):
+                    salary_min = int(float(job_data['job_min_salary']))
+                if job_data.get('job_max_salary'):
+                    salary_max = int(float(job_data['job_max_salary']))
             except (ValueError, TypeError):
                 logger.debug("Could not parse salary information")
 
@@ -248,6 +258,13 @@ class JSearchJobImporter:
             if isinstance(responsibilities, list):
                 responsibilities = ' '.join(responsibilities)
 
+            # FIXED: Ensure benefits is always an array
+            benefits = job_data.get('job_benefits', [])
+            if isinstance(benefits, str):
+                benefits = [benefits]
+            elif not isinstance(benefits, list):
+                benefits = []
+
             # Ensure all required fields have safe defaults
             job_dict = {
                 'title': job_data.get('job_title', '').strip() or 'Unknown Position',
@@ -267,12 +284,15 @@ class JSearchJobImporter:
                 'education_required': '',
                 'job_url': job_data.get('job_apply_link', ''),
                 'source': 'jsearch',
-                'external_id': str(job_data.get('job_id', '')),
+                'external_job_id': str(job_data.get('job_id', '')),  # Use external_job_id not external_id
                 'posted_date': job_data.get('job_posted_at_datetime_utc', ''),
-                'category': job_data.get('job_publisher', '')
+                'category': job_data.get('job_publisher', ''),
+                'benefits': benefits,  # FIXED: Now always an array
+                'currency': 'USD',
+                'company_size': None,
+                'application_deadline': None
             }
 
-            # Log the extracted data for debugging
             logger.debug(f"Extracted job: {job_dict['title']} at {job_dict['company']}")
 
             return job_dict
