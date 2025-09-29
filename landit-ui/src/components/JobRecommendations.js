@@ -333,7 +333,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                     min_similarity: 0.3,
                     offset: reset ? 0 : offset,
                     exclude_job_ids: currentShownIds,
-                    randomize: true
+                    randomize: false
                 })
             });
 
@@ -351,7 +351,8 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
             }
 
             const data = await response.json();
-            const newMatches = data.matches || [];
+
+            const newMatches = (data.matches || []).sort((a, b) => b.overall_score - a.overall_score);
 
             if (reset) {
                 setRecommendations(newMatches);
@@ -360,7 +361,9 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                 setRecommendations(prev => {
                     const existingIds = new Set(prev.map(job => job.job_id));
                     const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
-                    return [...prev, ...uniqueNewMatches];
+
+                    const combined = [...prev, ...uniqueNewMatches];
+                    return combined.sort((a, b) => b.overall_score - a.overall_score);
                 });
             }
 
