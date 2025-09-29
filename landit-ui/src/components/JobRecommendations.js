@@ -293,6 +293,24 @@ const SkillsGapAnalysis = ({ job, onGenerateLearningPlan }) => {
     );
 };
 
+// Enhanced Match Breakdown Component
+const MatchBreakdown = ({ job }) => (
+  <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <span>Skills Match:</span>
+      <span>{Math.round((job.skill_score || job.overall_score) * 100)}%</span>
+    </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <span>Experience Level:</span>
+      <span>{Math.round((job.experience_score || job.overall_score) * 100)}%</span>
+    </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <span>Location:</span>
+      <span>{Math.round((job.location_score || job.overall_score) * 100)}%</span>
+    </div>
+  </div>
+);
+
 const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -665,6 +683,8 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                     {job.match_explanation}
                                 </p>
                             </div>
+
+                            <MatchBreakdown job={job} />
 
                             {/* Enhanced Skills Gap Analysis */}
                             {(job.skill_gaps_detailed &&
