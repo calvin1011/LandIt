@@ -393,7 +393,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         if (userEmail) {
             fetchRecommendations(true); // Reset on user change
         }
-    }, [userEmail, fetchRecommendations]);
+    }, [userEmail]);
 
     const loadMoreJobs = () => {
         if (!loading && hasMore) {
