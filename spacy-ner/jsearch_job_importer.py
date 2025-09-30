@@ -37,7 +37,7 @@ class JSearchJobImporter:
         }
 
     def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
-        """Import jobs from JSearch API"""
+        """Import jobs from JSearch API with better error handling"""
         if keywords is None:
             keywords = [
                 "software engineer",
@@ -53,6 +53,7 @@ class JSearchJobImporter:
 
         for keyword in keywords:
             try:
+                logger.info(f"Processing keyword: '{keyword}'")
                 self._import_jobs_for_keyword(keyword, jobs_per_keyword, location)
                 time.sleep(2)  # Rate limiting between keywords
             except Exception as e:
@@ -63,42 +64,40 @@ class JSearchJobImporter:
         return self.stats
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
-        """Import jobs for a specific keyword"""
+        """Import jobs for a specific keyword - skip entire keyword if rate limited"""
         page = 1
         jobs_imported = 0
         max_pages = 3  # Safety limit
 
         while jobs_imported < max_per_keyword and page <= max_pages:
             try:
-                # Build API request parameters - CORRECTED based on documentation
+                # Build API request parameters
                 params = {
                     'query': f"{keyword} in {location}",
                     'page': str(page),
                     'num_pages': '1',
-                    'date_posted': 'all',  # Changed from 'week' to get more results
+                    'date_posted': 'all',
                     'employment_types': 'FULLTIME,CONTRACTOR',
                     'job_requirements': 'under_3_years_experience,more_than_3_years_experience',
-                    'country': 'us'  # Added country parameter
+                    'country': 'us'
                 }
 
                 logger.info(f" Fetching JSearch jobs: '{keyword}' page {page}")
 
-                # CORRECTED ENDPOINT: /search not base_url
                 response = self.session.get(f"{self.base_url}/search", params=params, timeout=30)
 
                 # Debug logging
                 logger.debug(f"Request URL: {response.url}")
                 logger.debug(f"Response status: {response.status_code}")
 
-                # Handle rate limiting
+                # Handle rate limiting - SKIP ENTIRE KEYWORD if rate limited
                 if response.status_code == 429:
-                    logger.warning("Rate limit hit, waiting 60 seconds...")
-                    time.sleep(60)
-                    continue
+                    logger.warning(f"Rate limit hit for '{keyword}', skipping this keyword entirely")
+                    break  # Break out of the while loop, skip to next keyword
 
                 if response.status_code != 200:
                     logger.error(f"API Error {response.status_code}: {response.text[:500]}")
-                    break
+                    break  # Skip this keyword on any API error
 
                 data = response.json()
 
@@ -131,9 +130,8 @@ class JSearchJobImporter:
                         self.stats['failed_imports'] += 1
 
                 self.stats['total_fetched'] += len(jobs)
-                page += 1
 
-                logger.info(f"Page {page - 1}: Processed {page_jobs_processed} jobs, total: {jobs_imported}")
+                logger.info(f"Page {page}: Processed {page_jobs_processed} jobs, total: {jobs_imported}")
 
                 # JSearch typically returns 10 jobs per page
                 if len(jobs) < 10:
@@ -141,13 +139,16 @@ class JSearchJobImporter:
 
                 # Rate limiting between pages
                 time.sleep(1)
+                page += 1
 
             except requests.exceptions.RequestException as e:
                 logger.error(f" API request failed for '{keyword}' page {page}: {e}")
-                break
+                break  # Skip this keyword on network errors
             except Exception as e:
                 logger.error(f" Unexpected error for '{keyword}' page {page}: {e}")
-                break
+                break  # Skip this keyword on any other errors
+
+        logger.info(f"Completed keyword '{keyword}': imported {jobs_imported} jobs")
 
     def test_api_connection(self):
         """Test API connection with minimal request"""
