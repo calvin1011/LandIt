@@ -31,13 +31,6 @@ const X = ({ style }) => (
     </svg>
 );
 
-const Eye = ({ style }) => (
-    <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    </svg>
-);
-
 const Search = ({ style }) => (
     <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -47,139 +40,35 @@ const Search = ({ style }) => (
 const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
     const [dragActive, setDragActive] = useState(false);
     const [file, setFile] = useState(null);
-    const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, processing, success, error
+    const [uploadStatus, setUploadStatus] = useState('idle');
     const [progress, setProgress] = useState(0);
     const [errorMessage, setErrorMessage] = useState('');
-    const [extractedData, setExtractedData] = useState(null);
     const [resumeStored, setResumeStored] = useState(false);
     const [autoFindJobs, setAutoFindJobs] = useState(true);
 
-    const handleDrag = useCallback((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
+    const handleUploadError = useCallback((error) => {
+        console.error('Upload error:', error);
+        let msg = 'Failed to process resume. Please try again.';
+        if (error.message.includes('ECONNREFUSED')) {
+            msg = 'Cannot connect to processing server. Please ensure the server is running.';
+        } else if (error.message.includes('400')) {
+            msg = 'Invalid file format or content';
+        } else if (error.message.includes('500')) {
+            msg = 'Server processing error. Please try again or contact support.';
+        } else if (error.message.includes('timeout')) {
+            msg = 'Request timed out. File might be too large or complex.';
         }
+        setErrorMessage(msg);
     }, []);
 
-    const handleDrop = useCallback((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFile(e.dataTransfer.files[0]);
-        }
-    }, []);
-
-    const handleFileInput = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            handleFile(e.target.files[0]);
-        }
-    };
-
-    const handleFile = (selectedFile) => {
-        // Validate file type
-        const allowedTypes = [
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain'
-        ];
-
-        if (!allowedTypes.includes(selectedFile.type)) {
-            setErrorMessage('Please upload a PDF, DOCX, or TXT file');
-            setUploadStatus('idle');
-            return;
-        }
-
-        // Validate file size (5MB limit)
-        if (selectedFile.size > 5 * 1024 * 1024) {
-            setErrorMessage('File size must be less than 5MB');
-            setUploadStatus('idle');
-            return;
-        }
-
-        setFile(selectedFile);
-        setErrorMessage('');
-        uploadFile(selectedFile);
-    };
-
-    const uploadFile = async (fileToUpload) => {
-        setUploadStatus('uploading');
-        setProgress(0);
-
-        try {
-            // For text files, read content and send to hybrid text endpoint
-            if (fileToUpload.type === 'text/plain') {
-                const text = await readFileAsText(fileToUpload);
-                await processTextDirectly(text);
-                return;
-            }
-
-            // For PDF/DOCX files, use the optimized file upload endpoint
-            const formData = new FormData();
-            formData.append('file', fileToUpload);
-
-            // Simulate upload progress
-            const progressInterval = setInterval(() => {
-                setProgress(prev => {
-                    if (prev >= 90) {
-                        clearInterval(progressInterval);
-                        return 90;
-                    }
-                    return prev + 10;
-                });
-            }, 200);
-
-            // Call the optimized file upload endpoint
-            const response = await fetch('http://localhost:8000/parse-resume-file', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            clearInterval(progressInterval);
-            setProgress(100);
-            setUploadStatus('processing');
-
-            // Store resume for job matching if the option is enabled
-            if (userEmail && autoFindJobs) {
-                await storeResumeForMatching(data);
-            }
-
-            // Just transition to success state.
-            setTimeout(() => {
-                setExtractedData([]); // Set extractedData to empty array or null
-                setUploadStatus('success');
-                onUploadSuccess(); // Call parent success callback
-            }, 1500);
-
-        } catch (error) {
-            setUploadStatus('error');
-            handleUploadError(error);
-        }
-    };
-
-    const storeResumeForMatching = async (resumeData) => {
+    const storeResumeForMatching = useCallback(async (resumeData) => {
         try {
             setProgress(95);
-            // The API response from /parse-resume-file endpoint contains structured data that can be used directly for matching
             const structuredData = resumeData.structured_data || resumeData;
 
-            // Store resume in backend for job matching
             const storeResponse = await fetch('http://localhost:8000/store-resume', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_email: userEmail,
                     resume_data: resumeData,
@@ -187,14 +76,22 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
                 })
             });
 
-            if (storeResponse.ok) {
+            if (!storeResponse.ok) {
+                const errorBody = await storeResponse.json();
+                throw new Error(errorBody.detail || 'Failed to store resume for matching.');
+            }
+
+            const result = await storeResponse.json();
+            if (result.success) {
                 setResumeStored(true);
+            } else {
+                throw new Error(result.message || 'An unknown error occurred while storing the resume.');
             }
         } catch (error) {
-            console.warn('Failed to store resume for job matching:', error);
-            // Don't fail the entire process if job matching storage fails
+            console.error('Failed to store resume for job matching:', error);
+            throw error;
         }
-    };
+    }, [userEmail]);
 
     const readFileAsText = (file) => {
         return new Promise((resolve, reject) => {
@@ -205,12 +102,10 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
         });
     };
 
-    const processTextDirectly = async (text) => {
+    const processTextDirectly = useCallback(async (text) => {
         setUploadStatus('processing');
         setProgress(50);
-
         try {
-            // Use hybrid processing for best results
             const response = await fetch('http://localhost:8000/parse-resume', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -229,43 +124,117 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
             const data = await response.json();
             setProgress(100);
 
-            // Store resume for job matching
             if (userEmail && autoFindJobs) {
                 await storeResumeForMatching(data);
             }
 
-            // Just transition to success state.
             setTimeout(() => {
-                setExtractedData([]); // Set extractedData to empty array or null
                 setUploadStatus('success');
-                onUploadSuccess(); // Call parent success callback
+                onUploadSuccess();
             }, 1000);
 
         } catch (error) {
             setUploadStatus('error');
             handleUploadError(error);
         }
-    };
+    }, [userEmail, autoFindJobs, storeResumeForMatching, onUploadSuccess, handleUploadError]);
 
-    const handleUploadError = (error) => {
-        console.error('Upload error:', error);
+    const uploadFile = useCallback(async (fileToUpload) => {
+        setUploadStatus('uploading');
+        setProgress(0);
+        try {
+            if (fileToUpload.type === 'text/plain') {
+                const text = await readFileAsText(fileToUpload);
+                await processTextDirectly(text);
+                return;
+            }
 
-        if (error.message.includes('ECONNREFUSED')) {
-            setErrorMessage('Cannot connect to processing server. Please ensure the server is running.');
-        } else if (error.message.includes('400')) {
-            setErrorMessage('Invalid file format or content');
-        } else if (error.message.includes('500')) {
-            setErrorMessage('Server processing error. Please try again or contact support.');
-        } else if (error.message.includes('timeout')) {
-            setErrorMessage('Request timed out. File might be too large or complex.');
-        } else {
-            setErrorMessage('Failed to process resume. Please try again.');
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+
+            const progressInterval = setInterval(() => {
+                setProgress(prev => {
+                    if (prev >= 90) {
+                        clearInterval(progressInterval);
+                        return 90;
+                    }
+                    return prev + 10;
+                });
+            }, 200);
+
+            const response = await fetch('http://localhost:8000/parse-resume-file', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            clearInterval(progressInterval);
+            setProgress(100);
+            setUploadStatus('processing');
+
+            if (userEmail && autoFindJobs) {
+                await storeResumeForMatching(data);
+            }
+
+            setTimeout(() => {
+                setUploadStatus('success');
+                onUploadSuccess();
+            }, 1500);
+        } catch (error) {
+            setUploadStatus('error');
+            handleUploadError(error);
         }
-    };
+    }, [userEmail, autoFindJobs, processTextDirectly, storeResumeForMatching, onUploadSuccess, handleUploadError]);
 
-    // The formatApiResponse function is no longer needed since you don't want to render the parsed data
-    const formatApiResponse = () => {
-        return [];
+    const handleFile = useCallback((selectedFile) => {
+        const allowedTypes = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ];
+        if (!allowedTypes.includes(selectedFile.type)) {
+            setErrorMessage('Please upload a PDF, DOCX, or TXT file');
+            setUploadStatus('idle');
+            return;
+        }
+        if (selectedFile.size > 5 * 1024 * 1024) {
+            setErrorMessage('File size must be less than 5MB');
+            setUploadStatus('idle');
+            return;
+        }
+        setFile(selectedFile);
+        setErrorMessage('');
+        uploadFile(selectedFile);
+    }, [uploadFile]);
+
+    const handleDrag = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    }, [handleFile]);
+
+    const handleFileInput = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+        }
     };
 
     const resetUpload = () => {
@@ -273,7 +242,6 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
         setUploadStatus('idle');
         setProgress(0);
         setErrorMessage('');
-        setExtractedData(null);
         setResumeStored(false);
     };
 

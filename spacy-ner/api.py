@@ -493,43 +493,6 @@ def find_job_matches(match_request: JobMatchRequest):
         raise HTTPException(status_code=503, detail="Embedding service not available")
 
     try:
-        # Create unique request key for caching the calls for finding jobs
-        request_key = f"{match_request.user_email}_{match_request.top_k}_{match_request.offset}_{','.join(map(str, match_request.exclude_job_ids))}"
-        request_hash = hashlib.md5(request_key.encode()).hexdigest()
-
-        # Check for duplicate request
-        now = datetime.now()
-        if request_hash in recent_match_requests:
-            cached_entry = recent_match_requests[request_hash]
-            last_request_time = cached_entry['timestamp']
-
-            # If request is still processing, reject it
-            if cached_entry.get('processing', False):
-                logger.info(f"Match request already processing for {match_request.user_email}, rejecting duplicate")
-                raise HTTPException(
-                    status_code=429,
-                    detail="Request already being processed. Please wait a moment."
-                )
-
-            # If we have a cached response, return it
-            if now - last_request_time < timedelta(seconds=3):  # 3 second window
-                logger.info(f"Duplicate match request detected for {match_request.user_email}, returning cached result")
-                return cached_entry['response']
-
-        # Clean old cache entries
-        keys_to_remove = []
-        for key, value in recent_match_requests.items():
-            if now - value['timestamp'] > timedelta(minutes=1):
-                keys_to_remove.append(key)
-        for key in keys_to_remove:
-            del recent_match_requests[key]
-
-        # Mark this request as processing
-        recent_match_requests[request_hash] = {
-            'timestamp': now,
-            'processing': True,
-            'response': None
-        }
 
         import random
         start_time = time.time()
@@ -725,13 +688,6 @@ def find_job_matches(match_request: JobMatchRequest):
             "recommendation_ids": recommendation_ids,
             "has_more": len(all_jobs) > (match_request.offset + len(matches)),
             "next_offset": match_request.offset + len(matches)
-        }
-
-        # Cache the response
-        recent_match_requests[request_hash] = {
-            'timestamp': now,
-            'processing': False,
-            'response': response
         }
 
         return response

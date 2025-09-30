@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // Icon Components
 const Briefcase = ({ style }) => (
@@ -13,6 +13,7 @@ const MapPin = ({ style }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
 );
+
 
 const DollarSign = ({ style }) => (
     <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,6 +57,7 @@ const TrendingUp = ({ style }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
 );
+
 
 const BookOpen = ({ style }) => (
     <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,31 +327,28 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         }
     }, [userEmail]);
 
-    const fetchRecommendations = async (reset = false) => {
+    const fetchRecommendations = useCallback(async (reset = false) => {
         setLoading(true);
         setError('');
 
-        // If resetting, clear previous recommendations
+        const currentOffset = reset ? 0 : offset;
+        const currentShownIds = reset ? [] : Array.from(shownJobIds);
+
         if (reset) {
             setRecommendations([]);
             setShownJobIds(new Set());
-            setOffset(0);
             setHasMore(true);
         }
 
         try {
-            const currentShownIds = reset ? [] : Array.from(shownJobIds);
-
             const response = await fetch('http://localhost:8000/jobs/find-matches', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_email: userEmail,
                     top_k: 10,
                     min_similarity: 0.3,
-                    offset: reset ? 0 : offset,
+                    offset: currentOffset,
                     exclude_job_ids: currentShownIds,
                     randomize: false
                 })
@@ -360,7 +359,6 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                     console.log('Duplicate request ignored - already processing');
                     return;
                 }
-
                 if (response.status === 404) {
                     throw new Error('Please upload your resume first to get job recommendations.');
                 } else {
@@ -369,25 +367,17 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
             }
 
             const data = await response.json();
-
             const newMatches = (data.matches || []).sort((a, b) => b.overall_score - a.overall_score);
 
-            if (reset) {
-                setRecommendations(newMatches);
-            } else {
-                // Append new matches, avoiding duplicates
-                setRecommendations(prev => {
-                    const existingIds = new Set(prev.map(job => job.job_id));
-                    const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
+            setRecommendations(prev => {
+                const existing = reset ? [] : prev;
+                const existingIds = new Set(existing.map(job => job.job_id));
+                const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
+                const combined = [...existing, ...uniqueNewMatches];
+                return combined.sort((a, b) => b.overall_score - a.overall_score);
+            });
 
-                    const combined = [...prev, ...uniqueNewMatches];
-                    return combined.sort((a, b) => b.overall_score - a.overall_score);
-                });
-            }
-
-            // Update tracking
-            const newJobIds = new Set([...shownJobIds, ...newMatches.map(job => job.job_id)]);
-            setShownJobIds(newJobIds);
+            setShownJobIds(prev => new Set([...prev, ...newMatches.map(job => job.job_id)]));
             setHasMore(data.has_more || false);
             setOffset(data.next_offset || 0);
 
@@ -397,7 +387,13 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userEmail, offset, shownJobIds]);
+
+    useEffect(() => {
+        if (userEmail) {
+            fetchRecommendations(true); // Reset on user change
+        }
+    }, [userEmail, fetchRecommendations]);
 
     const loadMoreJobs = () => {
         if (!loading && hasMore) {
