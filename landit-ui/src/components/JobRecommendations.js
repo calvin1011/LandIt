@@ -710,31 +710,6 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                 </div>
             )}
 
-            {/* --- NEW CONFIRMATION MODAL ---
-            {jobToConfirm && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 1000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <div style={{
-                        background: 'white', padding: '2rem', borderRadius: '12px',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)', textAlign: 'center'
-                    }}>
-                        <h3 style={{ marginTop: 0 }}>Did you apply?</h3>
-                        <p>Did you complete the application for<br/><strong>{jobToConfirm.title}</strong> at <strong>{jobToConfirm.company}</strong>?</p>
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <button onClick={handleConfirmApply} style={{  }}>
-                                Yes, I Applied
-                            </button>
-                            <button onClick={handleCancelApply} style={{  }}>
-                                No, I Didn't
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}*/}
-
             {/* Recommendations List */}
             {recommendations.length === 0 && !error ? (
                 <div style={{
