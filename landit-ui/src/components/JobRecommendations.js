@@ -325,6 +325,29 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [remoteOnly, setRemoteOnly] = useState(false);
     const [savedJobs, setSavedJobs] = useState(new Set());
     const [appliedJobs, setAppliedJobs] = useState(new Set());
+    const [jobToConfirm, setJobToConfirm] = useState(null);
+
+     useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                const pendingJobJSON = sessionStorage.getItem('pendingApplicationConfirmation');
+                if (pendingJobJSON) {
+                    const pendingJob = JSON.parse(pendingJobJSON);
+                    setJobToConfirm(pendingJob);
+                    sessionStorage.removeItem('pendingApplicationConfirmation');
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Also check once on mount in case the page was reloaded
+        handleVisibilityChange();
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     useEffect(() => {
         if (userEmail) {
@@ -474,47 +497,57 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         }
     };
 
-    const handleQuickApply = async (job) => {
-        // 1. Open the application link immediately for better UX
+    const handleQuickApply = (job) => {
+        // Store job info in session storage to check upon return
+        sessionStorage.setItem('pendingApplicationConfirmation', JSON.stringify(job));
+
+        // Open the application link
         if (job.job_url) {
             window.open(job.job_url, '_blank');
         } else {
-            // Fallback to a Google search if no direct URL is available
             const searchQuery = `${job.title} ${job.company} careers`;
             const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
             window.open(searchUrl, '_blank');
         }
+    };
 
-        // 2. If already marked as applied in the UI, do nothing more.
-        if (appliedJobs.has(job.job_id)) return;
+    const handleConfirmApply = async () => {
+        if (!jobToConfirm) return;
 
-        // 3. In the background, send the tracking request to your backend.
+        const { job_id, recommendation_id } = jobToConfirm;
+
+        // Update UI state
+        setAppliedJobs(prev => new Set(prev).add(job_id));
+
+        // Now, send the request to the backend to track the application
         try {
             const response = await fetch('http://localhost:8000/jobs/quick-apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_email: userEmail,
-                    job_id: job.job_id,
+                    job_id: job_id,
                 }),
             });
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-                console.log(`Quick Apply recorded for job ${job.job_id}`);
-                setAppliedJobs(prev => new Set(prev).add(job.job_id));
-                // Also trigger the 'applied' feedback for analytics
-                handleFeedback(job.recommendation_id, 'applied');
+            if (!response.ok) {
+                console.error("Failed to record application on the backend.");
             } else {
-                // This handles cases where it's already applied on the backend
-                console.warn(result.message || 'Could not record application.');
-                setAppliedJobs(prev => new Set(prev).add(job.job_id));
+                console.log(`Application for job ${job_id} successfully recorded.`);
             }
         } catch (err) {
-            // This will only catch network errors
-            console.error('Error during quick apply API call:', err);
+            console.error('Error recording application:', err);
         }
+
+        // Also submit feedback for analytics
+        handleFeedback(recommendation_id, 'applied');
+
+        // Close the confirmation dialog
+        setJobToConfirm(null);
+    };
+
+    const handleCancelApply = () => {
+        // Just close the dialog, no other action needed
+        setJobToConfirm(null);
     };
 
     if (loading && recommendations.length === 0) {
@@ -674,6 +707,31 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                 }}>
                     <span>⚠️</span>
                     <span>{error}</span>
+                </div>
+            )}
+
+            {/* --- NEW CONFIRMATION MODAL --- */}
+            {jobToConfirm && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        background: 'white', padding: '2rem', borderRadius: '12px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)', textAlign: 'center'
+                    }}>
+                        <h3 style={{ marginTop: 0 }}>Did you apply?</h3>
+                        <p>Did you complete the application for<br/><strong>{jobToConfirm.title}</strong> at <strong>{jobToConfirm.company}</strong>?</p>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+                            <button onClick={handleConfirmApply} style={{ padding: '0.5rem 1rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                Yes, I Applied
+                            </button>
+                            <button onClick={handleCancelApply} style={{ padding: '0.5rem 1rem', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer' }}>
+                                No, I Didn't
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
