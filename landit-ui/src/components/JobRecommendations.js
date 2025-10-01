@@ -320,6 +320,9 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [shownJobIds, setShownJobIds] = useState(new Set()); // Track shown jobs
     const [hasMore, setHasMore] = useState(true);
     const [offset, setOffset] = useState(0);
+    const [sortBy, setSortBy] = useState("match");
+    const [experienceFilter, setExperienceFilter] = useState("all");
+    const [remoteOnly, setRemoteOnly] = useState(false);
 
     useEffect(() => {
         if (userEmail) {
@@ -461,6 +464,28 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         );
     }
 
+    const sortedAndFilteredRecommendations = recommendations
+        .filter(job => {
+            if (remoteOnly && !job.remote_allowed) {
+                return false;
+            }
+            if (experienceFilter !== 'all' && job.experience_level !== experienceFilter) {
+                return false;
+            }
+            return true;
+        })
+        .sort((a, b) => {
+            switch (sortBy) {
+                case 'salary':
+                    return (b.salary_max || 0) - (a.salary_max || 0);
+                case 'recent':
+                    return new Date(b.posted_date) - new Date(a.posted_date);
+                case 'match':
+                default:
+                    return b.overall_score - a.overall_score;
+            }
+        });
+
     return (
         <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
@@ -529,6 +554,38 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
 
 
             </div>
+            <div style={{ display: 'flex', gap: '12px',
+                marginBottom: '20px', flexWrap: 'wrap' }}>
+              <select
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{
+                padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+              >
+                <option value="match">Best Match</option>
+                <option value="salary">Highest Salary</option>
+                <option value="recent">Most Recent</option>
+              </select>
+
+              <select
+                onChange={(e) => setExperienceFilter(e.target.value)}
+                style={{
+                padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+              >
+                <option value="all">All Levels</option>
+                <option value="entry">Entry Level</option>
+                <option value="mid">Mid Level</option>
+                <option value="senior">Senior</option>
+              </select>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="checkbox"
+                  checked={remoteOnly}
+                  onChange={(e) => setRemoteOnly(e.target.checked)}
+                />
+                Remote Only
+              </label>
+            </div>
 
             {/* Error Message */}
             {error && (
@@ -561,7 +618,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {recommendations.map((job) => (
+                    {sortedAndFilteredRecommendations.map((job) => (
                         <div
                             key={job.job_id}
                             style={{
