@@ -666,15 +666,28 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
 
                                 {/* Match Quality Badge */}
                                 <div style={{
-                                    background: getMatchQualityColor(job.overall_score),
-                                    color: 'white',
-                                    padding: '6px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                    textAlign: 'center'
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
                                 }}>
-                                    {Math.round(job.overall_score * 100)}% Match
+                                  <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '50%',
+                                    background: `conic-gradient(${getMatchQualityColor(job.overall_score)} ${job.overall_score * 360}deg, #e5e7eb 0deg)`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    color: getMatchQualityColor(job.overall_score)
+                                  }}>
+                                    {Math.round(job.overall_score * 100)}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '600' }}>Match</div>
+                                    <div style={{ fontSize: '10px', color: '#6b7280' }}>Score</div>
+                                  </div>
                                 </div>
                             </div>
 
