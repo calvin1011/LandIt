@@ -458,6 +458,25 @@ class DatabaseConnection:
             logger.error(f"Failed to save job: {e}")
             raise
 
+    def get_saved_jobs(self, user_email: str) -> List[Dict]:
+        """Get all jobs saved by a specific user"""
+        try:
+            cursor = self.get_cursor()
+            query = """
+                    SELECT j.*, sj.created_at as saved_at
+                    FROM jobs j
+                             JOIN saved_jobs sj ON j.id = sj.job_id
+                    WHERE sj.user_email = %s
+                    ORDER BY sj.created_at DESC; \
+                    """
+            cursor.execute(query, (user_email,))
+            results = cursor.fetchall()
+            cursor.close()
+            return [dict(result) for result in results]
+        except Exception as e:
+            logger.error(f"Failed to get saved jobs: {e}")
+            return []
+
     def get_feedback_analytics(self, days: int = 30) -> Dict:
         """Get feedback analytics for model improvement"""
         try:

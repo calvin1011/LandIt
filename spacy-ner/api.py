@@ -2128,6 +2128,16 @@ def save_job(request: SaveJobRequest):
         logger.error(f"Failed to save job: {e}")
         raise HTTPException(status_code=500, detail="Failed to save job")
 
+@app.get("/jobs/saved/{user_email}")
+def get_saved_jobs(user_email: str):
+    """Get all jobs saved by a user"""
+    try:
+        saved_jobs = db.get_saved_jobs(user_email)
+        return {"success": True, "saved_jobs": saved_jobs}
+    except Exception as e:
+        logger.error(f"Failed to retrieve saved jobs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve saved jobs")
+
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
     """
     Intelligently merge spaCy and semantic extraction results with comprehensive error handling

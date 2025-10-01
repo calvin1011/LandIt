@@ -9,6 +9,7 @@ import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
 import Learning from './components/Learning';
+import SavedJobs from './components/SavedJobs';
 
 const initialUserInfo = {
     fullName: '',
@@ -263,6 +264,24 @@ function App() {
                                     🎯 Jobs
                                 </button>
 
+                                {/* Saved Jobs Button */}
+                                <button
+                                    onClick={() => setActiveTab('saved')}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: activeTab === 'saved' ? '#6366f1' : 'transparent',
+                                        color: activeTab === 'saved' ? 'white' : '#6b7280',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    💾 Saved
+                                </button>
+
                                 {/*Leaning tab*/}
                                 <button
                                     onClick={() => setActiveTab('learning')}
@@ -376,7 +395,12 @@ function App() {
                             />
                         )}
 
-                        {/* 4. RENDER ADMINPANEL COMPONENT */}
+                        {/* Render SavedJobs component */}
+                        {activeTab === 'saved' && (
+                            <SavedJobs userEmail={userEmail} />
+                        )}
+
+                        {/* RENDER ADMINPANEL COMPONENT */}
                         {activeTab === 'admin' && (
                             <AdminPanel />
                         )}
