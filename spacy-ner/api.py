@@ -279,6 +279,10 @@ class StoreResumeRequest(BaseModel):
     resume_data: Dict[str, Any]
     structured_data: Optional[Dict[str, Any]] = None
 
+class SaveJobRequest(BaseModel):
+    user_email: str
+    job_id: int
+
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
     if not PDF_AVAILABLE:
@@ -2110,6 +2114,19 @@ def get_job_stats():
     except Exception as e:
         logger.error(f" Failed to get job stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get job stats: {str(e)}")
+
+@app.post("/jobs/save")
+def save_job(request: SaveJobRequest):
+    """Save a job for a user"""
+    try:
+        saved_job_id = db.save_job(request.user_email, request.job_id)
+        if saved_job_id:
+            return {"success": True, "saved_job_id": saved_job_id}
+        else:
+            return {"success": False, "message": "Job already saved"}
+    except Exception as e:
+        logger.error(f"Failed to save job: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save job")
 
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
     """

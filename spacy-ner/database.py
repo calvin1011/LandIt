@@ -441,6 +441,23 @@ class DatabaseConnection:
             logger.error(f" Failed to store feedback: {e}")
             raise
 
+    def save_job(self, user_email: str, job_id: int) -> int:
+        """Save a job for a user"""
+        try:
+            cursor = self.get_cursor()
+            query = """
+                    INSERT INTO saved_jobs (user_email, job_id)
+                    VALUES (%s, %s) ON CONFLICT (user_email, job_id) DO NOTHING
+                RETURNING id; \
+                    """
+            cursor.execute(query, (user_email, job_id))
+            result = cursor.fetchone()
+            cursor.close()
+            return result['id'] if result else None
+        except Exception as e:
+            logger.error(f"Failed to save job: {e}")
+            raise
+
     def get_feedback_analytics(self, days: int = 30) -> Dict:
         """Get feedback analytics for model improvement"""
         try:

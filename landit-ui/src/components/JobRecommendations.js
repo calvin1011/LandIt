@@ -323,6 +323,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [sortBy, setSortBy] = useState("match");
     const [experienceFilter, setExperienceFilter] = useState("all");
     const [remoteOnly, setRemoteOnly] = useState(false);
+    const [savedJobs, setSavedJobs] = useState(new Set()); // New state to track saved jobs
 
     useEffect(() => {
         if (userEmail) {
@@ -485,6 +486,38 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                     return b.overall_score - a.overall_score;
             }
         });
+
+    const handleSaveJob = async (jobId) => {
+        if (savedJobs.has(jobId)) return; // Don't save if already saved
+
+        try {
+            const response = await fetch('http://localhost:8000/jobs/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    job_id: jobId,
+                }),
+            });
+
+            if (response.ok) {
+                console.log(`Job ${jobId} saved successfully!`);
+                setSavedJobs(prev => new Set(prev).add(jobId)); // Update state to reflect save
+            } else {
+                 const errorData = await response.json();
+                 console.error("Failed to save job:", errorData.detail);
+            }
+        } catch (err) {
+            console.error('Error saving job:', err);
+        }
+    };
+
+    const handleQuickApply = (job) => {
+        console.log(`Quick applying to ${job.title} at ${job.company}`);
+        // Here you would typically open a modal or make an API call to quick apply
+    };
 
     return (
         <div style={{
@@ -907,6 +940,38 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                         <ThumbsDown style={{ width: '14px', height: '14px' }} />
                                         Not Interested
                                     </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button
+                                    onClick={() => handleSaveJob(job.job_id)}
+                                    disabled={savedJobs.has(job.job_id)}
+                                    style={{
+                                        padding: '8px 14px',
+                                        background: savedJobs.has(job.job_id) ? '#e5e7eb' : '#f3f4f6',
+                                        color: savedJobs.has(job.job_id) ? '#6b7280' : '#374151',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        fontWeight: '500',
+                                        cursor: savedJobs.has(job.job_id) ? 'default' : 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    {savedJobs.has(job.job_id) ? '💾 Saved' : '💾 Save'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleQuickApply(job)}
+                                    style={{
+                                      padding: '6px 12px',
+                                      background: '#10b981',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    ⚡ Quick Apply
+                                  </button>
                                 </div>
 
                                 <button
