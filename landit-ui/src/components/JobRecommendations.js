@@ -710,7 +710,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                 </div>
             )}
 
-            {/* --- NEW CONFIRMATION MODAL --- */}
+            {/* --- NEW CONFIRMATION MODAL ---
             {jobToConfirm && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -724,16 +724,16 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                         <h3 style={{ marginTop: 0 }}>Did you apply?</h3>
                         <p>Did you complete the application for<br/><strong>{jobToConfirm.title}</strong> at <strong>{jobToConfirm.company}</strong>?</p>
                         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
-                            <button onClick={handleConfirmApply} style={{ padding: '0.5rem 1rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                            <button onClick={handleConfirmApply} style={{  }}>
                                 Yes, I Applied
                             </button>
-                            <button onClick={handleCancelApply} style={{ padding: '0.5rem 1rem', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer' }}>
+                            <button onClick={handleCancelApply} style={{  }}>
                                 No, I Didn't
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+            )}*/}
 
             {/* Recommendations List */}
             {recommendations.length === 0 && !error ? (
@@ -756,7 +756,8 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '16px',
                                 padding: '24px',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                position: 'relative'
                             }}
                             onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
@@ -767,6 +768,44 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                 e.currentTarget.style.boxShadow = 'none';
                             }}
                         >
+                            {/* Confirmation Dialog inside the job card --- */}
+                            {jobToConfirm && jobToConfirm.job_id === job.job_id && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0, left: 0, right: 0, bottom: 0,
+                                    backgroundColor: 'rgba(248, 250, 252, 0.95)',
+                                    zIndex: 10,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '16px',
+                                    backdropFilter: 'blur(4px)'
+                                }}>
+                                    <div style={{
+                                        background: 'white',
+                                        padding: '2rem',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                                        textAlign: 'center',
+                                        border: '1px solid #e2e8f0'
+                                    }}>
+                                        <h3 style={{ marginTop: 0, color: '#1f2937' }}>Did you apply?</h3>
+                                        <p style={{ color: '#4b5563' }}>
+                                            Did you complete the application for<br/>
+                                            <strong>{jobToConfirm.title}</strong> at <strong>{jobToConfirm.company}</strong>?
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
+                                            <button onClick={handleConfirmApply} style={{ padding: '0.5rem 1rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                                Yes, I Applied
+                                            </button>
+                                            <button onClick={handleCancelApply} style={{ padding: '0.5rem 1rem', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer' }}>
+                                                No, I Didn't
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Job Header */}
                             <div style={{
                                 display: 'flex',
