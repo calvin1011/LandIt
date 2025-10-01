@@ -323,7 +323,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [sortBy, setSortBy] = useState("match");
     const [experienceFilter, setExperienceFilter] = useState("all");
     const [remoteOnly, setRemoteOnly] = useState(false);
-    const [savedJobs, setSavedJobs] = useState(new Set()); // track saved jobs
+    const [savedJobs, setSavedJobs] = useState(new Set());
     const [appliedJobs, setAppliedJobs] = useState(new Set());
 
     useEffect(() => {
@@ -447,6 +447,76 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         return '#ef4444';
     };
 
+    const handleSaveJob = async (jobId) => {
+        if (savedJobs.has(jobId)) return; // Don't save if already saved
+
+        try {
+            const response = await fetch('http://localhost:8000/jobs/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    job_id: jobId,
+                }),
+            });
+
+            if (response.ok) {
+                console.log(`Job ${jobId} saved successfully!`);
+                setSavedJobs(prev => new Set(prev).add(jobId)); // Update state to reflect save
+            } else {
+                 const errorData = await response.json();
+                 console.error("Failed to save job:", errorData.detail);
+            }
+        } catch (err) {
+            console.error('Error saving job:', err);
+        }
+    };
+
+    const handleQuickApply = async (job) => {
+        // 1. Open the application link immediately for better UX
+        if (job.job_url) {
+            window.open(job.job_url, '_blank');
+        } else {
+            // Fallback to a Google search if no direct URL is available
+            const searchQuery = `${job.title} ${job.company} careers`;
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+            window.open(searchUrl, '_blank');
+        }
+
+        // 2. If already marked as applied in the UI, do nothing more.
+        if (appliedJobs.has(job.job_id)) return;
+
+        // 3. In the background, send the tracking request to your backend.
+        try {
+            const response = await fetch('http://localhost:8000/jobs/quick-apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    job_id: job.job_id,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                console.log(`Quick Apply recorded for job ${job.job_id}`);
+                setAppliedJobs(prev => new Set(prev).add(job.job_id));
+                // Also trigger the 'applied' feedback for analytics
+                handleFeedback(job.recommendation_id, 'applied');
+            } else {
+                // This handles cases where it's already applied on the backend
+                console.warn(result.message || 'Could not record application.');
+                setAppliedJobs(prev => new Set(prev).add(job.job_id));
+            }
+        } catch (err) {
+            // This will only catch network errors
+            console.error('Error during quick apply API call:', err);
+        }
+    };
+
     if (loading && recommendations.length === 0) {
         return (
             <div style={{
@@ -488,65 +558,6 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
             }
         });
 
-    const handleSaveJob = async (jobId) => {
-        if (savedJobs.has(jobId)) return; // Don't save if already saved
-
-        try {
-            const response = await fetch('http://localhost:8000/jobs/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    user_email: userEmail,
-                    job_id: jobId,
-                }),
-            });
-
-            if (response.ok) {
-                console.log(`Job ${jobId} saved successfully!`);
-                setSavedJobs(prev => new Set(prev).add(jobId)); // Update state to reflect save
-            } else {
-                 const errorData = await response.json();
-                 console.error("Failed to save job:", errorData.detail);
-            }
-        } catch (err) {
-            console.error('Error saving job:', err);
-        }
-    };
-
-    const handleQuickApply = async (job) => {
-    if (appliedJobs.has(job.job_id)) return;
-
-    try {
-        const response = await fetch('http://localhost:8000/jobs/quick-apply', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_email: userEmail,
-                job_id: job.job_id,
-            }),
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-                console.log(`Quick Apply successful for job ${job.job_id}`);
-                setAppliedJobs(prev => new Set(prev).add(job.job_id));
-                // Optionally, also trigger the feedback function
-                handleFeedback(job.recommendation_id, 'applied');
-            } else {
-                console.warn(result.message);
-                // If already applied, update UI anyway
-                setAppliedJobs(prev => new Set(prev).add(job.job_id));
-            }
-        } else {
-            console.error("Failed to quick apply.");
-        }
-    } catch (err) {
-        console.error('Error during quick apply:', err);
-    }
-};
     return (
         <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
@@ -922,21 +933,10 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                             cursor: job.userFeedback === 'interested' ? 'default' : 'pointer',
                                             transition: 'all 0.2s'
                                         }}
-                                        onMouseOver={(e) => {
-                                            if (job.userFeedback !== 'interested') {
-                                                e.target.style.background = '#e5e7eb';
-                                            }
-                                        }}
-                                        onMouseOut={(e) => {
-                                            if (job.userFeedback !== 'interested') {
-                                                e.target.style.background = '#f3f4f6';
-                                            }
-                                        }}
                                     >
                                         <ThumbsUp style={{ width: '14px', height: '14px' }} />
                                         Interested
                                     </button>
-
                                     <button
                                         onClick={() => handleFeedback(job.recommendation_id, 'not_interested', 2)}
                                         disabled={job.userFeedback === 'not_interested'}
@@ -954,90 +954,53 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                             cursor: job.userFeedback === 'not_interested' ? 'default' : 'pointer',
                                             transition: 'all 0.2s'
                                         }}
-                                        onMouseOver={(e) => {
-                                            if (job.userFeedback !== 'not_interested') {
-                                                e.target.style.background = '#e5e7eb';
-                                            }
-                                        }}
-                                        onMouseOut={(e) => {
-                                            if (job.userFeedback !== 'not_interested') {
-                                                e.target.style.background = '#f3f4f6';
-                                            }
-                                        }}
                                     >
                                         <ThumbsDown style={{ width: '14px', height: '14px' }} />
                                         Not Interested
                                     </button>
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button
-                                    onClick={() => handleSaveJob(job.job_id)}
-                                    disabled={savedJobs.has(job.job_id)}
-                                    style={{
-                                        padding: '8px 14px',
-                                        background: savedJobs.has(job.job_id) ? '#e5e7eb' : '#f3f4f6',
-                                        color: savedJobs.has(job.job_id) ? '#6b7280' : '#374151',
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        cursor: savedJobs.has(job.job_id) ? 'default' : 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                  >
-                                    {savedJobs.has(job.job_id) ? '💾 Saved' : '💾 Save'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleQuickApply(job)}
-                                    disabled={appliedJobs.has(job.job_id)}
-                                    style={{
-                                        padding: '8px 14px',
-                                        background: appliedJobs.has(job.job_id) ? '#10b981' : '#16a34a',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        cursor: appliedJobs.has(job.job_id) ? 'default' : 'pointer',
-                                        transition: 'all 0.2s',
-                                        opacity: appliedJobs.has(job.job_id) ? 0.7 : 1,
-                                    }}
-                                >
-                                    {appliedJobs.has(job.job_id) ? '⚡ Applied' : '⚡ Quick Apply'}
-                                </button>
-                                </div>
 
-                                <button
-                                    onClick={() => {
-                                        handleFeedback(job.recommendation_id, 'applied');
-                                        if (job.job_url) {
-                                            window.open(job.job_url, '_blank');
-                                        } else {
-                                            const searchQuery = `${job.title} ${job.company} careers`;
-                                            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
-                                            window.open(searchUrl, '_blank');
-                                        }
-                                    }}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '8px 16px',
-                                        background: '#6366f1',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.target.style.background = '#4f46e5'}
-                                    onMouseOut={(e) => e.target.style.background = '#6366f1'}
-                                >
-                                    <ExternalLink style={{ width: '14px', height: '14px' }} />
-                                    Apply Now
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <button
+                                        onClick={() => handleSaveJob(job.job_id)}
+                                        disabled={savedJobs.has(job.job_id)}
+                                        style={{
+                                            padding: '8px 14px',
+                                            background: savedJobs.has(job.job_id) ? '#e5e7eb' : '#f3f4f6',
+                                            color: savedJobs.has(job.job_id) ? '#6b7280' : '#374151',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '8px',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            cursor: savedJobs.has(job.job_id) ? 'default' : 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {savedJobs.has(job.job_id) ? '💾 Saved' : '💾 Save'}
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleQuickApply(job)}
+                                        disabled={appliedJobs.has(job.job_id)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '8px 16px',
+                                            background: appliedJobs.has(job.job_id) ? '#6366f1' : '#10b981',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            cursor: appliedJobs.has(job.job_id) ? 'default' : 'pointer',
+                                            transition: 'all 0.2s',
+                                            opacity: appliedJobs.has(job.job_id) ? 0.7 : 1,
+                                        }}
+                                    >
+                                        {appliedJobs.has(job.job_id) ? '⚡ Applied' : '⚡ Quick Apply'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
