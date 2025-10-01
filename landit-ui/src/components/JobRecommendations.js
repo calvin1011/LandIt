@@ -323,7 +323,8 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     const [sortBy, setSortBy] = useState("match");
     const [experienceFilter, setExperienceFilter] = useState("all");
     const [remoteOnly, setRemoteOnly] = useState(false);
-    const [savedJobs, setSavedJobs] = useState(new Set()); // New state to track saved jobs
+    const [savedJobs, setSavedJobs] = useState(new Set()); // track saved jobs
+    const [appliedJobs, setAppliedJobs] = useState(new Set());
 
     useEffect(() => {
         if (userEmail) {
@@ -514,11 +515,38 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
         }
     };
 
-    const handleQuickApply = (job) => {
-        console.log(`Quick applying to ${job.title} at ${job.company}`);
-        // Here you would typically open a modal or make an API call to quick apply
-    };
+    const handleQuickApply = async (job) => {
+    if (appliedJobs.has(job.job_id)) return;
 
+    try {
+        const response = await fetch('http://localhost:8000/jobs/quick-apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_email: userEmail,
+                job_id: job.job_id,
+            }),
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                console.log(`Quick Apply successful for job ${job.job_id}`);
+                setAppliedJobs(prev => new Set(prev).add(job.job_id));
+                // Optionally, also trigger the feedback function
+                handleFeedback(job.recommendation_id, 'applied');
+            } else {
+                console.warn(result.message);
+                // If already applied, update UI anyway
+                setAppliedJobs(prev => new Set(prev).add(job.job_id));
+            }
+        } else {
+            console.error("Failed to quick apply.");
+        }
+    } catch (err) {
+        console.error('Error during quick apply:', err);
+    }
+};
     return (
         <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
@@ -961,17 +989,22 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
                                   </button>
                                   <button
                                     onClick={() => handleQuickApply(job)}
+                                    disabled={appliedJobs.has(job.job_id)}
                                     style={{
-                                      padding: '6px 12px',
-                                      background: '#10b981',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer'
+                                        padding: '8px 14px',
+                                        background: appliedJobs.has(job.job_id) ? '#10b981' : '#16a34a',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        fontWeight: '500',
+                                        cursor: appliedJobs.has(job.job_id) ? 'default' : 'pointer',
+                                        transition: 'all 0.2s',
+                                        opacity: appliedJobs.has(job.job_id) ? 0.7 : 1,
                                     }}
-                                  >
-                                    ⚡ Quick Apply
-                                  </button>
+                                >
+                                    {appliedJobs.has(job.job_id) ? '⚡ Applied' : '⚡ Quick Apply'}
+                                </button>
                                 </div>
 
                                 <button

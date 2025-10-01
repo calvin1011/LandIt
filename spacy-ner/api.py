@@ -283,6 +283,10 @@ class SaveJobRequest(BaseModel):
     user_email: str
     job_id: int
 
+class QuickApplyRequest(BaseModel):
+    user_email: str
+    job_id: int
+
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
     if not PDF_AVAILABLE:
@@ -2137,6 +2141,30 @@ def get_saved_jobs(user_email: str):
     except Exception as e:
         logger.error(f"Failed to retrieve saved jobs: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve saved jobs")
+
+@app.post("/jobs/quick-apply")
+def quick_apply_for_job(request: QuickApplyRequest):
+    """Records a 'quick apply' action for a user and job."""
+    try:
+        # For this version, we just record the application in our database.
+        # A more advanced version would integrate with third-party application systems.
+        application_id = db.record_application(request.user_email, request.job_id)
+
+        if application_id:
+            # Also add feedback that the user applied
+            try:
+                # We need to find the recommendation_id for this user/job pair
+                # This part is optional but good for tracking
+                pass # Simplified for now
+            except Exception as feedback_error:
+                logger.warning(f"Could not automatically add 'applied' feedback: {feedback_error}")
+
+            return {"success": True, "application_id": application_id, "message": "Application recorded successfully."}
+        else:
+            return {"success": False, "message": "You have already applied to this job."}
+    except Exception as e:
+        logger.error(f"Failed to process quick apply: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process quick apply.")
 
 def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, original_text: str) -> Dict:
     """

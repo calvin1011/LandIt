@@ -477,6 +477,24 @@ class DatabaseConnection:
             logger.error(f"Failed to get saved jobs: {e}")
             return []
 
+    def record_application(self, user_email: str, job_id: int) -> Optional[int]:
+        """Records a job application for a user."""
+        try:
+            cursor = self.get_cursor()
+            query = """
+                    INSERT INTO applications (user_email, job_id)
+                    VALUES (%s, %s) ON CONFLICT (user_email, job_id) DO NOTHING
+                RETURNING id; \
+                    """
+            cursor.execute(query, (user_email, job_id))
+            result = cursor.fetchone()
+            cursor.close()
+            logger.info(f"Recorded application for user {user_email} to job {job_id}")
+            return result['id'] if result else None
+        except Exception as e:
+            logger.error(f"Failed to record application: {e}")
+            raise
+
     def get_feedback_analytics(self, days: int = 30) -> Dict:
         """Get feedback analytics for model improvement"""
         try:
