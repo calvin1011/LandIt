@@ -418,10 +418,12 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
     }, [userEmail, offset, shownJobIds]);
 
     useEffect(() => {
+    // This effect runs when the component mounts or when the user changes.
+    // It only fetches jobs if no `initialJobs` were passed in as props.
         if (userEmail && initialJobs.length === 0) {
-            fetchRecommendations(true); // Reset on user change
+            fetchRecommendations(true);
         }
-    }, [userEmail, initialJobs.length]);
+    }, [userEmail, initialJobs]);
 
     const loadMoreJobs = () => {
         if (!loading && hasMore) {

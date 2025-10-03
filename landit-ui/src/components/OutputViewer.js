@@ -1,7 +1,7 @@
 import React from 'react';
 
 const OutputViewer = ({ data }) => {
-    if (!data.length) return null;
+    if (!data || !data.length) return null;
 
     // Group data by categories
     const groupedData = {
@@ -158,7 +158,7 @@ const OutputViewer = ({ data }) => {
                                             letterSpacing: '0.5px',
                                             marginBottom: '4px'
                                         }}>
-                                            {item.type.replace(/_/g, ' ')}
+                                            {(item.type || 'UNCATEGORIZED').replace(/_/g, ' ')}
                                         </div>
                                         <div style={{
                                             fontSize: '14px',
