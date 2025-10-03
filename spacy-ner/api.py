@@ -16,6 +16,7 @@ from adzuna_job_importer import AdzunaJobImporter
 from jsearch_job_importer import JSearchJobImporter
 from remotive_job_importer import RemotiveJobImporter
 from ai_project_generator import AIProjectGenerator
+from usajobs_importer import USAJobsImporter
 from functools import lru_cache
 import hashlib
 from datetime import datetime, timedelta
@@ -555,12 +556,30 @@ def find_job_matches(match_request: JobMatchRequest):
                 job.get('remote_allowed', False)
             )
 
-            # Calculate overall score
+            # Define default weights
+            weights = {
+                "skills": 0.45,
+                "semantic": 0.25,
+                "experience": 0.20,
+                "location": 0.10
+            }
+
+            # Safely get the job_type from the job dictionary
+            job_type = job.get('job_type')
+
+            # Check if the job is entry-level or an internship and adjust weights
+            if job_type in ["Internship", "Entry level", "internship", "entry"]:
+                weights["skills"] = 0.60
+                # semantic can stay the same
+                weights["experience"] = 0.05
+                # location can stay the same
+
+            # Calculate the overall match score using the selected weights
             overall_score = (
-                    semantic_similarity * 0.25 +
-                    skills_similarity * 0.45 +
-                    experience_match * 0.20 +
-                    location_match * 0.10
+                    skills_similarity * weights["skills"] +
+                    semantic_similarity * weights["semantic"] +
+                    experience_match * weights["experience"] +
+                    location_match * weights["location"]
             )
 
             # Only include jobs above minimum similarity
@@ -1781,8 +1800,19 @@ def test_all_importers():
     except Exception as e:
         results['remotive'] = {'status': 'error', 'message': str(e)}
 
-    return results
+    # Test USAJOBS
+    try:
+        usajobs_importer = USAJobsImporter()
+        usajobs_importer.import_jobs(max_jobs=max_jobs_per_source)
+        summaries['usajobs'] = usajobs_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"USAJOBS import failed: {e}")
+        summaries['usajobs'] = {'error': str(e)}
 
+    logger.info(f"SCHEDULER: Automated job import successful: {summaries}")
+    return {"status": "completed", "summaries": summaries}
+
+    return results
 
 def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from potentially unlimited
     """Direct function to run all job imports (for scheduler use)"""
@@ -1827,6 +1857,15 @@ def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from poten
     except Exception as e:
         logger.error(f"Remotive import failed: {e}")
         summaries['remotive'] = {'error': str(e)}
+
+    # USAJOBS Importer
+    try:
+        usajobs_importer = USAJobsImporter()
+        usajobs_importer.import_jobs(max_jobs=max_jobs_per_source)
+        summaries['usajobs'] = usajobs_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"USAJOBS import failed: {e}")
+        summaries['usajobs'] = {'error': str(e)}
 
     return {"status": "completed", "summaries": summaries}
 
@@ -2064,6 +2103,24 @@ def import_jsearch_jobs(
     except Exception as e:
         logger.error(f" JSearch import failed: {e}")
         raise HTTPException(status_code=500, detail=f"JSearch import failed: {str(e)}")
+
+@app.post("/admin/import-usajobs-jobs")
+def import_usajobs_jobs(keywords: List[str] = None, max_jobs: int = 50):
+    """Import jobs from USAJOBS API."""
+    try:
+        start_time = time.time()
+        importer = USAJobsImporter()
+        importer.import_jobs(keywords=keywords, max_jobs=max_jobs)
+        summary = importer.get_import_summary()
+        processing_time = time.time() - start_time
+        return {
+            "success": True,
+            "summary": summary,
+            "processing_time": processing_time
+        }
+    except Exception as e:
+        logger.error(f"USAJOBS import failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/import-remotive-jobs")
 def trigger_remotive_import():
