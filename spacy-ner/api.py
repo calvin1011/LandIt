@@ -1,5 +1,5 @@
 import spacy
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel, Field
 import re
 import logging
@@ -287,6 +287,14 @@ class SaveJobRequest(BaseModel):
 class QuickApplyRequest(BaseModel):
     user_email: str
     job_id: int
+
+def extract_skills(text: str) -> List[str]:
+    """Extracts skills from a given text using the NLP model."""
+    if not text:
+        return []
+    doc = nlp(text)
+    skills = [ent.text for ent in doc.ents if ent.label_ in ["SKILL", "TECHNOLOGY"]]
+    return list(set(skills))
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
@@ -1390,7 +1398,8 @@ async def parse_resume_file(
         file: UploadFile = File(...),
         analysis_level: str = "full",
         include_suggestions: bool = True,
-        use_hybrid: bool = True
+        use_hybrid: bool = True,
+        job_description_text: Optional[str] = Form(None)
 ):
     """
     Parse resume from uploaded file (PDF, DOCX, TXT)
@@ -1436,6 +1445,61 @@ async def parse_resume_file(
             raise HTTPException(status_code=400, detail="No text could be extracted from the file")
 
         logger.info(f" Extracted {len(text)} characters from {file.filename}")
+
+        spacy_results = safe_context_extraction(text)
+        semantic_results = semantic_extractor.extract_semantic_entities(text)
+        merged_results = merge_extraction_results(spacy_results, semantic_results, text)
+
+        resume_skills = extract_skills(text)
+        missing_skills = []
+
+        # Check for Job Description and Generate Missing Skills
+        if job_description_text:
+            logger.info("Job description provided, analyzing skill gap.")
+            jd_skills = extract_skills(job_description_text)
+
+            resume_skills_set = set(skill.lower() for skill in resume_skills)
+            jd_skills_set = set(skill.lower() for skill in jd_skills)
+
+            missing_skills = sorted(list(jd_skills_set - resume_skills_set))
+
+        # Get Job Recommendations
+        logger.info("Fetching job recommendations based on resume skills.")
+
+        recommended_jobs = []
+        if embedding_service and resume_skills:
+            # First, create an embedding from the list of resume skills
+            skills_embedding = embedding_service.generate_skills_embedding(resume_skills)
+
+            # Now, use the correct function with the generated embedding
+            recommended_jobs = db.find_similar_jobs_by_vector(skills_embedding, limit=50)
+
+        processing_time = time.time() - start_time
+        logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
+
+        # 4. Return a Unified Response
+        return {
+            "entities": merged_results.get("entities", []),
+            "structured_data": {
+                "personal_info": merged_results.get("personal_info", {}),
+                "work_experience": merged_results.get("work_experience", []),
+                "education": merged_results.get("education", []),
+                "skills": merged_results.get("skills", {})
+            },
+            "file_info": {
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "size_bytes": len(file_content)
+            },
+            "missing_skills": missing_skills,
+            "recommended_jobs": recommended_jobs
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"  File processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
         # Choose processing method based on use_hybrid parameter
         if use_hybrid and semantic_extractor:

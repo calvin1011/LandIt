@@ -37,7 +37,7 @@ const Search = ({ style }) => (
     </svg>
 );
 
-const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
+const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
     const [dragActive, setDragActive] = useState(false);
     const [file, setFile] = useState(null);
     const [uploadStatus, setUploadStatus] = useState('idle');
@@ -152,6 +152,10 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
             const formData = new FormData();
             formData.append('file', fileToUpload);
 
+            if (jobDescriptionText) {
+                formData.append('job_description_text', jobDescriptionText);
+            }
+
             const progressInterval = setInterval(() => {
                 setProgress(prev => {
                     if (prev >= 90) {
@@ -183,7 +187,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail }) => {
 
             setTimeout(() => {
                 setUploadStatus('success');
-                onUploadSuccess();
+                onUploadSuccess(data);
             }, 1500);
         } catch (error) {
             setUploadStatus('error');

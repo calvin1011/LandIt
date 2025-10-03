@@ -313,9 +313,9 @@ const MatchBreakdown = ({ job }) => (
   </div>
 );
 
-const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
-    const [recommendations, setRecommendations] = useState([]);
-    const [loading, setLoading] = useState(false);
+const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] }) => {
+    const [recommendations, setRecommendations] = useState(initialJobs);
+    const [loading, setLoading] = useState(initialJobs.length === 0);
     const [error, setError] = useState('');
     const [shownJobIds, setShownJobIds] = useState(new Set()); // Track shown jobs
     const [hasMore, setHasMore] = useState(true);
@@ -418,10 +418,10 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning }) => {
     }, [userEmail, offset, shownJobIds]);
 
     useEffect(() => {
-        if (userEmail) {
+        if (userEmail && initialJobs.length === 0) {
             fetchRecommendations(true); // Reset on user change
         }
-    }, [userEmail]);
+    }, [userEmail, initialJobs.length]);
 
     const loadMoreJobs = () => {
         if (!loading && hasMore) {

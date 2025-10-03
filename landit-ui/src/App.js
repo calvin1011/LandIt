@@ -31,6 +31,10 @@ function App() {
 
     const [learningJobContext, setLearningJobContext] = useState(null);
 
+    const [jobDescription, setJobDescription] = useState('');
+    const [missingSkills, setMissingSkills] = useState([]);
+    const [recommendedJobs, setRecommendedJobs] = useState([]);
+
     useEffect(() => {
         console.log('Setting up Firebase auth listener...');
 
@@ -133,10 +137,22 @@ function App() {
         setActiveTab('resume');
     };
 
-    const handleUploadSuccess = () => {
+    const handleUploadSuccess = (data) => {
         setShowUploader(false);
-        setTimeout(() => setActiveTab('jobs'), 2000);
+
+        // Set parsed resume data
+        setParsedData(data.entities || []);
+
+        // Set the missing skills to state
+        setMissingSkills(data.missing_skills || []);
+
+        // Set recommended jobs to state
+        setRecommendedJobs(data.recommended_jobs || []);
+
+        // Automatically switch to the jobs tab
+        setActiveTab('jobs');
     };
+
 
     useEffect(() => {
         if (loggedIn && userEmail && !loading) {
@@ -373,6 +389,28 @@ function App() {
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
 
+                        {/* Job Description Text Area */}
+                        {activeTab === 'resume' && (
+                            <div style={{ marginBottom: '30px' }}>
+                                <h3 style={{ color: '#1f2937' }}>Optional: Job Description Analysis</h3>
+                                <textarea
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
+                                    placeholder="Paste the job description here to analyze skill gaps..."
+                                    style={{
+                                        width: '100%',
+                                        minHeight: '150px',
+                                        padding: '15px',
+                                        borderRadius: '12px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '14px',
+                                        fontFamily: 'inherit',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         {/* Main Content Area */}
                         {activeTab === 'resume' && (
                             <>
@@ -381,9 +419,26 @@ function App() {
                                     <ResumeUploader
                                         onUploadSuccess={handleUploadSuccess}
                                         userEmail={userEmail}
+                                        jobDescriptionText={jobDescription}
                                     />
                                 ) : (
-                                    <OutputViewer data={parsedData} />
+                                    <>
+                                        {/* Display missing skills if they exist */}
+                                      {missingSkills.length > 0 && (
+                                        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+                                          <h3 style={{ color: '#c2410c' }}>Skills to Add</h3>
+                                          <p style={{color: '#9a3412'}}>Based on the job description, you might want to highlight these skills on your resume:</p>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                                            {missingSkills.map(skill => (
+                                              <span key={skill} style={{ background: '#fed7aa', color: '#7c2d12', padding: '4px 10px', borderRadius: '12px', fontSize: '14px' }}>
+                                                {skill}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      <OutputViewer data={parsedData} />
+                                    </>
                                 )}
                             </>
                         )}
@@ -391,6 +446,7 @@ function App() {
                         {activeTab === 'jobs' && (
                             <JobRecommendations
                                 userEmail={userEmail}
+                                initialJobs={recommendedJobs}
                                 onNavigateToLearning={handleNavigateToLearning}
                             />
                         )}
