@@ -149,6 +149,9 @@ function App() {
         // Set recommended jobs to state
         setRecommendedJobs(data.recommended_jobs || []);
 
+        // Save the entire data object to sessionStorage
+        sessionStorage.setItem('resumeAnalysisData', JSON.stringify(data));
+
         // Automatically switch to the jobs tab
         setActiveTab('jobs');
     };
@@ -167,6 +170,17 @@ function App() {
             handleAccountSwitch(userEmail);
         }
     }, [userEmail]);
+
+    useEffect(() => {
+    // Check sessionStorage for persisted data when the app loads
+    const persistedData = sessionStorage.getItem('resumeAnalysisData');
+    if (persistedData) {
+        const data = JSON.parse(persistedData);
+        setParsedData(data.entities || []);
+        setMissingSkills(data.missing_skills || []);
+        // You could optionally set recommendedJobs here too if needed
+        }
+    }, []);
 
     if (loading) {
         return (
