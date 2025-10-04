@@ -3,7 +3,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import ResumeUploader from './components/ResumeUploader';
 import JobRecommendations from './components/JobRecommendations';
-import OutputViewer from './components/OutputViewer';
 import Login from "./components/Login";
 import Profile from './components/Profile';
 import AdminPanel from './components/AdminPanel';
@@ -451,7 +450,6 @@ function App() {
                                           </div>
                                         </div>
                                       )}
-                                      <OutputViewer data={parsedData} />
                                     </>
                                 )}
                             </>
