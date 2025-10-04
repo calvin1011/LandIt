@@ -9,10 +9,11 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 
 
-# In your train.py, replace the load_clean_training_data function:
+# load_clean_training_data function:
 def load_clean_training_data():
     """Load cleaned training data from multiple files"""
     training_files = [
+        "kaggle_prelabeled_20251004_163122.json",
         "train_data_skills.json",
         "train_data_contacts.json",
         "train_data_companies.json",

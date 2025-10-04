@@ -105,7 +105,7 @@ def main():
     # Generate a dynamic output filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_filename = f"kaggle_prelabeled_{timestamp}.json"
-    output_path = project_root / "data" / "kaggle" / "processed" / output_filename
+    output_path = script_dir.parent / output_filename
 
     print(f"Loading CSV from: {csv_path}")
     print(f"Loading model from: {model_path}")
@@ -198,7 +198,7 @@ def main():
 
         # Only keep examples with reasonable number of entities
         if 5 <= len(validated_entities) <= 100:  # Reasonable range
-            training_example = (cleaned_text, {"entities": validated_entities})
+            training_example = [cleaned_text, {"entities": validated_entities}]
             training_data.append(training_example)
             successful_count += 1
         else:
