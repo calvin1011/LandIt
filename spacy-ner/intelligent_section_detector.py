@@ -532,81 +532,6 @@ class IntelligentSectionDetector:
 
         return merged
 
-    class ContextAwareEntityExtractor:
-        """
-        Enhanced entity extractor that uses section context to improve extraction accuracy.
-        """
-
-        def __init__(self, nlp_model):
-            self.nlp = nlp_model
-            self.section_detector = IntelligentSectionDetector()
-
-        def extract_entities_with_context(self, text: str) -> Dict[str, List[Dict]]:
-            """
-            Extract entities with section context awareness for better accuracy.
-            """
-            # Detect sections first
-            sections = self.section_detector.detect_sections(text)
-
-            # Extract entities with section context
-            doc = self.nlp(text)
-            entities_by_section = {section.value: [] for section in ResumeSection}
-
-            for ent in doc.ents:
-                # Get the section context for this entity
-                section = self.section_detector.get_section_context(sections, ent.start_char)
-
-                entities_by_section[section.value].append({
-                    'text': ent.text,
-                    'label': ent.label_,
-                    'start': ent.start_char,
-                    'end': ent.end_char,
-                    'confidence': 1.0  # You can add confidence scoring here
-                })
-
-            return entities_by_section
-
-        def enhance_entity_extraction(self, text: str, raw_entities: List[Dict]) -> List[Dict]:
-            """
-            Enhance entity extraction using section context and validation rules.
-            """
-            sections = self.section_detector.detect_sections(text)
-            enhanced_entities = []
-
-            for entity in raw_entities:
-                # Get section context
-                section = self.section_detector.get_section_context(sections, entity['start'])
-
-                # Apply section-specific validation rules
-                entity = self._validate_entity_with_context(entity, section)
-
-                if entity:  # Only include if validation passes
-                    entity['section'] = section.value
-                    enhanced_entities.append(entity)
-
-            return enhanced_entities
-
-        def _validate_entity_with_context(self, entity: Dict, section: ResumeSection) -> Optional[Dict]:
-            """
-            Validate entities based on their section context.
-            """
-            # Example validation rules
-            if section == ResumeSection.EDUCATION:
-                if entity['label'] == 'COMPANY':
-                    # Companies in education section might actually be schools
-                    entity['label'] = 'SCHOOL'
-                    entity['confidence'] *= 0.8  # Reduce confidence slightly
-
-            elif section == ResumeSection.SKILLS:
-                if entity['label'] == 'COMPANY' and len(entity['text']) < 4:
-                    # Short company names in skills might be technologies
-                    entity['label'] = 'SKILL'
-                    entity['confidence'] *= 0.7
-
-            # Add more context-aware validation rules as needed
-
-            return entity
-
     def _fill_section_gaps(self, sections: Dict[ResumeSection, List[SectionBoundary]], text: str) -> Dict[
         ResumeSection, List[SectionBoundary]]:
         """Fill in gaps for undetected sections using contextual analysis"""
@@ -707,3 +632,78 @@ class IntelligentSectionDetector:
 
         plt.tight_layout()
         plt.show()
+
+class ContextAwareEntityExtractor:
+    """
+    Enhanced entity extractor that uses section context to improve extraction accuracy.
+    """
+
+    def __init__(self, nlp_model):
+        self.nlp = nlp_model
+        self.section_detector = IntelligentSectionDetector()
+
+    def extract_entities_with_context(self, text: str) -> Dict[str, List[Dict]]:
+        """
+        Extract entities with section context awareness for better accuracy.
+        """
+        # Detect sections first
+        sections = self.section_detector.detect_sections(text)
+
+        # Extract entities with section context
+        doc = self.nlp(text)
+        entities_by_section = {section.value: [] for section in ResumeSection}
+
+        for ent in doc.ents:
+            # Get the section context for this entity
+            section = self.section_detector.get_section_context(sections, ent.start_char)
+
+            entities_by_section[section.value].append({
+                'text': ent.text,
+                'label': ent.label_,
+                'start': ent.start_char,
+                'end': ent.end_char,
+                'confidence': 1.0  # You can add confidence scoring here
+            })
+
+        return entities_by_section
+
+    def enhance_entity_extraction(self, text: str, raw_entities: List[Dict]) -> List[Dict]:
+        """
+        Enhance entity extraction using section context and validation rules.
+        """
+        sections = self.section_detector.detect_sections(text)
+        enhanced_entities = []
+
+        for entity in raw_entities:
+            # Get section context
+            section = self.section_detector.get_section_context(sections, entity['start'])
+
+            # Apply section-specific validation rules
+            entity = self._validate_entity_with_context(entity, section)
+
+            if entity:  # Only include if validation passes
+                entity['section'] = section.value
+                enhanced_entities.append(entity)
+
+        return enhanced_entities
+
+    def _validate_entity_with_context(self, entity: Dict, section: ResumeSection) -> Optional[Dict]:
+        """
+        Validate entities based on their section context.
+        """
+        # Example validation rules
+        if section == ResumeSection.EDUCATION:
+            if entity['label'] == 'COMPANY':
+                # Companies in education section might actually be schools
+                entity['label'] = 'SCHOOL'
+                entity['confidence'] *= 0.8  # Reduce confidence slightly
+
+        elif section == ResumeSection.SKILLS:
+            if entity['label'] == 'COMPANY' and len(entity['text']) < 4:
+                # Short company names in skills might be technologies
+                entity['label'] = 'SKILL'
+                entity['confidence'] *= 0.7
+
+        # Add more context-aware validation rules as needed
+
+        return entity
