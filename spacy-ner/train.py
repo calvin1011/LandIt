@@ -13,7 +13,8 @@ warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 def load_clean_training_data():
     """Load cleaned training data from multiple files"""
     training_files = [
-        "Entity Recognition in Resumes.json",
+        "train_data_experience_refined.json",
+        "train_data_dataturks.json",
         "train_data_education_complex.json",
         "train_data_skills_prose.json",
         "train_data_hr_analytics.json",
