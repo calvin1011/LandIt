@@ -14,6 +14,8 @@ def load_clean_training_data():
     """Load cleaned training data from multiple files"""
     training_files = [
         "Entity Recognition in Resumes.json",
+        "train_data_education_complex.json",
+        "train_data_skills_prose.json",
         "train_data_hr_analytics.json",
         "kaggle_prelabeled_20251004_163122.json",
         "train_data_skills.json",
