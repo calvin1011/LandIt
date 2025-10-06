@@ -37,31 +37,86 @@ class JSearchJobImporter:
         }
 
     def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
-        """Import jobs from JSearch API with better error handling"""
+        """
+        Import jobs from JSearch API
+        """
+        if not self.embedding_service:
+            logger.error("Embedding service not available. Aborting import.")
+            return
+
         if keywords is None:
             keywords = [
-                "software engineer",
-                "data scientist",
-                "product manager",
-                "full stack developer",
-                "machine learning engineer"
+                'Software Engineer', 'Data Scientist', 'Product Manager', 'UX Designer',
+                'DevOps Engineer', 'Cybersecurity Analyst', 'Cloud Engineer'
             ]
 
-        logger.info(f" Starting JSearch job import for {len(keywords)} keywords...")
-
-        jobs_per_keyword = max(10, max_jobs // len(keywords))
+        logger.info(f"=== Starting JSearch Job Import for keywords: {', '.join(keywords)} ===")
 
         for keyword in keywords:
+            logger.info(f" Fetching jobs for '{keyword}' in {location}")
             try:
-                logger.info(f"Processing keyword: '{keyword}'")
-                self._import_jobs_for_keyword(keyword, jobs_per_keyword, location)
-                time.sleep(2)  # Rate limiting between keywords
-            except Exception as e:
-                logger.error(f" Failed to import jobs for '{keyword}': {e}")
-                continue
+                # Fetch job data from API
+                fetched_jobs = self._fetch_jobs_from_api(keyword, location, num_pages=2)
+                if not fetched_jobs:
+                    logger.warning(f" No jobs found for '{keyword}'")
+                    continue
 
-        logger.info(f" JSearch import completed: {self.stats}")
-        return self.stats
+                self.stats['total_fetched'] += len(fetched_jobs)
+                jobs_to_process = fetched_jobs[:max_jobs]
+                logger.info(f" Processing {len(jobs_to_process)} jobs for '{keyword}'")
+
+                # Process and store each job
+                for job in jobs_to_process:
+                    try:
+                        # Normalize and enrich job data
+                        job_data = self._normalize_job_data(job)
+                        if not job_data:
+                            self.stats['failed_imports'] += 1
+                            continue
+
+                        # Check for duplicates
+                        if self._is_duplicate_job(job_data['title'], job_data['company']):
+                            self.stats['duplicate_jobs'] += 1
+                            continue
+
+                        # Generate embeddings
+                        description_text = job_data.get('description', '')
+                        description_embedding = self.embedding_service.generate_embedding(description_text)
+
+                        # Generate skills embedding from the required skills list
+                        skills_list = job_data.get('skills_required', [])
+                        skills_embedding = None
+                        if skills_list:
+                            # Join the list of skills into a single string for embedding
+                            skills_text = ". ".join(skills_list)
+                            skills_embedding = self.embedding_service.generate_embedding(skills_text)
+
+
+                        # Store job posting with the new skills_embedding
+                        job_id = db.store_job_posting(
+                            job_data,
+                            {
+                                'description': description_embedding,
+                                'requirements': description_embedding,
+                                'skills_embedding': skills_embedding  # Add the new embedding here
+                            }
+                        )
+
+                        if job_id:
+                            self.stats['successfully_imported'] += 1
+                        else:
+                            self.stats['failed_imports'] += 1
+
+                    except Exception as e:
+                        logger.error(f" Error processing job {job.get('job_id')}: {e}")
+                        self.stats['failed_imports'] += 1
+
+                time.sleep(1)  # Respectful delay between keywords
+
+            except Exception as e:
+                logger.error(f" Failed to fetch or process jobs for '{keyword}': {e}")
+
+        logger.info("=== JSearch Job Import Finished ===")
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
         """Import jobs for a specific keyword - skip entire keyword if rate limited"""

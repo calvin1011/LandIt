@@ -500,6 +500,16 @@ def create_job_posting(job_data: JobPostingRequest):
         logger.error(f"Failed to create job posting: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create job posting: {str(e)}")
 
+def calculate_jaccard_similarity(set1: set, set2: set) -> float:
+    """Calculates the Jaccard similarity between two sets of skills."""
+    if not set1 and not set2:
+        return 1.0
+    if not set1 or not set2:
+        return 0.0
+
+    intersection = len(set1.intersection(set2))
+    union = len(set1.union(set2))
+    return intersection / union
 
 @app.post("/jobs/find-matches")
 def find_job_matches(match_request: JobMatchRequest):
@@ -513,81 +523,70 @@ def find_job_matches(match_request: JobMatchRequest):
         import random
         start_time = time.time()
 
-        # Get user's resume
         user_resume = db.get_user_resume(match_request.user_email)
         if not user_resume:
             raise HTTPException(status_code=404, detail="User resume not found. Please upload a resume first.")
 
-        # Get all active jobs (excluding already shown ones)
         all_jobs = db.get_all_jobs_with_embeddings()
         if not all_jobs:
-            return {
-                "matches": [],
-                "total_found": 0,
-                "message": "No active job postings available"
-            }
+            return {"matches": [], "total_found": 0, "message": "No active job postings available"}
 
-        # Filter out excluded jobs
         if match_request.exclude_job_ids:
             all_jobs = [job for job in all_jobs if job['id'] not in match_request.exclude_job_ids]
 
         logger.info(f"Finding matches among {len(all_jobs)} jobs for {match_request.user_email}")
 
-        # Get user's resume embedding
         resume_embedding = user_resume['full_resume_embedding']
         skills_embedding = user_resume['skills_embedding']
 
-        # Calculate matches
         matches = []
         for job in all_jobs:
-            # Calculate similarity scores
+
+            # 1. Keyword-based (Jaccard) Similarity
+            user_skills_set = set(extract_user_skills(user_resume))
+            job_skills_set = set([s.lower() for s in job.get('skills_required', [])])
+            jaccard_score = calculate_jaccard_similarity(user_skills_set, job_skills_set)
+
+            # 2. Semantic Similarity (Skills vs. Skills)
+            semantic_skills_score = 0.0
+            job_skills_embedding = job.get('skills_embedding')
+            if skills_embedding is not None and job_skills_embedding is not None:
+                semantic_skills_score = embedding_service.calculate_similarity(
+                    skills_embedding,
+                    job_skills_embedding
+                )
+
+            # 3. Create the Hybrid Score
+            skills_similarity = (0.7 * semantic_skills_score) + (0.3 * jaccard_score)
+            skills_similarity = min(1.0, skills_similarity)
+
+            # Calculate other scores
             semantic_similarity = embedding_service.calculate_similarity(
                 resume_embedding,
                 job['description_embedding']
             )
-
-            skills_similarity = embedding_service.calculate_similarity(
-                skills_embedding,
-                job['description_embedding']
-            )
-
-            # Calculate experience match
             user_years = user_resume.get('years_of_experience', 0)
             job_level = job.get('experience_level', 'mid')
             experience_match = calculate_experience_match(user_years, job_level)
 
-            # Calculate location match
             location_match = calculate_location_match(
                 user_resume.get('preferred_locations', []),
                 job.get('location', ''),
                 job.get('remote_allowed', False)
             )
 
-            # Define default weights
             weights = {
-                "skills": 0.45,
-                "semantic": 0.25,
-                "experience": 0.20,
-                "location": 0.10
+                "skills": 0.45, "semantic": 0.25, "experience": 0.20, "location": 0.10
             }
 
-            # Safely get the job_type from the job dictionary
             job_type = job.get('job_type', '').lower()
-
-            # HANDLING FOR JUNIOR ROLES
             is_junior_role = any(keyword in job_type for keyword in ["internship", "entry", "intern"])
+
             if is_junior_role:
-                # Forgive lack of experience completely for junior roles.
                 if user_years <= 1:
                     experience_match = 1.0
+                weights = {"skills": 0.70, "semantic": 0.20, "experience": 0.0, "location": 0.10}
 
-                # Adjust weights heavily towards skills.
-                weights["skills"] = 0.70
-                weights["semantic"] = 0.20
-                weights["experience"] = 0.0
-                weights["location"] = 0.10
-
-            # Calculate the initial overall match score
             overall_score = (
                     skills_similarity * weights["skills"] +
                     semantic_similarity * weights["semantic"] +
@@ -595,12 +594,10 @@ def find_job_matches(match_request: JobMatchRequest):
                     location_match * weights["location"]
             )
 
-            # ADD A SCORE BOOST FOR JUNIOR ROLES
             if is_junior_role:
-                boost = 0.10 * (1.0 - overall_score)  # Apply a 10% boost
+                boost = 0.10 * (1.0 - overall_score)
                 overall_score = min(0.95, overall_score + boost)
 
-            # Only include jobs above minimum similarity
             if overall_score >= match_request.min_similarity:
                 user_skills = extract_user_skills(user_resume)
                 job_skills = job.get('skills_required', [])

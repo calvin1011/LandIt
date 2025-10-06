@@ -39,22 +39,82 @@ class USAJobsImporter:
     def get_import_summary(self) -> Dict:
         return self.stats
 
-    def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50):
-        if keywords is None:
-            keywords = ["IT Specialist", "Data Scientist", "Cybersecurity Specialist"]
+    def import_jobs(self, keywords: List[str] = None, max_jobs_per_keyword: int = 100):
+        """
+        Imports job data from the USAJOBS API for specified keywords.
+        """
+        if not self.embedding_service:
+            logger.error("Embedding service not available. Aborting USAJOBS import.")
+            return
 
-        logger.info(f"=== Starting USAJOBS Job Import for {len(keywords)} keywords ===")
-        jobs_per_keyword = max_jobs // len(keywords)
+        if keywords is None:
+            keywords = ['Software Engineer', 'Data Scientist', 'IT Specialist', 'Cybersecurity']
+
+        logger.info(f"=== Starting USAJOBS Import for keywords: {', '.join(keywords)} ===")
 
         for keyword in keywords:
             try:
-                self._import_jobs_for_keyword(keyword, jobs_per_keyword)
-                time.sleep(1.5)  # Be respectful of the API
-            except Exception as e:
-                logger.error(f"Failed to import jobs for keyword '{keyword}': {e}")
-                self.stats['failed_imports'] += 1
+                logger.info(f"Fetching jobs for keyword: '{keyword}'")
+                params = {'Keyword': keyword, 'ResultsPerPage': max_jobs_per_keyword}
+                response = self.session.get(f"{self.base_url}/Search", params=params, timeout=30)
+                response.raise_for_status()
+                search_results = response.json().get('SearchResult', {}).get('SearchResultItems', [])
 
-        logger.info(f"=== USAJOBS import completed: {self.stats} ===")
+                if not search_results:
+                    logger.info(f"No jobs found for '{keyword}'.")
+                    continue
+
+                self.stats['total_fetched'] += len(search_results)
+                logger.info(f"Processing {len(search_results)} jobs for '{keyword}'.")
+
+                for item in search_results:
+                    try:
+                        job_data = self._normalize_job_data(item.get('MatchedObjectDescriptor', {}))
+
+                        if self._is_duplicate_job(job_data['title'], job_data['company']):
+                            self.stats['duplicates_skipped'] += 1
+                            continue
+
+                        # --- START: THIS IS THE NEW CODE ---
+                        # Generate embeddings
+                        description_text = job_data.get('description', '')
+                        description_embedding = self.embedding_service.generate_embedding(description_text)
+                        requirements_embedding = self.embedding_service.generate_embedding(
+                            job_data.get('requirements', ''))
+
+                        # Generate skills embedding
+                        skills_list = job_data.get('skills_required', [])
+                        skills_embedding = None
+                        if skills_list:
+                            skills_text = ". ".join(skills_list)
+                            skills_embedding = self.embedding_service.generate_embedding(skills_text)
+
+                        # Store job posting
+                        job_id = db.store_job_posting(
+                            job_data,
+                            {
+                                'description': description_embedding,
+                                'requirements': requirements_embedding,
+                                'skills_embedding': skills_embedding  # Add the new embedding here
+                            }
+                        )
+                        if job_id:
+                            self.stats['successfully_imported'] += 1
+                        else:
+                            self.stats['failed_imports'] += 1
+
+                    except Exception as e:
+                        logger.error(f"Error processing USAJOBS item: {e}")
+                        self.stats['failed_imports'] += 1
+
+                time.sleep(1)  # Be respectful to the API
+
+            except requests.exceptions.RequestException as e:
+                logger.error(f"API request failed for keyword '{keyword}': {e}")
+            except Exception as e:
+                logger.error(f"An unexpected error occurred for keyword '{keyword}': {e}")
+
+        logger.info("=== USAJOBS Import Finished ===")
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int):
         page = 1

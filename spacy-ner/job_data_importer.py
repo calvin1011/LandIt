@@ -44,14 +44,70 @@ class MuseJobImporter:
         logger.info(f" Starting The Muse import for {len(categories)} categories")
 
         for category in categories:
-            try:
-                logger.info(f" Importing jobs for category: {category}")
-                self._import_category(category, locations, max_jobs)
-                time.sleep(1)  # Rate limiting - be nice to the API
+            for page in range(1, 11):  # The Muse API has a page limit
+                if self.imported_count >= max_jobs:
+                    break
 
-            except Exception as e:
-                logger.error(f" Error importing category '{category}': {e}")
-                self.error_count += 1
+                try:
+                    params = {
+                        'category': category,
+                        'page': page
+                    }
+                    if locations:
+                        params['location'] = " | ".join(locations)
+
+                    response = requests.get(self.base_url, params=params)
+                    response.raise_for_status()
+                    jobs = response.json().get('results', [])
+
+                    if not jobs:
+                        break  # No more jobs for this category
+
+                    for job in jobs:
+                        try:
+                            # Check for duplicates first
+                            if self._is_duplicate_job(job['name'], job['company']['name']):
+                                self.skipped_count += 1
+                                continue
+
+                            # Normalize job data
+                            job_data = self._normalize_job_data(job)
+
+                            # Generate embeddings
+                            description_embedding = self.embedding_service.generate_embedding(job_data['description'])
+                            requirements_embedding = self.embedding_service.generate_embedding(job_data['requirements'])
+
+                            # Generate skills embedding from the required skills list
+                            skills_list = job_data.get('skills_required', [])
+                            skills_embedding = None
+                            if skills_list:
+                                # Join the list of skills into a single string for embedding
+                                skills_text = ". ".join(skills_list)
+                                skills_embedding = self.embedding_service.generate_embedding(skills_text)
+
+                            # Store job posting
+                            db.store_job_posting(
+                                job_data,
+                                {
+                                    'description': description_embedding,
+                                    'requirements': requirements_embedding,
+                                    'skills_embedding': skills_embedding
+                                }
+                            )
+                            self.imported_count += 1
+
+                        except Exception as e:
+                            logger.error(f"Error processing job {job.get('id')}: {e}")
+                            self.error_count += 1
+
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"API request failed for category {category}: {e}")
+                    break  # Stop trying if the API fails
+
+            time.sleep(1)  # Be respectful to the API
+
+        logger.info(
+            f" The Muse import finished: {self.imported_count} imported, {self.skipped_count} skipped, {self.error_count} errors.")
 
     def _import_category(self, category: str, locations: List[str] = None, max_jobs: int = 100):
         """Import jobs for a specific category"""
