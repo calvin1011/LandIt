@@ -510,7 +510,6 @@ def find_job_matches(match_request: JobMatchRequest):
         raise HTTPException(status_code=503, detail="Embedding service not available")
 
     try:
-
         import random
         start_time = time.time()
 
@@ -573,16 +572,22 @@ def find_job_matches(match_request: JobMatchRequest):
             }
 
             # Safely get the job_type from the job dictionary
-            job_type = job.get('job_type')
+            job_type = job.get('job_type', '').lower()
 
-            # Check if the job is entry-level or an internship and adjust weights
-            if job_type in ["Internship", "Entry level", "internship", "entry"]:
-                weights["skills"] = 0.60
-                # semantic can stay the same
-                weights["experience"] = 0.05
-                # location can stay the same
+            # HANDLING FOR JUNIOR ROLES
+            is_junior_role = any(keyword in job_type for keyword in ["internship", "entry", "intern"])
+            if is_junior_role:
+                # Forgive lack of experience completely for junior roles.
+                if user_years <= 1:
+                    experience_match = 1.0
 
-            # Calculate the overall match score using the selected weights
+                # Adjust weights heavily towards skills.
+                weights["skills"] = 0.70
+                weights["semantic"] = 0.20
+                weights["experience"] = 0.0
+                weights["location"] = 0.10
+
+            # Calculate the initial overall match score
             overall_score = (
                     skills_similarity * weights["skills"] +
                     semantic_similarity * weights["semantic"] +
@@ -590,9 +595,13 @@ def find_job_matches(match_request: JobMatchRequest):
                     location_match * weights["location"]
             )
 
+            # ADD A SCORE BOOST FOR JUNIOR ROLES
+            if is_junior_role:
+                boost = 0.10 * (1.0 - overall_score)  # Apply a 10% boost
+                overall_score = min(0.95, overall_score + boost)
+
             # Only include jobs above minimum similarity
             if overall_score >= match_request.min_similarity:
-                # Extract matching skills
                 user_skills = extract_user_skills(user_resume)
                 job_skills = job.get('skills_required', [])
                 skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
@@ -631,12 +640,11 @@ def find_job_matches(match_request: JobMatchRequest):
                     'experience_match': round(experience_match, 3),
                     'location_match': round(location_match, 3),
                     'skill_matches': skill_matches,
-                    'skill_gaps': skill_gaps_detailed['critical'][:3],  # Keep existing for compatibility
+                    'skill_gaps': skill_gaps_detailed['critical'][:3],
                     'skill_gaps_detailed': skill_gaps_detailed,
                     'gap_analysis': gap_analysis,
                     'improvement_summary': improvement_summary,
-                    'learning_priority': 'high' if gap_analysis['critical_gaps'] >= 2 else 'medium' if gap_analysis['critical_gaps'] >= 1 else 'low',
-
+                    'learning_priority': 'high' if gap_analysis['critical_gaps'] >= 2 else 'medium',
                     'match_explanation': generate_enhanced_match_explanation(
                         overall_score, skill_matches, skill_gaps_detailed, experience_match, gap_analysis
                     )
@@ -868,16 +876,19 @@ def calculate_experience_match(user_years: int, job_level: str) -> float:
 
     min_years, max_years = level_requirements[job_level]
 
-    if min_years <= user_years <= max_years:
-        return 1.0  # Perfect match
-    elif user_years < min_years:
+    if user_years >= min_years:
+        # Over-qualified or perfect match.
+        # A slight penalty for being very over-qualified.
+        excess = max(0, user_years - max_years)
+        return max(0.7, 1.0 - (excess * 0.05))
+    else:
         # Under-qualified
         gap = min_years - user_years
-        return max(0.3, 1.0 - (gap * 0.2))
-    else:
-        # Over-qualified
-        excess = user_years - max_years
-        return max(0.5, 1.0 - (excess * 0.1))
+        # Use a non-linear penalty: 1 / (1 + 0.5 * gap)
+        # 1 year gap = 1 / 1.5 = 0.66 score
+        # 2 year gap = 1 / 2.0 = 0.50 score
+        # 3 year gap = 1 / 2.5 = 0.40 score
+        return max(0.3, 1.0 / (1 + 0.5 * gap))
 
 
 def calculate_location_match(user_locations: List[str], job_location: str, remote_allowed: bool) -> float:

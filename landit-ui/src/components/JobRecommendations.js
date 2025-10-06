@@ -295,24 +295,6 @@ const SkillsGapAnalysis = ({ job, onGenerateLearningPlan }) => {
     );
 };
 
-// Enhanced Match Breakdown Component
-const MatchBreakdown = ({ job }) => (
-  <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <span>Skills Match:</span>
-      <span>{Math.round((job.skill_score || job.overall_score) * 100)}%</span>
-    </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <span>Experience Level:</span>
-      <span>{Math.round((job.experience_score || job.overall_score) * 100)}%</span>
-    </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <span>Location:</span>
-      <span>{Math.round((job.location_score || job.overall_score) * 100)}%</span>
-    </div>
-  </div>
-);
-
 const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] }) => {
     const [recommendations, setRecommendations] = useState(initialJobs);
     const [loading, setLoading] = useState(initialJobs.length === 0);
@@ -896,7 +878,21 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
                                 </p>
                             </div>
 
-                            <MatchBreakdown job={job} />
+                            {/* Match breakdown */}
+                            <div style={{ marginTop: '16px', fontSize: '12px', color: '#6b7280', lineHeight: '1.8' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Skills Match:</span>
+                                <span style={{ fontWeight: '600' }}>{Math.round(job.skills_similarity * 100)}%</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Experience Level:</span>
+                                <span style={{ fontWeight: '600' }}>{Math.round(job.experience_match * 100)}%</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Location:</span>
+                                <span style={{ fontWeight: '600' }}>{Math.round(job.location_match * 100)}%</span>
+                              </div>
+                            </div>
 
                             {/* Enhanced Skills Gap Analysis */}
                             {(job.skill_gaps_detailed &&
