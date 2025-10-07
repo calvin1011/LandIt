@@ -362,7 +362,7 @@ def safe_context_extraction(text: str) -> Dict:
             return _fallback_basic_extraction(text)
 
         context_extractor = ContextAwareEntityExtractor(nlp)
-        results = context_extractor.extract_with_context(text)
+        results = context_extractor.extract_entities_with_context(text)
 
         # Ensure the results have all required keys
         safe_results = {
@@ -1875,7 +1875,7 @@ def test_all_importers():
     # Test USAJOBS
     try:
         usajobs_importer = USAJobsImporter()
-        usajobs_importer.import_jobs(max_jobs=max_jobs_per_source)
+        usajobs_importer.import_jobs(max_jobs_per_keyword=max_jobs_per_source)
         summaries['usajobs'] = usajobs_importer.get_import_summary()
     except Exception as e:
         logger.error(f"USAJOBS import failed: {e}")
@@ -1933,7 +1933,7 @@ def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from poten
     # USAJOBS Importer
     try:
         usajobs_importer = USAJobsImporter()
-        usajobs_importer.import_jobs(max_jobs=max_jobs_per_source)
+        usajobs_importer.import_jobs(max_jobs_per_keyword=max_jobs_per_source)
         summaries['usajobs'] = usajobs_importer.get_import_summary()
     except Exception as e:
         logger.error(f"USAJOBS import failed: {e}")

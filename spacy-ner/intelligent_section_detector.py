@@ -27,6 +27,7 @@ class ResumeSection(Enum):
 
 @dataclass
 class SectionBoundary:
+    section: ResumeSection
     start: int
     end: int
     content: str
@@ -272,6 +273,7 @@ class IntelligentSectionDetector:
                 section_content = text[content_start:content_end].strip()
                 if section_content:
                     sections[detected_section].append(SectionBoundary(
+                        section=detected_section,
                         start=content_start,
                         end=content_end,
                         content=section_content,
@@ -298,6 +300,7 @@ class IntelligentSectionDetector:
                 detected_section, confidence = self._detect_section_by_content(sent_text)
                 if detected_section and confidence > 0.6:
                     sections[detected_section].append(SectionBoundary(
+                        section=detected_section,
                         start=sent.start_char,
                         end=sent.end_char,
                         content=sent_text,
@@ -317,6 +320,7 @@ class IntelligentSectionDetector:
                     detected_section, confidence = self._detect_section_by_content(line)
                     if detected_section and confidence > 0.6:
                         sections[detected_section].append(SectionBoundary(
+                            section=detected_section,
                             start=line_start,
                             end=line_end,
                             content=line,
@@ -527,7 +531,7 @@ class IntelligentSectionDetector:
                 j += 1
 
             # Add the merged section
-            merged[current].append(current)
+            merged[current.section].append(current)
             i = j
 
         return merged
