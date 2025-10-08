@@ -1454,10 +1454,6 @@ async def parse_resume_file(
 
         logger.info(f" Extracted {len(text)} characters from {file.filename}")
 
-        spacy_results = safe_context_extraction(text)
-        semantic_results = semantic_extractor.extract_semantic_entities(text)
-        merged_results = merge_extraction_results(spacy_results, semantic_results, text)
-
         resume_skills = extract_skills(text)
         missing_skills = []
 
@@ -1470,6 +1466,11 @@ async def parse_resume_file(
             jd_skills_set = set(skill.lower() for skill in jd_skills)
 
             missing_skills = sorted(list(jd_skills_set - resume_skills_set))
+            logger.info(f"Found {len(missing_skills)} missing skills")
+
+        spacy_results = safe_context_extraction(text)
+        semantic_results = semantic_extractor.extract_semantic_entities(text)
+        merged_results = merge_extraction_results(spacy_results, semantic_results, text)
 
         # Get Job Recommendations
         logger.info("Fetching job recommendations based on resume skills.")
@@ -1485,7 +1486,7 @@ async def parse_resume_file(
         processing_time = time.time() - start_time
         logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
 
-        # 4. Return a Unified Response
+        # Return a response with missing_skills
         return {
             "entities": merged_results.get("entities", []),
             "structured_data": {
@@ -1500,7 +1501,8 @@ async def parse_resume_file(
                 "size_bytes": len(file_content)
             },
             "missing_skills": missing_skills,
-            "recommended_jobs": recommended_jobs
+            "recommended_jobs": recommended_jobs,
+            "resume_skills": resume_skills
         }
 
     except HTTPException as e:
