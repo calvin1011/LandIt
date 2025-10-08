@@ -288,13 +288,82 @@ class QuickApplyRequest(BaseModel):
     user_email: str
     job_id: int
 
+
 def extract_skills(text: str) -> List[str]:
     """Extracts skills from a given text using the NLP model."""
     if not text:
         return []
+
     doc = nlp(text)
-    skills = [ent.text for ent in doc.ents if ent.label_ in ["SKILL", "TECHNOLOGY"]]
-    return list(set(skills))
+    skills = []
+
+    # Extract skills from entities
+    for ent in doc.ents:
+        if ent.label_ in ["SKILL", "TECHNOLOGY", "TOOL"]:
+            skills.append(ent.text.strip())
+
+    # Also extract from noun chunks that might be skills
+    for chunk in doc.noun_chunks:
+        chunk_text = chunk.text.lower().strip()
+        # Common skill indicators
+        if any(keyword in chunk_text for keyword in
+               ['programming', 'development', 'engineering', 'analysis', 'management']):
+            skills.append(chunk.text.strip())
+
+    return list(set(skills))  # Remove duplicates
+
+
+def _extract_skills_list(resume_data: Dict) -> List[str]:
+    """Extract a clean list of skills from resume data"""
+    try:
+        skills_list = []
+
+        # From structured data skills
+        structured = resume_data.get('structured_data', {})
+        if isinstance(structured, str):
+            try:
+                structured = json.loads(structured)
+            except:
+                structured = {}
+
+        skills_data = structured.get('skills', {})
+        if isinstance(skills_data, dict):
+            for category, skill_list in skills_data.items():
+                if isinstance(skill_list, list):
+                    for skill in skill_list:
+                        if isinstance(skill, dict):
+                            skill_name = skill.get('name', '')
+                            if skill_name:
+                                skills_list.append(skill_name.lower().strip())
+                        elif isinstance(skill, str):
+                            skills_list.append(skill.lower().strip())
+
+        # From work experience skills
+        work_exp = structured.get('work_experience', [])
+        for exp in work_exp:
+            if isinstance(exp, dict) and exp.get('skills'):
+                exp_skills = exp['skills']
+                if isinstance(exp_skills, list):
+                    for skill in exp_skills:
+                        if isinstance(skill, str):
+                            skills_list.append(skill.lower().strip())
+
+        # From entities
+        entities = resume_data.get('entities', [])
+        for entity in entities:
+            if isinstance(entity, dict) and entity.get('label') in ['SKILL', 'TECHNOLOGY', 'TOOL']:
+                skill_text = entity.get('text', '')
+                if skill_text:
+                    skills_list.append(skill_text.lower().strip())
+
+        # Clean and remove duplicates
+        unique_skills = list(set([skill for skill in skills_list if skill and len(skill) > 1]))
+
+        return unique_skills
+
+    except Exception as e:
+        logger.error(f"Failed to extract skills list: {e}")
+        return []
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF bytes"""
@@ -1477,10 +1546,8 @@ async def parse_resume_file(
 
         recommended_jobs = []
         if embedding_service and resume_skills:
-            # First, create an embedding from the list of resume skills
+            # Generate embedding from skills list
             skills_embedding = embedding_service.generate_skills_embedding(resume_skills)
-
-            # Now, use the correct function with the generated embedding
             recommended_jobs = db.find_similar_jobs_by_vector(skills_embedding, limit=50)
 
         processing_time = time.time() - start_time
@@ -2016,6 +2083,33 @@ def test_job_apis_comprehensive():
 
     return test_results
 
+
+@app.post("/test-skills-extraction")
+async def test_skills_extraction(file: UploadFile = File(...)):
+    """Test endpoint to debug skills extraction"""
+    try:
+        file_content = await file.read()
+
+        if file.content_type == 'text/plain':
+            text = extract_text_from_txt(file_content)
+        elif file.content_type == 'application/pdf':
+            text = extract_text_from_pdf(file_content)
+        elif file.content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            text = extract_text_from_docx(file_content)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        skills = extract_skills(text)
+
+        return {
+            "text_sample": text[:500] + "..." if len(text) > 500 else text,
+            "skills_found": skills,
+            "skills_count": len(skills),
+            "skills_sample": skills[:10] if skills else []
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def test_remotive_api():
     """Test Remotive API connection"""

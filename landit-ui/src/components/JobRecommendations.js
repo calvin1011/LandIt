@@ -917,21 +917,26 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
                                         Matching Skills:
                                     </h4>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                        {job.skill_matches.slice(0, 5).map((skill, index) => (
-                                            <span
-                                                key={index}
-                                                style={{
-                                                    background: '#dcfce7',
-                                                    color: '#166534',
-                                                    padding: '4px 8px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '500'
-                                                }}
-                                            >
-                                                {skill}
-                                            </span>
-                                        ))}
+                                        {job.skill_matches.slice(0, 5).map((skill, index) => {
+                                            // Ensure skill is a string
+                                            const skillText = typeof skill === 'string' ? skill :
+                                                            skill.name || skill.text || JSON.stringify(skill);
+                                            return (
+                                                <span
+                                                    key={index}
+                                                    style={{
+                                                        background: '#dcfce7',
+                                                        color: '#166534',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}
+                                                >
+                                                    {skillText}
+                                                </span>
+                                            );
+                                        })}
                                         {job.skill_matches.length > 5 && (
                                             <span style={{
                                                 color: '#6b7280',
