@@ -36,82 +36,30 @@ class AdzunaJobImporter:
         }
 
     def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
-        """
-        Import jobs from Adzuna API
-        """
-        if not self.embedding_service:
-            logger.error("Embedding service not available. Aborting import.")
-            return
-
+        """Import jobs from Adzuna API with proper limits"""
         if keywords is None:
             keywords = [
-                'Software Engineer', 'Data Scientist', 'Product Manager', 'UX Designer',
-                'DevOps Engineer', 'Cybersecurity Analyst', 'Cloud Engineer'
+                "software engineer",
+                "data scientist",
+                "product manager",
+                "full stack developer",
+                "machine learning engineer"
             ]
 
-        logger.info(f"=== Starting Adzuna Job Import for keywords: {', '.join(keywords)} ===")
+        logger.info(f" Starting Adzuna job import for {len(keywords)} keywords, max {max_jobs} total jobs...")
+
+        jobs_per_keyword = max(5, max_jobs // len(keywords))  # Ensure at least 5 per keyword
 
         for keyword in keywords:
-            logger.info(f" Fetching jobs for '{keyword}' in {location}")
             try:
-                # Fetch job data from API
-                fetched_jobs = self._fetch_jobs_from_api(keyword, location)
-                if not fetched_jobs:
-                    logger.warning(f" No jobs found for '{keyword}'")
-                    continue
-
-                self.stats['total_fetched'] += len(fetched_jobs)
-                jobs_to_process = fetched_jobs[:max_jobs]
-                logger.info(f" Processing {len(jobs_to_process)} jobs for '{keyword}'")
-
-                # Process and store each job
-                for job in jobs_to_process:
-                    try:
-                        # Normalize and enrich job data
-                        job_data = self._normalize_job_data(job)
-                        if not job_data or self._is_duplicate_job(job_data['title'], job_data['company']):
-                            if job_data: self.stats['duplicate_jobs'] += 1
-                            continue
-
-                        # Generate embeddings
-                        description_text = job_data.get('description', '')
-                        description_embedding = self.embedding_service.generate_embedding(description_text)
-
-                        # --- START: THIS IS THE NEW CODE ---
-                        # Generate skills embedding from the required skills list
-                        skills_list = job_data.get('skills_required', [])
-                        skills_embedding = None
-                        if skills_list:
-                            # Join the list of skills into a single string for embedding
-                            skills_text = ". ".join(skills_list)
-                            skills_embedding = self.embedding_service.generate_embedding(skills_text)
-                        # --- END: NEW CODE ---
-
-                        # Store job posting with the new skills_embedding
-                        job_id = db.store_job_posting(
-                            job_data,
-                            {
-                                'description': description_embedding,
-                                'requirements': description_embedding,  # Adzuna doesn't separate these well
-                                'skills_embedding': skills_embedding  # Add the new embedding here
-                            }
-                        )
-
-                        if job_id:
-                            self.stats['successfully_imported'] += 1
-                        else:
-                            self.stats['failed_imports'] += 1
-
-                    except Exception as e:
-                        logger.error(f" Error processing Adzuna job {job.get('id')}: {e}")
-                        self.stats['failed_imports'] += 1
-
-                time.sleep(1)  # Respectful delay between keywords
-
+                self._import_jobs_for_keyword(keyword, jobs_per_keyword, location)
+                time.sleep(2)  # Increased rate limiting between keywords
             except Exception as e:
-                logger.error(f" Failed to fetch or process jobs for '{keyword}': {e}")
+                logger.error(f" Failed to import jobs for '{keyword}': {e}")
+                continue
 
-        logger.info("=== Adzuna Job Import Finished ===")
+        logger.info(f" Adzuna import completed: {self.stats}")
+        return self.stats
 
     def _import_jobs_for_keyword(self, keyword: str, max_per_keyword: int, location: str):
         """Import jobs for a specific keyword with safety limits"""

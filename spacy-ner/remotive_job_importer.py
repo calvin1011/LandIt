@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from database import db
 from typing import Dict, List
-from embedding_service import ResumeJobEmbeddingService # <-- ADDED IMPORT
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,6 @@ class RemotiveJobImporter:
             'failed_imports': 0,
             'duplicates_skipped': 0
         }
-        # Initialize embedding service for job processing
-        try:
-            self.embedding_service = ResumeJobEmbeddingService()
-            logger.info("Embedding service ready for Remotive jobs")
-        except Exception as e:
-            logger.error(f"Embedding service failed: {e}")
-            self.embedding_service = None
 
     def get_import_summary(self) -> Dict:
         """Returns a summary of the import statistics."""
@@ -41,81 +34,68 @@ class RemotiveJobImporter:
         Args:
             limit (int): The maximum number of jobs to fetch, per API documentation.
         """
-
-        if not self.embedding_service:
-            logger.error("Embedding service not available. Aborting import.")
-            return
-
+        # Per Remotive's rate limiting, this function should not be called
+        # excessively (e.g., more than 2x per minute or 4x per day).
         logger.info("=== Starting Remotive Job Import ===")
         try:
             if not db.test_connection():
                 logger.error("Database connection failed. Aborting Remotive import.")
                 return
 
-            response = requests.get(self.api_url, params={'limit': limit})
+            params = {'limit': limit}
+            logger.info(f"Fetching up to {limit} jobs from Remotive API...")
+            response = requests.get(self.api_url, params=params, timeout=15)
             response.raise_for_status()
+
             data = response.json()
-            jobs_to_process = data.get('jobs', [])
-            self.stats['total_fetched'] = len(jobs_to_process)
+            jobs_from_api = data.get('jobs', [])
+            self.stats['total_fetched'] = len(jobs_from_api)
+            logger.info(f"Found {self.stats['total_fetched']} jobs from API.")
 
-            logger.info(f"Fetched {self.stats['total_fetched']} jobs from Remotive API.")
-
-            for job in jobs_to_process:
+            for job_data in jobs_from_api:
                 try:
-                    job_data = self._normalize_job_data(job)
+                    title = job_data.get('title', '').strip()
+                    company = job_data.get('company_name', '').strip()
 
-                    if self._is_duplicate(job_data['title'], job_data['company']):
+                    if not title or not company:
+                        logger.warning("Skipping job with missing title or company name.")
+                        self.stats['failed_imports'] += 1
+                        continue
+
+                    existing_jobs = db.get_jobs_by_title_company(title, company)
+                    logger.info(f"Duplicate check: '{title}' at '{company}' -> {len(existing_jobs)} existing jobs")
+
+                    if existing_jobs:
+                        logger.info(f"Skipping duplicate job: {title} at {company}")
                         self.stats['duplicates_skipped'] += 1
                         continue
 
-                    # Generate embeddings
-                    description_text = job_data.get('description', '')
-                    description_embedding = self.embedding_service.generate_embedding(description_text)
+                    job_dict = self._prepare_job_data(job_data)
 
-                    # Generate skills embedding
-                    skills_list = job_data.get('skills_required', [])
-                    skills_embedding = None
-                    if skills_list:
-                        skills_text = ". ".join(skills_list)
-                        skills_embedding = self.embedding_service.generate_embedding(skills_text)
+                    embeddings = {
+                        'description': np.zeros(384),
+                        'title': np.zeros(384),
+                        'requirements': np.zeros(384)
+                    }
 
-                    # Store job posting with embeddings
-                    job_id = db.store_job_posting(
-                        job_data,
-                        {
-                            'description': description_embedding,
-                            'requirements': description_embedding,
-                            'skills_embedding': skills_embedding
-                        }
-                    )
-
-                    if job_id:
-                        self.stats['successfully_imported'] += 1
-                    else:
-                        self.stats['failed_imports'] += 1
+                    db.store_job_posting(job_dict, embeddings)
+                    self.stats['successfully_imported'] += 1
 
                 except Exception as e:
-                    logger.error(f"Error processing job ID {job.get('id')}: {e}")
                     self.stats['failed_imports'] += 1
+                    logger.error(f"Failed to process job '{job_data.get('title')}': {e}")
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch jobs from Remotive API: {e}")
+            logger.error(f"Failed to fetch data from Remotive API: {e}")
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during Remotive import: {e}")
+        finally:
+            logger.info(f"=== Remotive import completed: {self.stats} ===")
 
-        logger.info("=== Remotive Job Import Finished ===")
+    def _prepare_job_data(self, job_data: Dict) -> Dict:
+        """Transforms API data into the format needed for the database."""
 
-
-    def _is_duplicate(self, title: str, company: str) -> bool:
-        """
-        Checks if a job with the same title and company already exists.
-        """
-        return db.get_jobs_by_title_company(title, company) is not None
-
-
-    def _normalize_job_data(self, job_data: Dict) -> Dict:
-        """
-        Normalizes data from the Remotive API to match the database schema.
-        """
-        # Parse the ISO 8601 date string from the API
+        # Correctly parse the ISO 8601 date string from the API
         publication_date_str = job_data.get('publication_date')
         posted_date = datetime.utcnow()
         if publication_date_str:
@@ -144,7 +124,6 @@ class RemotiveJobImporter:
             'job_type': job_data.get('job_type', 'full-time'),
             'source': 'Remotive',
             'job_url': job_data.get('url', ''),
-            'external_job_id': str(job_data.get('id', '')),
-            'posted_date': posted_date.strftime('%Y-%m-%d'),
+            'posted_date': posted_date,
             'skills_required': skills
         }
