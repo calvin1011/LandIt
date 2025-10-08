@@ -86,19 +86,26 @@ class SemanticResumeExtractor:
         skills_db = {
             "Programming Languages": [
                 "python", "java", "javascript", "typescript", "c++", "c#",
-                "php", "ruby", "go", "rust", "swift", "kotlin", "scala", "sql"
+                "php", "ruby", "go", "rust", "swift", "kotlin", "scala", "sql",
+                "powershell", "bash"
             ],
             "Web Technologies": [
                 "react", "angular", "vue", "html", "css", "nodejs", "node.js",
-                "express", "django", "flask", "spring", "bootstrap"
+                "express", "django", "flask", "spring", "bootstrap",
+                "next.js", "graphql"
             ],
             "Databases": [
                 "mysql", "postgresql", "mongodb", "redis", "sqlite",
-                "oracle", "sql server", "elasticsearch"
+                "oracle", "sql server", "elasticsearch", "dynamodb"
             ],
             "Cloud & DevOps": [
                 "aws", "azure", "gcp", "docker", "kubernetes", "jenkins",
-                "git", "gitlab", "github", "terraform", "ansible", "linux"
+                "git", "gitlab", "github", "terraform", "ansible", "linux",
+                "ci/cd", "circleci"
+            ],
+            "Data Science & ML": [
+                "pandas", "numpy", "scikit-learn", "tensorflow", "pytorch",
+                "machine learning", "deep learning", "natural language processing"
             ]
         }
 

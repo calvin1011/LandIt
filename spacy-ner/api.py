@@ -297,6 +297,12 @@ def extract_skills(text: str) -> List[str]:
     doc = nlp(text)
     skills = []
 
+    # Keywords that often precede a list of skills
+    skill_keywords = [
+        "skills", "technologies", "experience with", "proficient in",
+        "familiar with", "tools", "platforms", "frameworks"
+    ]
+
     # Extract skills from entities
     for ent in doc.ents:
         if ent.label_ in ["SKILL", "TECHNOLOGY", "TOOL"]:
@@ -310,7 +316,23 @@ def extract_skills(text: str) -> List[str]:
                ['programming', 'development', 'engineering', 'analysis', 'management']):
             skills.append(chunk.text.strip())
 
-    return list(set(skills))  # Remove duplicates
+        # Check if the preceding token is a skill keyword
+        if chunk.root.head.i > 0:
+            preceding_token = doc[chunk.root.head.i - 1]
+            if preceding_token.text.lower() in skill_keywords:
+                skills.append(chunk.text.strip())
+
+    # Look for bulleted lists of skills
+    for line in text.split('\n'):
+        line = line.strip()
+        if line.startswith(('*', '-', '•')):
+            # Simple check if the line contains a potential skill
+            # This can be improved with more sophisticated checks
+            potential_skill = line[1:].strip()
+            if len(potential_skill.split()) <= 3 and len(potential_skill) > 1:  # Avoid long sentences
+                skills.append(potential_skill)
+
+    return sorted(list(set(s.lower() for s in skills)))  # Remove duplicates and sort
 
 
 def _extract_skills_list(resume_data: Dict) -> List[str]:
