@@ -353,6 +353,7 @@ class IntelligentSectionDetector:
                     section_content = text[section_start:line_start].strip()
                     if section_content:
                         sections[current_section].append(SectionBoundary(
+                            section=current_section,
                             start=section_start,
                             end=line_start,
                             content=section_content,
@@ -377,6 +378,7 @@ class IntelligentSectionDetector:
             section_content = text[section_start:].strip()
             if section_content:
                 sections[current_section].append(SectionBoundary(
+                    section=current_section,
                     start=section_start,
                     end=len(text),
                     content=section_content,
