@@ -398,7 +398,7 @@ function App() {
                         </div>
                     </div>
 
-                    <div style={{ padding: '30px 40px', maxWidth: '1400px', margin: '0 auto' }}>
+                    <div style={{ padding: '30px 40px', width: '100%', boxSizing: 'border-box' }}>
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
 
