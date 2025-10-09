@@ -215,44 +215,79 @@ function App() {
             ) : (
                 <div style={{
                     minHeight: '100vh',
-                    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
+                    {/* Animated Background Elements */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '-50%',
+                        left: '-10%',
+                        width: '500px',
+                        height: '500px',
+                        background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+                        borderRadius: '50%',
+                        animation: 'float 20s infinite ease-in-out',
+                        pointerEvents: 'none'
+                    }}></div>
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '-30%',
+                        right: '-5%',
+                        width: '600px',
+                        height: '600px',
+                        background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)',
+                        borderRadius: '50%',
+                        animation: 'float 25s infinite ease-in-out reverse',
+                        pointerEvents: 'none'
+                    }}></div>
+
                     {/* Header */}
                     <div style={{
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        backdropFilter: 'blur(10px)',
-                        borderBottom: '1px solid rgba(0,0,0,0.1)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        borderBottom: '1px solid rgba(255,255,255,0.18)',
                         padding: '20px 40px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         position: 'sticky',
                         top: 0,
-                        zIndex: 100
+                        zIndex: 100,
+                        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                             <div style={{
-                                width: '40px',
-                                height: '40px',
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                borderRadius: '10px',
+                                width: '50px',
+                                height: '50px',
+                                background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%)',
+                                borderRadius: '15px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '18px'
-                            }}>📋</div>
+                                fontSize: '24px',
+                                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+                                transition: 'transform 0.3s ease',
+                                cursor: 'pointer'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05) rotate(5deg)'}
+                            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
+                            >📋</div>
                             <div>
                                 <h1 style={{
                                     margin: 0,
-                                    fontSize: '24px',
-                                    fontWeight: '700',
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text'
+                                    fontSize: '28px',
+                                    fontWeight: '800',
+                                    color: 'white',
+                                    textShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                                    letterSpacing: '-0.5px'
                                 }}>LandIt</h1>
-                                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Smart Document Parser & Job Matcher</p>
+                                <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>
+                                    Smart Document Parser & Job Matcher
+                                </p>
                             </div>
                         </div>
 
@@ -262,15 +297,38 @@ function App() {
                                 <button
                                     onClick={() => setActiveTab('resume')}
                                     style={{
-                                        padding: '8px 16px',
-                                        background: activeTab === 'resume' ? '#6366f1' : 'transparent',
-                                        color: activeTab === 'resume' ? 'white' : '#6b7280',
-                                        border: 'none',
-                                        borderRadius: '8px',
+                                        padding: '10px 20px',
+                                        background: activeTab === 'resume'
+                                            ? 'rgba(255, 255, 255, 0.25)'
+                                            : 'rgba(255, 255, 255, 0.08)',
+                                        color: 'white',
+                                        border: activeTab === 'resume'
+                                            ? '1px solid rgba(255, 255, 255, 0.3)'
+                                            : '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
                                         fontSize: '14px',
-                                        fontWeight: '500',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: activeTab === 'resume'
+                                            ? '0 4px 15px rgba(0,0,0,0.1)'
+                                            : 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (activeTab !== 'resume') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            e.target.style.transform = 'translateY(-2px)';
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (activeTab !== 'resume') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                            e.target.style.transform = 'translateY(0)';
+                                        }
                                     }}
                                 >
                                     📄 Resume
@@ -279,70 +337,159 @@ function App() {
                                 <button
                                     onClick={() => setActiveTab('jobs')}
                                     style={{
-                                        padding: '8px 16px',
-                                        background: activeTab === 'jobs' ? '#6366f1' : 'transparent',
-                                        color: activeTab === 'jobs' ? 'white' : '#6b7280',
-                                        border: 'none',
-                                        borderRadius: '8px',
+                                        padding: '10px 20px',
+                                        background: activeTab === 'jobs'
+                                            ? 'rgba(255, 255, 255, 0.25)'
+                                            : 'rgba(255, 255, 255, 0.08)',
+                                        color: 'white',
+                                        border: activeTab === 'jobs'
+                                            ? '1px solid rgba(255, 255, 255, 0.3)'
+                                            : '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
                                         fontSize: '14px',
-                                        fontWeight: '500',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: activeTab === 'jobs'
+                                            ? '0 4px 15px rgba(0,0,0,0.1)'
+                                            : 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (activeTab !== 'jobs') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            e.target.style.transform = 'translateY(-2px)';
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (activeTab !== 'jobs') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                            e.target.style.transform = 'translateY(0)';
+                                        }
                                     }}
                                 >
                                     🎯 Jobs
                                 </button>
 
-                                {/* Saved Jobs Button */}
                                 <button
                                     onClick={() => setActiveTab('saved')}
                                     style={{
-                                        padding: '8px 16px',
-                                        background: activeTab === 'saved' ? '#6366f1' : 'transparent',
-                                        color: activeTab === 'saved' ? 'white' : '#6b7280',
-                                        border: 'none',
-                                        borderRadius: '8px',
+                                        padding: '10px 20px',
+                                        background: activeTab === 'saved'
+                                            ? 'rgba(255, 255, 255, 0.25)'
+                                            : 'rgba(255, 255, 255, 0.08)',
+                                        color: 'white',
+                                        border: activeTab === 'saved'
+                                            ? '1px solid rgba(255, 255, 255, 0.3)'
+                                            : '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
                                         fontSize: '14px',
-                                        fontWeight: '500',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: activeTab === 'saved'
+                                            ? '0 4px 15px rgba(0,0,0,0.1)'
+                                            : 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (activeTab !== 'saved') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            e.target.style.transform = 'translateY(-2px)';
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (activeTab !== 'saved') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                            e.target.style.transform = 'translateY(0)';
+                                        }
                                     }}
                                 >
                                     💾 Saved
                                 </button>
 
-                                {/*Leaning tab*/}
                                 <button
                                     onClick={() => setActiveTab('learning')}
                                     style={{
-                                        padding: '8px 16px',
-                                        background: activeTab === 'learning' ? '#6366f1' : 'transparent',
-                                        color: activeTab === 'learning' ? 'white' : '#6b7280',
-                                        border: 'none',
-                                        borderRadius: '8px',
+                                        padding: '10px 20px',
+                                        background: activeTab === 'learning'
+                                            ? 'rgba(255, 255, 255, 0.25)'
+                                            : 'rgba(255, 255, 255, 0.08)',
+                                        color: 'white',
+                                        border: activeTab === 'learning'
+                                            ? '1px solid rgba(255, 255, 255, 0.3)'
+                                            : '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
                                         fontSize: '14px',
-                                        fontWeight: '500',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: activeTab === 'learning'
+                                            ? '0 4px 15px rgba(0,0,0,0.1)'
+                                            : 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (activeTab !== 'learning') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            e.target.style.transform = 'translateY(-2px)';
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (activeTab !== 'learning') {
+                                            e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                            e.target.style.transform = 'translateY(0)';
+                                        }
                                     }}
                                 >
                                     🧠 Learning
                                 </button>
 
-                                {/* ADMIN PANEL BUTTON */}
                                 {isAdmin && (
                                     <button
                                         onClick={() => setActiveTab('admin')}
                                         style={{
-                                            padding: '8px 16px',
-                                            background: activeTab === 'admin' ? '#6366f1' : 'transparent',
-                                            color: activeTab === 'admin' ? 'white' : '#6b7280',
-                                            border: 'none',
-                                            borderRadius: '8px',
+                                            padding: '10px 20px',
+                                            background: activeTab === 'admin'
+                                                ? 'rgba(255, 255, 255, 0.25)'
+                                                : 'rgba(255, 255, 255, 0.08)',
+                                            color: 'white',
+                                            border: activeTab === 'admin'
+                                                ? '1px solid rgba(255, 255, 255, 0.3)'
+                                                : '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '12px',
                                             fontSize: '14px',
-                                            fontWeight: '500',
+                                            fontWeight: '600',
                                             cursor: 'pointer',
-                                            transition: 'all 0.2s'
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            backdropFilter: 'blur(10px)',
+                                            boxShadow: activeTab === 'admin'
+                                                ? '0 4px 15px rgba(0,0,0,0.1)'
+                                                : 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            if (activeTab !== 'admin') {
+                                                e.target.style.background = 'rgba(255, 255, 255, 0.15)';
+                                                e.target.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseOut={(e) => {
+                                            if (activeTab !== 'admin') {
+                                                e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                                                e.target.style.transform = 'translateY(0)';
+                                            }
                                         }}
                                     >
                                         ⚙️ Admin
@@ -354,73 +501,148 @@ function App() {
                                 <button
                                     onClick={handleUploadNew}
                                     style={{
-                                        padding: '8px 16px',
-                                        background: '#6366f1',
+                                        padding: '10px 20px',
+                                        background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.2) 100%)',
                                         color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255,255,255,0.3)',
+                                        borderRadius: '12px',
                                         fontSize: '14px',
-                                        fontWeight: '500',
+                                        fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s',
+                                        transition: 'all 0.3s ease',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px'
+                                        gap: '8px',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                                     }}
-                                    onMouseOver={(e) => e.target.style.background = '#4f46e5'}
-                                    onMouseOut={(e) => e.target.style.background = '#6366f1'}
+                                    onMouseOver={(e) => {
+                                        e.target.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.3) 100%)';
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.target.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.2) 100%)';
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+                                    }}
                                 >
                                     📤 Upload New Resume
                                 </button>
                             )}
 
-                            <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                                👋 {userEmail}
-                            </span>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                background: 'rgba(255,255,255,0.15)',
+                                borderRadius: '12px',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255,255,255,0.2)'
+                            }}>
+                                <span style={{ fontSize: '20px' }}>👋</span>
+                                <span style={{ fontSize: '14px', color: 'white', fontWeight: '500' }}>
+                                    {userEmail}
+                                </span>
+                            </div>
+
                             <button
                                 onClick={handleLogout}
                                 style={{
-                                    padding: '8px 16px',
-                                    background: '#ef4444',
+                                    padding: '10px 20px',
+                                    background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
                                     color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    borderRadius: '12px',
                                     fontSize: '14px',
-                                    fontWeight: '500',
+                                    fontWeight: '600',
                                     cursor: 'pointer',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.3s ease',
+                                    backdropFilter: 'blur(10px)',
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
                                 }}
-                                onMouseOver={(e) => e.target.style.background = '#dc2626'}
-                                onMouseOut={(e) => e.target.style.background = '#ef4444'}
+                                onMouseOver={(e) => {
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+                                }}
                             >
                                 Sign Out
                             </button>
                         </div>
                     </div>
 
-                    <div style={{ padding: '30px 40px', width: '100%', boxSizing: 'border-box' }}>
+                    <div style={{
+                        padding: '30px 40px',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        animation: 'fadeIn 0.6s ease-out'
+                    }}>
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
 
                         {/* Job Description Text Area */}
                         {activeTab === 'resume' && (
-                            <div style={{ marginBottom: '30px' }}>
-                                <h3 style={{ color: '#1f2937' }}>Optional: Job Description Analysis</h3>
-                                <textarea
-                                    value={jobDescription}
-                                    onChange={(e) => setJobDescription(e.target.value)}
-                                    placeholder="Paste the job description here to analyze skill gaps..."
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '150px',
-                                        padding: '15px',
-                                        borderRadius: '12px',
-                                        border: '1px solid #d1d5db',
-                                        fontSize: '14px',
-                                        fontFamily: 'inherit',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
+                            <div style={{
+                                marginBottom: '30px',
+                                animation: 'scaleIn 0.5s ease-out'
+                            }}>
+                                <div style={{
+                                    background: 'rgba(255, 255, 255, 0.15)',
+                                    backdropFilter: 'blur(20px) saturate(180%)',
+                                    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                                    borderRadius: '20px',
+                                    padding: '30px',
+                                    border: '1px solid rgba(255,255,255,0.18)',
+                                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.2)',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    <h3 style={{
+                                        color: 'white',
+                                        marginTop: 0,
+                                        fontSize: '20px',
+                                        fontWeight: '700',
+                                        marginBottom: '15px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px'
+                                    }}>
+                                        <span style={{ fontSize: '24px' }}>📝</span>
+                                        Optional: Job Description Analysis
+                                    </h3>
+                                    <textarea
+                                        value={jobDescription}
+                                        onChange={(e) => setJobDescription(e.target.value)}
+                                        placeholder="Paste the job description here to analyze skill gaps and get personalized recommendations..."
+                                        style={{
+                                            width: '100%',
+                                            minHeight: '150px',
+                                            padding: '20px',
+                                            borderRadius: '15px',
+                                            border: '1px solid rgba(255,255,255,0.2)',
+                                            fontSize: '15px',
+                                            fontFamily: 'inherit',
+                                            boxSizing: 'border-box',
+                                            background: 'rgba(255, 255, 255, 0.9)',
+                                            color: '#1f2937',
+                                            resize: 'vertical',
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+                                        }}
+                                        onFocus={(e) => {
+                                            e.target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                                            e.target.style.transform = 'scale(1.01)';
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
+                                            e.target.style.transform = 'scale(1)';
+                                        }}
+                                    />
+                                </div>
                             </div>
                         )}
 
