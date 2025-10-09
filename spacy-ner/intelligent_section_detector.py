@@ -648,30 +648,35 @@ class ContextAwareEntityExtractor:
         self.nlp = nlp_model
         self.section_detector = IntelligentSectionDetector()
 
-    def extract_entities_with_context(self, text: str) -> Dict[str, List[Dict]]:
+    def extract_entities_with_context(self, text: str) -> Dict:
         """
-        Extract entities with section context awareness for better accuracy.
+        Extracts entities and enhances them with section context and validation.
+        This is the primary method to call for extraction.
         """
-        # Detect sections first
+        # Get raw spaCy entities
+        doc = self.nlp(text)
+        raw_entities = [{"text": ent.text, "label": ent.label_, "start": ent.start_char, "end": ent.end_char} for ent in
+                        doc.ents]
+
+        # Get section boundaries
         sections = self.section_detector.detect_sections(text)
 
-        # Extract entities with section context
-        doc = self.nlp(text)
-        entities_by_section = {section.value: [] for section in ResumeSection}
+        # Validate entities based on their section
+        validated_entities = []
+        for entity in raw_entities:
+            section = self.section_detector.get_section_context(sections, entity['start'])
+            validated_entity = self._validate_entity_with_context(entity, section)
+            if validated_entity:
+                validated_entity['section'] = section.value
+                validated_entities.append(validated_entity)
 
-        for ent in doc.ents:
-            # Get the section context for this entity
-            section = self.section_detector.get_section_context(sections, ent.start_char)
-
-            entities_by_section[section.value].append({
-                'text': ent.text,
-                'label': ent.label_,
-                'start': ent.start_char,
-                'end': ent.end_char,
-                'confidence': 1.0  # You can add confidence scoring here
-            })
-
-        return entities_by_section
+        # Structure the final results
+        results = {
+            "entities": validated_entities,
+            "sections": {s.section.value: s.content for s in sections},
+            # Add other analysis results here if needed
+        }
+        return results
 
     def enhance_entity_extraction(self, text: str, raw_entities: List[Dict]) -> List[Dict]:
         """

@@ -290,49 +290,57 @@ class QuickApplyRequest(BaseModel):
 
 
 def extract_skills(text: str) -> List[str]:
-    """Extracts skills from a given text using the NLP model."""
+    """
+    Extracts skills from a given text using the NER model, dependency parsing,
+    and pattern matching.
+    """
     if not text:
         return []
 
     doc = nlp(text)
-    skills = []
+    skills = set() # Use a set to automatically handle duplicates
 
-    # Keywords that often precede a list of skills
-    skill_keywords = [
-        "skills", "technologies", "experience with", "proficient in",
-        "familiar with", "tools", "platforms", "frameworks"
-    ]
-
-    # Extract skills from entities
+    # NER-based Extraction
     for ent in doc.ents:
-        if ent.label_ in ["SKILL", "TECHNOLOGY", "TOOL"]:
-            skills.append(ent.text.strip())
+        if ent.label_ in ["TECHNOLOGY", "HARD_SKILL", "SKILL"]:
+            skills.add(ent.text.strip())
 
-    # Also extract from noun chunks that might be skills
+    # Dependency Parsing for Contextual Skills
+    skill_verbs = {"developed", "managed", "led", "built", "created", "implemented", "used", "leveraged"}
+    skill_prepositions = {"with", "in", "using"}
+
+    for token in doc:
+        # Find skills that are objects of skill-related verbs
+        if token.pos_ == "VERB" and token.lemma_ in skill_verbs:
+            for child in token.children:
+                if child.dep_ == "dobj": # Direct object
+                    skills.add(child.text)
+
+        # Find skills that are objects of prepositions after a verb
+        if token.pos_ == "ADP" and token.text.lower() in skill_prepositions: # ADP is a preposition
+            for child in token.children:
+                if child.dep_ == "pobj": # Object of preposition
+                    skills.add(child.text)
+
+    # Check for noun phrases that look like skills
     for chunk in doc.noun_chunks:
-        chunk_text = chunk.text.lower().strip()
-        # Common skill indicators
-        if any(keyword in chunk_text for keyword in
-               ['programming', 'development', 'engineering', 'analysis', 'management']):
-            skills.append(chunk.text.strip())
+        # A simple rule: if a noun chunk is 2-4 words long and contains a relevant keyword,
+        # it's likely a skill. This avoids overly generic single words.
+        if 1 < len(chunk.text.split()) < 5:
+            if any(keyword in chunk.text.lower() for keyword in ['management', 'analysis', 'development', 'design']):
+                skills.add(chunk.text.strip())
 
-        # Check if the preceding token is a skill keyword
-        if chunk.root.head.i > 0:
-            preceding_token = doc[chunk.root.head.i - 1]
-            if preceding_token.text.lower() in skill_keywords:
-                skills.append(chunk.text.strip())
-
-    # Look for bulleted lists of skills
-    for line in text.split('\n'):
+    for line in text.split('\\n'):
         line = line.strip()
         if line.startswith(('*', '-', '•')):
-            # Simple check if the line contains a potential skill
-            # This can be improved with more sophisticated checks
             potential_skill = line[1:].strip()
-            if len(potential_skill.split()) <= 3 and len(potential_skill) > 1:  # Avoid long sentences
-                skills.append(potential_skill)
+            if 1 < len(potential_skill) < 50: # Basic filter
+                skills.add(potential_skill)
 
-    return sorted(list(set(s.lower() for s in skills)))  # Remove duplicates and sort
+    # Clean up and return the final list
+    # Convert to lowercase and remove very short, likely noisy, items
+    final_skills = {s.lower() for s in skills if len(s) > 1}
+    return sorted(list(final_skills))
 
 
 def _extract_skills_list(resume_data: Dict) -> List[str]:
