@@ -15,9 +15,9 @@ def load_clean_training_data():
     training_files = [
         "train_data_contextual.json",
         "train_data_experience_refined.json",
+        "train_data_address.json",
         "train_data_dataturks.json",
         "train_data_education_complex.json",
-        "train_data_education_refined.json",
         "train_data_gpa.json",
         "train_data_skills_prose.json",
         "train_data_hr_analytics.json",
@@ -296,8 +296,8 @@ def main():
 
     # Group labels logically
     label_groups = {
-        "Contact": ["NAME", "EMAIL", "PHONE", "ADDRESS", "LOCATION"],
-        "Professional": ["TITLE", "COMPANY", "SKILL", "EXPERIENCE"],
+        "Contact": ["NAME", "PHONE", "EMAIL", "LOCATION"],
+        "Professional": ["TITLE", "COMPANY", "EXPERIENCE", "TECHNOLOGY", "HARD_SKILL"],
         "Education": ["EDUCATION", "DEGREE", "FIELD", "GRAD_YEAR", "GPA"],
         "Other": []
     }
@@ -360,7 +360,7 @@ def main():
         optimizer = nlp.resume_training()
 
         # Reduced iterations for fine-tuning
-        n_iter = 15
+        n_iter = 30
 
         for iteration in range(n_iter):
             print(f"\n   Iteration {iteration + 1}/{n_iter}")
@@ -406,7 +406,26 @@ def main():
         "Jane Doe graduated from MIT with a Computer Science degree and knows Python, Java, and React.",
         "Skills: Python, JavaScript, React, AWS, Docker, Kubernetes, machine learning.",
         "Contact: john.doe@email.com | Phone: (555) 123-4567 | Location: Boston, MA",
-        "Worked as a Software Developer at Microsoft from 2020 to 2023 building cloud applications."
+        "Worked as a Software Developer at Microsoft from 2020 to 2023 building cloud applications.",
+
+        # Healthcare
+        "Maria Garcia, RN, BSN, has 8 years of experience in patient care at Alamosa Community Hospital.",
+        "Seeking a registered nurse with a valid certification in pediatric advanced life support.",
+
+        # Finance
+        "David Chen is a Certified Public Accountant (CPA) specializing in forensic accounting.",
+        "Financial Analyst proficient in financial modeling, Excel, and QuickBooks, graduated in 2021.",
+
+        # Marketing
+        "Emily White, a Marketing Manager at HubSpot, increased lead generation using Salesforce and SEO.",
+        "Contact Emily at emily.w@email.com or (555) 888-9999 for opportunities in Denver, CO.",
+
+        # Education & Administration
+        "Michael Brown holds a Master of Education from University of Colorado and has been teaching since August 2015.",
+        "Administrative assistant skilled in office management and executive support.",
+
+        # Skilled Trades
+        "Licensed Journeyman Electrician with expertise in commercial wiring and project management."
     ]
 
     for sentence in test_sentences:
@@ -445,4 +464,4 @@ def main():
         return
 
 if __name__ == "__main__":
-    main(n_iter=30)
+    main()
