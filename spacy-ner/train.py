@@ -17,6 +17,8 @@ def load_clean_training_data():
         "train_data_experience_refined.json",
         "train_data_dataturks.json",
         "train_data_education_complex.json",
+        "train_data_education_refined.json",
+        "train_data_gpa.json",
         "train_data_skills_prose.json",
         "train_data_hr_analytics.json",
         "kaggle_prelabeled_20251004_163122.json",
@@ -238,7 +240,7 @@ def simplify_label(label: str) -> str:
 
         # Education
         'EDUCATION': 'EDUCATION', 'DEGREE': 'DEGREE', 'SCHOOL': 'SCHOOL',
-        'UNIVERSITY': 'SCHOOL', 'COLLEGE': 'SCHOOL', 'GPA': 'EDUCATION',
+        'UNIVERSITY': 'SCHOOL', 'COLLEGE': 'SCHOOL', 'GPA': 'GPA',
         'FIELD': 'EDUCATION',
 
         # Other
@@ -443,4 +445,4 @@ def main():
         return
 
 if __name__ == "__main__":
-    main()
+    main(n_iter=30)

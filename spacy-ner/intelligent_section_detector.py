@@ -707,7 +707,7 @@ class ContextAwareEntityExtractor:
         elif section == ResumeSection.SKILLS:
             if entity['label'] == 'COMPANY' and len(entity['text']) < 4:
                 # Short company names in skills might be technologies
-                entity['label'] = 'SKILL'
+                entity['label'] = 'TECHNOLOGY'
                 entity['confidence'] *= 0.7
 
         # Add more context-aware validation rules as needed
