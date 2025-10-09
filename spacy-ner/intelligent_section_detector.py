@@ -44,7 +44,7 @@ class IntelligentSectionDetector:
     def __init__(self):
         # Load NLP model for advanced text analysis
         try:
-            self.nlp = spacy.load("en_core_web_sm")
+            self.nlp = nlp = spacy.load("en_core_web_lg")
         except OSError:
             logger.warning("spaCy model 'en_core_web_sm' not found. Using regex-only mode.")
             self.nlp = None

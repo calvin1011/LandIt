@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
 def load_clean_training_data():
     """Load cleaned training data from multiple files"""
     training_files = [
+        "train_data_contextual.json",
         "train_data_experience_refined.json",
         "train_data_dataturks.json",
         "train_data_education_complex.json",
@@ -210,10 +211,19 @@ def apply_class_weights_to_examples(examples, class_weights):
     return weighted_examples
 
 def simplify_label(label: str) -> str:
-    """Simplify labels to core categories"""
+    """
+    Combines robust mapping for general labels with granular categorization for skills.
+    """
     label = label.upper()
 
-    # Core resume labels with comprehensive mapping
+    # ranular logic for all skill-related labels
+    if any(keyword in label for keyword in ["PROGRAMMING", "TECHNOLOGY", "PLATFORM", "FRAMEWORK", "TOOL"]):
+        return "TECHNOLOGY"
+    if any(keyword in label for keyword in ["SKILL", "INDUSTRY"]):
+        return "HARD_SKILL"
+    if "SOFT_SKILL" in label:
+        return "SOFT_SKILL"
+
     core_mapping = {
         # Personal info
         'NAME': 'NAME', 'PERSON': 'NAME', 'FULL_NAME': 'NAME',
@@ -225,35 +235,34 @@ def simplify_label(label: str) -> str:
         'TITLE': 'TITLE', 'JOB_TITLE': 'TITLE', 'POSITION': 'TITLE',
         'COMPANY': 'COMPANY', 'ORGANIZATION': 'COMPANY', 'ORG': 'COMPANY', 'EMPLOYER': 'COMPANY',
         'EXPERIENCE': 'EXPERIENCE', 'WORK_EXPERIENCE': 'EXPERIENCE',
-        'INDUSTRY': 'SKILL',
-
-        # Skills
-        'SKILL': 'SKILL', 'SKILLS': 'SKILL', 'TECHNOLOGY': 'SKILL', 'TECHNOLOGIES': 'SKILL',
-        'PLATFORM': 'SKILL', 'PROGRAMMING_LANGUAGE': 'SKILL', 'TECHNICAL_SKILL': 'SKILL',
-        'LANGUAGE': 'LANGUAGE', 'LANGUAGE_SKILL': 'LANGUAGE',
 
         # Education
         'EDUCATION': 'EDUCATION', 'DEGREE': 'DEGREE', 'SCHOOL': 'SCHOOL',
         'UNIVERSITY': 'SCHOOL', 'COLLEGE': 'SCHOOL', 'GPA': 'EDUCATION',
-        'FIELD': 'EDUCATION', 'GRAD_YEAR': 'DATE', 'YEAR': 'DATE',
+        'FIELD': 'EDUCATION',
 
         # Other
-        'CERTIFICATION': 'CERTIFICATION', 'PROJECT': 'PROJECT',
-        'ACHIEVEMENT': 'ACHIEVEMENT', 'DATE': 'DATE'
+        'CERTIFICATION': 'CERTIFICATION',
+        'PROJECT': 'PROJECT',
+        'ACHIEVEMENT': 'ACHIEVEMENT',
+        'DATE': 'DATE', 'GRAD_YEAR': 'DATE', 'YEAR': 'DATE',
+        'LANGUAGE': 'LANGUAGE' # For spoken languages, not programming
     }
 
-    return core_mapping.get(label, 'OTHER')
+    # Return the mapped label, or the original label if not in the map
+    return core_mapping.get(label, label)
 
 def main():
+    model_name = "en_core_web_lg"
     print(" HYBRID RESUME NER TRAINING")
     print("=" * 50)
-    print("Using: en_core_web_sm + Your Custom Resume Labels")
+    print("Using: en_core_web_lg + Your Custom Resume Labels")
     print("=" * 50)
 
     # Load the pre-trained English model (the hybrid foundation)
     try:
-        nlp = spacy.load("en_core_web_sm")
-        print(" Loaded en_core_web_sm as base model")
+        nlp = spacy.load(model_name)
+        print(" Loaded en_core_web_lg as base model")
         print(f"   Existing labels: {len(nlp.get_pipe('ner').labels)}")
     except OSError:
         print(" en_core_web_sm not found!")
@@ -267,12 +276,13 @@ def main():
         return
 
     # Filter to highest quality examples for efficient training
-    quality_data = filter_quality_examples(training_data, max_examples=500)
+    quality_data = filter_quality_examples(training_data, max_examples=3000)
 
-    # ENHANCE MINORITY CLASSES - ADD THIS
+    # ENHANCE MINORITY CLASSES
     print("\n Enhancing minority classes...")
     enhanced_data = enhance_minority_classes(quality_data, target_min_count=10)
-    quality_data = filter_quality_examples(enhanced_data, max_examples=600)  # Slightly higher limit
+    # quality_data = filter_quality_examples(enhanced_data, max_examples=600)
+    quality_data = enhanced_data
 
     # CALCULATE CLASS WEIGHTS - ADD THIS
     print("\n Calculating class weights...")
@@ -416,7 +426,7 @@ def main():
         # Save metadata
         metadata = {
             "model_type": "hybrid_pretrained_custom",
-            "base_model": "en_core_web_sm",
+            "base_model": model_name,
             "custom_labels": list(custom_labels),
             "training_examples": len(valid_examples),
             "training_iterations": n_iter,

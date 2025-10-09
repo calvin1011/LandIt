@@ -751,7 +751,7 @@ def test_intelligent_resume_analysis():
     try:
         nlp = spacy.load("output_hybrid")
     except:
-        nlp = spacy.load("en_core_web_sm")
+        nlp = nlp = spacy.load("en_core_web_lg")
 
     analyzer = ResumeIntelligenceAnalyzer(nlp)
 

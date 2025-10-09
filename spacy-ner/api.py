@@ -109,7 +109,7 @@ except Exception as e:
         logger.warning(" Using fallback custom model")
     except Exception as e2:
         logger.error(f" Failed to load any model: {e2}")
-        nlp = spacy.load("en_core_web_sm")
+        nlp = nlp = spacy.load("en_core_web_lg")
         training_info = {"model_type": "pretrained_only"}
         logger.warning(" Using pretrained model only")
 
