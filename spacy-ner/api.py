@@ -698,7 +698,8 @@ def find_job_matches(match_request: JobMatchRequest):
                     user_skills,
                     job_skills,
                     job,
-                    user_resume.get('experience_level', 'mid')
+                    user_resume.get('experience_level', 'mid'),
+                    overall_score
                 )
 
                 gap_analysis = calculate_gap_severity(
@@ -1065,7 +1066,7 @@ def format_salary_range(salary_min: Optional[int], salary_max: Optional[int]) ->
 
 
 def categorize_skill_gaps(user_skills: List[str], job_skills: List[str], job_data: Dict,
-                          user_experience_level: str) -> Dict:
+                          user_experience_level: str, overall_score: float = 0.0) -> Dict:
     """
     Categorize skill gaps by importance and type
     """
@@ -1134,6 +1135,14 @@ def categorize_skill_gaps(user_skills: List[str], job_skills: List[str], job_dat
             skill_gaps['trending'].append(skill)
         else:
             skill_gaps['nice_to_have'].append(skill)
+
+    # Promote 'nice_to_have' skills to 'important' if match score is below 75% and no critical gaps
+    if overall_score < 0.75 and not skill_gaps['critical'] and skill_gaps['nice_to_have']:
+        promote_count = min(len(skill_gaps['nice_to_have']), 2) # Promote up to 2 skills
+        skills_to_promote = skill_gaps['nice_to_have'][:promote_count]
+        skill_gaps['important'].extend(skills_to_promote)
+        skill_gaps['nice_to_have'] = skill_gaps['nice_to_have'][promote_count:]
+        logger.info(f"Promoted {promote_count} 'nice_to_have' skills to 'important' due to low match score and no critical gaps.")
 
     return skill_gaps
 
