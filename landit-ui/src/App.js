@@ -463,9 +463,11 @@ function App() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        position: 'sticky',
+                        position: 'fixed', // Changed from 'sticky' to 'fixed'
                         top: 0,
-                        zIndex: 100,
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000, // Increased z-index
                         boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -503,6 +505,7 @@ function App() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                             {/* Navigation Tabs */}
                             <div style={{ display: 'flex', gap: '8px' }}>
+                                {/* ... your tab buttons remain the same ... */}
                                 <button
                                     onClick={() => setActiveTab('resume')}
                                     style={{
@@ -787,9 +790,11 @@ function App() {
 
                     <div style={{
                         padding: '30px 40px',
+                        paddingTop: '120px',
                         width: '100%',
                         boxSizing: 'border-box',
-                        animation: 'fadeIn 0.6s ease-out'
+                        animation: 'fadeIn 0.6s ease-out',
+                        minHeight: 'calc(100vh - 120px)'
                     }}>
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
