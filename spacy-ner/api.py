@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 from contextlib import asynccontextmanager
+from thefuzz import fuzz
 
 # Scheduler for automated job imports
 scheduler = BackgroundScheduler()
@@ -610,6 +611,29 @@ def calculate_jaccard_similarity(set1: set, set2: set) -> float:
     union = len(set1.union(set2))
     return intersection / union
 
+def calculate_fuzzy_skill_similarity(user_skills: set, job_skills: set) -> float:
+    """Calculates a more forgiving skill similarity score using fuzzy matching."""
+    if not user_skills or not job_skills:
+        return 0.0
+
+    total_score = 0
+    # For each skill the job requires...
+    for job_skill in job_skills:
+        best_match_score = 0
+        # ...find the best possible match from the user's skills.
+        for user_skill in user_skills:
+            # The token_set_ratio is great for matching skills that might be out of order
+            # or have extra words (e.g., "Machine Learning" vs "Learning, Machine").
+            similarity = fuzz.token_set_ratio(job_skill, user_skill)
+            if similarity > best_match_score:
+                best_match_score = similarity
+        total_score += best_match_score
+
+    # Return the average best match score, scaled to be between 0 and 1.
+    if not job_skills:
+        return 0.0
+    return (total_score / len(job_skills)) / 100.0
+
 @app.post("/jobs/find-matches")
 def find_job_matches(match_request: JobMatchRequest):
     """
@@ -641,10 +665,12 @@ def find_job_matches(match_request: JobMatchRequest):
         matches = []
         for job in all_jobs:
 
-            # 1. Keyword-based (Jaccard) Similarity
+            # 1. Calculate Keyword-based Skill Scores
             user_skills_set = set(extract_user_skills(user_resume))
             job_skills_set = set([s.lower() for s in job.get('skills_required', [])])
+
             jaccard_score = calculate_jaccard_similarity(user_skills_set, job_skills_set)
+            fuzzy_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
 
             # 2. Semantic Similarity (Skills vs. Skills)
             semantic_skills_score = 0.0
@@ -656,7 +682,10 @@ def find_job_matches(match_request: JobMatchRequest):
                 )
 
             # 3. Create the Hybrid Score
-            skills_similarity = (0.7 * semantic_skills_score) + (0.3 * jaccard_score)
+            # Blend of fuzzy (forgiving) and jaccard (strict)
+            keyword_score = (0.7 * fuzzy_score) + (0.3 * jaccard_score)
+            # Blend semantic (context) and keyword (direct match) scores
+            skills_similarity = (0.6 * semantic_skills_score) + (0.4 * keyword_score)
             skills_similarity = min(1.0, skills_similarity)
 
             # Calculate other scores
@@ -750,7 +779,7 @@ def find_job_matches(match_request: JobMatchRequest):
         # Sort by overall score
         matches.sort(key=lambda x: x['overall_score'], reverse=True)
 
-        # NEW: Implement job rotation logic
+        # Implement job rotation logic
         if match_request.randomize and len(matches) > match_request.top_k:
             # Get top matches (2x what we need for quality)
             top_matches = matches[:match_request.top_k * 2]
@@ -841,6 +870,7 @@ def find_job_matches(match_request: JobMatchRequest):
         if 'request_hash' in locals() and request_hash in recent_match_requests:
             del recent_match_requests[request_hash]
         raise HTTPException(status_code=500, detail=f"Job matching failed: {str(e)}")
+
 def generate_enhanced_match_explanation(overall_score: float, skill_matches: List[str],
                                        skill_gaps_detailed: Dict, experience_match: float,
                                        gap_analysis: Dict) -> str:
