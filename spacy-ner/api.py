@@ -634,10 +634,17 @@ def calculate_fuzzy_skill_similarity(user_skills: set, job_skills: set) -> float
         return 0.0
     return (total_score / len(job_skills)) / 100.0
 
+
+def apply_confidence_boost(score, factor=1.5):
+    """Applies a non-linear boost to a score to reward higher values more."""
+    # An exponential curve provides a strong boost for high scores
+    # while not punishing lower scores too harshly.
+    return score ** (1.0 / factor)
+
 @app.post("/jobs/find-matches")
 def find_job_matches(match_request: JobMatchRequest):
     """
-    Find job matches for a user's resume with rotation and fresh results
+    Find job matches for a user's resume with rotation and fresh results.
     """
     if not embedding_service:
         raise HTTPException(status_code=503, detail="Embedding service not available")
@@ -660,73 +667,68 @@ def find_job_matches(match_request: JobMatchRequest):
         logger.info(f"Finding matches among {len(all_jobs)} jobs for {match_request.user_email}")
 
         resume_embedding = user_resume['full_resume_embedding']
-        skills_embedding = user_resume['skills_embedding']
 
         matches = []
         for job in all_jobs:
-
-            # 1. Calculate Keyword-based Skill Scores
+            # Calculate Raw Scores
             user_skills_set = set(extract_user_skills(user_resume))
-            job_skills_set = set([s.lower() for s in job.get('skills_required', [])])
+            job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
 
-            jaccard_score = calculate_jaccard_similarity(user_skills_set, job_skills_set)
-            fuzzy_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
+            # Direct keyword matching (our confidence score)
+            keyword_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
 
-            # 2. Semantic Similarity (Skills vs. Skills)
-            semantic_skills_score = 0.0
-            job_skills_embedding = job.get('skills_embedding')
-            if skills_embedding is not None and job_skills_embedding is not None:
-                semantic_skills_score = embedding_service.calculate_similarity(
-                    skills_embedding,
-                    job_skills_embedding
-                )
-
-            # 3. Create the Hybrid Score
-            # Blend of fuzzy (forgiving) and jaccard (strict)
-            keyword_score = (0.7 * fuzzy_score) + (0.3 * jaccard_score)
-            # Blend semantic (context) and keyword (direct match) scores
-            skills_similarity = (0.6 * semantic_skills_score) + (0.4 * keyword_score)
-            skills_similarity = min(1.0, skills_similarity)
-
-            # Calculate other scores
+            # Semantic matching (contextual understanding)
             semantic_similarity = embedding_service.calculate_similarity(
                 resume_embedding,
                 job['description_embedding']
             )
+
+            # Experience and Location matching
             user_years = user_resume.get('years_of_experience', 0)
             job_level = job.get('experience_level', 'mid')
             experience_match = calculate_experience_match(user_years, job_level)
-
             location_match = calculate_location_match(
                 user_resume.get('preferred_locations', []),
                 job.get('location', ''),
                 job.get('remote_allowed', False)
             )
 
-            weights = {
-                "skills": 0.45, "semantic": 0.25, "experience": 0.20, "location": 0.10
-            }
-
-            job_type = job.get('job_type', '').lower()
-            is_junior_role = any(keyword in job_type for keyword in ["internship", "entry", "intern"])
+            # Apply Role-Specific Logic & Keyword Confidence
+            job_title_lower = job.get('title', '').lower()
+            is_junior_role = any(keyword in job_title_lower for keyword in ["intern", "junior", "entry"])
 
             if is_junior_role:
-                if user_years <= 1:
-                    experience_match = 1.0
-                weights = {"skills": 0.70, "semantic": 0.20, "experience": 0.0, "location": 0.10}
+                # For interns, skills are paramount. Experience is ignored.
+                # We apply a strong boost based on the keyword score.
+                skills_similarity = apply_confidence_boost(keyword_score, factor=2.0)
 
-            overall_score = (
-                    skills_similarity * weights["skills"] +
-                    semantic_similarity * weights["semantic"] +
-                    experience_match * weights["experience"] +
-                    location_match * weights["location"]
-            )
+                # Final score is heavily weighted towards skills.
+                weights = {"skills": 0.80, "semantic": 0.10, "experience": 0.0, "location": 0.10}
+                overall_score = (
+                        skills_similarity * weights["skills"] +
+                        semantic_similarity * weights["semantic"] +
+                        location_match * weights["location"]
+                )
+            else:
+                # For other roles, blend semantic and keyword scores for a balanced view.
+                skills_similarity = (keyword_score + semantic_similarity) / 2.0
+                skills_similarity = apply_confidence_boost(skills_similarity, factor=1.5)
 
-            if is_junior_role:
-                boost = 0.10 * (1.0 - overall_score)
-                overall_score = min(0.95, overall_score + boost)
+                # Use original weights for non-junior roles.
+                weights = {"skills": 0.45, "semantic": 0.25, "experience": 0.20, "location": 0.10}
+                overall_score = (
+                        skills_similarity * weights["skills"] +
+                        semantic_similarity * weights["semantic"] +
+                        experience_match * weights["experience"] +
+                        location_match * weights["location"]
+                )
 
+            # Final Score Normalization
+            overall_score = min(0.99, overall_score)
+
+            # Append Match if it Meets Threshold
             if overall_score >= match_request.min_similarity:
+                # (The rest of the logic to append the match stays the same)
                 user_skills = extract_user_skills(user_resume)
                 job_skills = job.get('skills_required', [])
                 skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
@@ -738,12 +740,10 @@ def find_job_matches(match_request: JobMatchRequest):
                     user_resume.get('experience_level', 'mid'),
                     overall_score
                 )
-
                 gap_analysis = calculate_gap_severity(
                     skill_gaps_detailed,
                     user_resume.get('experience_level', 'mid')
                 )
-
                 improvement_summary = generate_improvement_summary(
                     skill_gaps_detailed,
                     gap_analysis
