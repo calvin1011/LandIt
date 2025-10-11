@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Briefcase, MapPin, DollarSign, RefreshCw, Bookmark, TrendingUp, ArrowRight, BrainCircuit, ThumbsUp, ThumbsDown, BookOpen, Clock } from 'lucide-react';
 
 // MatchScore Component for the right side of the card
@@ -437,143 +437,61 @@ const JobCard = ({ job, userEmail, onGenerateLearningPlan, savedJobs, appliedJob
     );
 };
 
-const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] }) => {
-    const [recommendations, setRecommendations] = useState(initialJobs);
-    const [loading, setLoading] = useState(initialJobs.length === 0);
-    const [error, setError] = useState('');
-    const [shownJobIds, setShownJobIds] = useState(new Set());
-    const [hasMore, setHasMore] = useState(true);
-    const [offset, setOffset] = useState(0);
+const JobRecommendations = ({
+  userEmail,
+  onNavigateToLearning,
+  recommendations = [],
+  loading = false,
+  error = '',
+  hasMore = false,
+  onFetchRecommendations,
+  onLoadMore,
+  onFeedback,
+  onSaveJob,
+  onQuickApply,
+  savedJobs = new Set(),
+  appliedJobs = new Set(),
+  jobToConfirm = null,
+  onConfirmApply,
+  onCancelApply
+}) => {
     const [sortBy, setSortBy] = useState("match");
     const [experienceFilter, setExperienceFilter] = useState("all");
     const [remoteOnly, setRemoteOnly] = useState(false);
-    const [savedJobs, setSavedJobs] = useState(new Set());
-    const [appliedJobs, setAppliedJobs] = useState(new Set());
-    const [jobToConfirm, setJobToConfirm] = useState(null);
-
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                const pendingJobJSON = sessionStorage.getItem('pendingApplicationConfirmation');
-                if (pendingJobJSON) {
-                    const pendingJob = JSON.parse(pendingJobJSON);
-                    setJobToConfirm(pendingJob);
-                    sessionStorage.removeItem('pendingApplicationConfirmation');
-                }
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        handleVisibilityChange();
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (userEmail) {
-            fetchRecommendations(true);
-        }
-    }, [userEmail]);
-
-    const fetchRecommendations = useCallback(async (reset = false) => {
-        setLoading(true);
-        setError('');
-
-        const currentOffset = reset ? 0 : offset;
-        const currentShownIds = reset ? [] : Array.from(shownJobIds);
-
-        if (reset) {
-            setRecommendations([]);
-            setShownJobIds(new Set());
-            setHasMore(true);
-        }
-
-        try {
-            const response = await fetch('http://localhost:8000/jobs/find-matches', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_email: userEmail,
-                    top_k: 10,
-                    min_similarity: 0.3,
-                    offset: currentOffset,
-                    exclude_job_ids: currentShownIds,
-                    randomize: false
-                })
-            });
-
-            if (!response.ok) {
-                if (response.status === 429) {
-                    console.log('Duplicate request ignored - already processing');
-                    return;
-                }
-                if (response.status === 404) {
-                    throw new Error('Please upload your resume first to get job recommendations.');
-                } else {
-                    throw new Error('Failed to fetch job recommendations. Please try again.');
-                }
-            }
-
-            const data = await response.json();
-            const newMatches = (data.matches || []).sort((a, b) => b.overall_score - a.overall_score);
-
-            setRecommendations(prev => {
-                const existing = reset ? [] : prev;
-                const existingIds = new Set(existing.map(job => job.job_id));
-                const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
-                const combined = [...existing, ...uniqueNewMatches];
-                return combined.sort((a, b) => b.overall_score - a.overall_score);
-            });
-
-            setShownJobIds(prev => new Set([...prev, ...newMatches.map(job => job.job_id)]));
-            setHasMore(data.has_more || false);
-            setOffset(data.next_offset || 0);
-
-        } catch (err) {
-            console.error('Error fetching recommendations:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [userEmail, offset, shownJobIds]);
-
-    useEffect(() => {
-        if (userEmail && initialJobs.length === 0) {
-            fetchRecommendations(true);
-        }
-    }, [userEmail, initialJobs]);
 
     const loadMoreJobs = () => {
-        if (!loading && hasMore) {
-            fetchRecommendations(false);
+        if (!loading && hasMore && onLoadMore) {
+            onLoadMore();
         }
     };
 
     const handleFeedback = async (recommendationId, feedbackType, rating = null) => {
-        try {
-            const response = await fetch('http://localhost:8000/jobs/feedback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_email: userEmail,
-                    recommendation_id: recommendationId,
-                    feedback_type: feedbackType,
-                    overall_rating: rating,
-                    action_taken: feedbackType
-                })
-            });
+        if (onFeedback) {
+            onFeedback(recommendationId, feedbackType, rating);
+        }
+    };
 
-            if (response.ok) {
-                setRecommendations(prev => prev.map(rec =>
-                    rec.recommendation_id === recommendationId
-                        ? { ...rec, userFeedback: feedbackType }
-                        : rec
-                ));
-            }
-        } catch (err) {
-            console.error('Error submitting feedback:', err);
+    const handleSaveJob = async (jobId) => {
+        if (onSaveJob) {
+            onSaveJob(jobId);
+        }
+    };
+
+    const handleQuickApply = (job) => {
+        if (onQuickApply) {
+            onQuickApply(job);
+        }
+    };
+
+    const handleConfirmApply = async () => {
+        if (onConfirmApply) {
+            onConfirmApply();
+        }
+    };
+
+    const handleCancelApply = () => {
+        if (onCancelApply) {
+            onCancelApply();
         }
     };
 
@@ -581,70 +499,6 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
         if (onNavigateToLearning) {
             onNavigateToLearning(job);
         }
-    };
-
-    const handleSaveJob = async (jobId) => {
-        if (savedJobs.has(jobId)) return;
-
-        try {
-            const response = await fetch('http://localhost:8000/jobs/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: userEmail, job_id: jobId }),
-            });
-
-            if (response.ok) {
-                console.log(`Job ${jobId} saved successfully!`);
-                setSavedJobs(prev => new Set(prev).add(jobId));
-            } else {
-                const errorData = await response.json();
-                console.error("Failed to save job:", errorData.detail);
-            }
-        } catch (err) {
-            console.error('Error saving job:', err);
-        }
-    };
-
-    const handleQuickApply = (job) => {
-        sessionStorage.setItem('pendingApplicationConfirmation', JSON.stringify(job));
-
-        if (job.job_url) {
-            window.open(job.job_url, '_blank');
-        } else {
-            const searchQuery = `${job.title} ${job.company} careers`;
-            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
-            window.open(searchUrl, '_blank');
-        }
-    };
-
-    const handleConfirmApply = async () => {
-        if (!jobToConfirm) return;
-
-        const { job_id, recommendation_id } = jobToConfirm;
-
-        setAppliedJobs(prev => new Set(prev).add(job_id));
-
-        try {
-            const response = await fetch('http://localhost:8000/jobs/quick-apply', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: userEmail, job_id: job_id }),
-            });
-            if (!response.ok) {
-                console.error("Failed to record application on the backend.");
-            } else {
-                console.log(`Application for job ${job_id} successfully recorded.`);
-            }
-        } catch (err) {
-            console.error('Error recording application:', err);
-        }
-
-        handleFeedback(recommendation_id, 'applied');
-        setJobToConfirm(null);
-    };
-
-    const handleCancelApply = () => {
-        setJobToConfirm(null);
     };
 
     const sortedAndFilteredRecommendations = recommendations
@@ -705,7 +559,7 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
                 </div>
 
                 <button
-                    onClick={() => fetchRecommendations(true)}
+                    onClick={() => onFetchRecommendations(true)}
                     disabled={loading}
                     style={{
                         display: 'flex',
@@ -735,13 +589,13 @@ const JobRecommendations = ({ userEmail, onNavigateToLearning, initialJobs = [] 
 
             {/* Filters */}
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                <select onChange={(e) => setSortBy(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                     <option value="match">Best Match</option>
                     <option value="salary">Highest Salary</option>
                     <option value="recent">Most Recent</option>
                 </select>
 
-                <select onChange={(e) => setExperienceFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                <select value={experienceFilter} onChange={(e) => setExperienceFilter(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                     <option value="all">All Levels</option>
                     <option value="entry">Entry Level</option>
                     <option value="mid">Mid Level</option>

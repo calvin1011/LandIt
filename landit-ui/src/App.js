@@ -34,6 +34,212 @@ function App() {
     const [missingSkills, setMissingSkills] = useState([]);
     const [recommendedJobs, setRecommendedJobs] = useState([]);
 
+    // Job recommendations state
+    const [jobRecommendations, setJobRecommendations] = useState([]);
+    const [jobsLoading, setJobsLoading] = useState(false);
+    const [jobsError, setJobsError] = useState('');
+    const [shownJobIds, setShownJobIds] = useState(new Set());
+    const [hasMoreJobs, setHasMoreJobs] = useState(true);
+    const [jobOffset, setJobOffset] = useState(0);
+    const [savedJobs, setSavedJobs] = useState(new Set());
+    const [appliedJobs, setAppliedJobs] = useState(new Set());
+    const [jobToConfirm, setJobToConfirm] = useState(null);
+
+    // Fetch job recommendations function
+    const fetchJobRecommendations = async (reset = false) => {
+        if (!userEmail) return;
+
+        setJobsLoading(true);
+        setJobsError('');
+
+        const currentOffset = reset ? 0 : jobOffset;
+        const currentShownIds = reset ? [] : Array.from(shownJobIds);
+
+        if (reset) {
+            setJobRecommendations([]);
+            setShownJobIds(new Set());
+            setHasMoreJobs(true);
+        }
+
+        try {
+            const response = await fetch('http://localhost:8000/jobs/find-matches', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    top_k: 10,
+                    min_similarity: 0.3,
+                    offset: currentOffset,
+                    exclude_job_ids: currentShownIds,
+                    randomize: false
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                    console.log('Duplicate request ignored - already processing');
+                    return;
+                }
+                if (response.status === 404) {
+                    throw new Error('Please upload your resume first to get job recommendations.');
+                } else {
+                    throw new Error('Failed to fetch job recommendations. Please try again.');
+                }
+            }
+
+            const data = await response.json();
+            const newMatches = (data.matches || []).sort((a, b) => b.overall_score - a.overall_score);
+
+            setJobRecommendations(prev => {
+                const existing = reset ? [] : prev;
+                const existingIds = new Set(existing.map(job => job.job_id));
+                const uniqueNewMatches = newMatches.filter(job => !existingIds.has(job.job_id));
+                const combined = [...existing, ...uniqueNewMatches];
+                return combined.sort((a, b) => b.overall_score - a.overall_score);
+            });
+
+            setShownJobIds(prev => new Set([...prev, ...newMatches.map(job => job.job_id)]));
+            setHasMoreJobs(data.has_more || false);
+            setJobOffset(data.next_offset || 0);
+
+        } catch (err) {
+            console.error('Error fetching recommendations:', err);
+            setJobsError(err.message);
+        } finally {
+            setJobsLoading(false);
+        }
+    };
+
+    // Handler functions for job actions
+    const handleJobFeedback = async (recommendationId, feedbackType, rating = null) => {
+        try {
+            const response = await fetch('http://localhost:8000/jobs/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_email: userEmail,
+                    recommendation_id: recommendationId,
+                    feedback_type: feedbackType,
+                    overall_rating: rating,
+                    action_taken: feedbackType
+                })
+            });
+
+            if (response.ok) {
+                setJobRecommendations(prev => prev.map(rec =>
+                    rec.recommendation_id === recommendationId
+                        ? { ...rec, userFeedback: feedbackType }
+                        : rec
+                ));
+            }
+        } catch (err) {
+            console.error('Error submitting feedback:', err);
+        }
+    };
+
+    const handleSaveJob = async (jobId) => {
+        if (savedJobs.has(jobId)) return;
+
+        try {
+            const response = await fetch('http://localhost:8000/jobs/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: userEmail, job_id: jobId }),
+            });
+
+            if (response.ok) {
+                console.log(`Job ${jobId} saved successfully!`);
+                setSavedJobs(prev => new Set(prev).add(jobId));
+            } else {
+                const errorData = await response.json();
+                console.error("Failed to save job:", errorData.detail);
+            }
+        } catch (err) {
+            console.error('Error saving job:', err);
+        }
+    };
+
+    const handleQuickApply = (job) => {
+        sessionStorage.setItem('pendingApplicationConfirmation', JSON.stringify(job));
+        setJobToConfirm(job);
+
+        if (job.job_url) {
+            window.open(job.job_url, '_blank');
+        } else {
+            const searchQuery = `${job.title} ${job.company} careers`;
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+            window.open(searchUrl, '_blank');
+        }
+    };
+
+    const handleConfirmApply = async () => {
+        if (!jobToConfirm) return;
+
+        const { job_id, recommendation_id } = jobToConfirm;
+
+        setAppliedJobs(prev => new Set(prev).add(job_id));
+
+        try {
+            const response = await fetch('http://localhost:8000/jobs/quick-apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: userEmail, job_id: job_id }),
+            });
+            if (!response.ok) {
+                console.error("Failed to record application on the backend.");
+            } else {
+                console.log(`Application for job ${job_id} successfully recorded.`);
+            }
+        } catch (err) {
+            console.error('Error recording application:', err);
+        }
+
+        handleJobFeedback(recommendation_id, 'applied');
+        setJobToConfirm(null);
+    };
+
+    const handleCancelApply = () => {
+        setJobToConfirm(null);
+    };
+
+    // Handle visibility change for job confirmation
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                const pendingJobJSON = sessionStorage.getItem('pendingApplicationConfirmation');
+                if (pendingJobJSON) {
+                    const pendingJob = JSON.parse(pendingJobJSON);
+                    setJobToConfirm(pendingJob);
+                    sessionStorage.removeItem('pendingApplicationConfirmation');
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        handleVisibilityChange();
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    // Only fetch jobs when user logs in or uploads resume, not when switching tabs
+    useEffect(() => {
+        if (loggedIn && userEmail && jobRecommendations.length === 0) {
+            // Check if we have jobs from resume upload first
+            const persistedData = sessionStorage.getItem('resumeAnalysisData');
+            if (persistedData) {
+                const data = JSON.parse(persistedData);
+                if (data.recommended_jobs && data.recommended_jobs.length > 0) {
+                    setJobRecommendations(data.recommended_jobs);
+                    return;
+                }
+            }
+            // Otherwise fetch from API
+            fetchJobRecommendations(true);
+        }
+    }, [loggedIn, userEmail]);
+
     useEffect(() => {
         console.log('Setting up Firebase auth listener...');
 
@@ -148,13 +354,17 @@ function App() {
         // Set recommended jobs to state
         setRecommendedJobs(data.recommended_jobs || []);
 
+        // Update job recommendations with the new jobs from resume analysis
+        if (data.recommended_jobs && data.recommended_jobs.length > 0) {
+            setJobRecommendations(data.recommended_jobs);
+        }
+
         // Save the entire data object to sessionStorage
         sessionStorage.setItem('resumeAnalysisData', JSON.stringify(data));
 
         // Automatically switch to the jobs tab
         setActiveTab('jobs');
     };
-
 
     useEffect(() => {
         if (loggedIn && userEmail && !loading) {
@@ -171,13 +381,12 @@ function App() {
     }, [userEmail]);
 
     useEffect(() => {
-    // Check sessionStorage for persisted data when the app loads
-    const persistedData = sessionStorage.getItem('resumeAnalysisData');
-    if (persistedData) {
-        const data = JSON.parse(persistedData);
-        setParsedData(data.entities || []);
-        setMissingSkills(data.missing_skills || []);
-        // You could optionally set recommendedJobs here too if needed
+        // Check sessionStorage for persisted data when the app loads
+        const persistedData = sessionStorage.getItem('resumeAnalysisData');
+        if (persistedData) {
+            const data = JSON.parse(persistedData);
+            setParsedData(data.entities || []);
+            setMissingSkills(data.missing_skills || []);
         }
     }, []);
 
@@ -680,8 +889,21 @@ function App() {
                         {activeTab === 'jobs' && (
                             <JobRecommendations
                                 userEmail={userEmail}
-                                initialJobs={recommendedJobs}
                                 onNavigateToLearning={handleNavigateToLearning}
+                                recommendations={jobRecommendations}
+                                loading={jobsLoading}
+                                error={jobsError}
+                                hasMore={hasMoreJobs}
+                                onFetchRecommendations={fetchJobRecommendations}
+                                onLoadMore={() => fetchJobRecommendations(false)}
+                                onFeedback={handleJobFeedback}
+                                onSaveJob={handleSaveJob}
+                                onQuickApply={handleQuickApply}
+                                savedJobs={savedJobs}
+                                appliedJobs={appliedJobs}
+                                jobToConfirm={jobToConfirm}
+                                onConfirmApply={handleConfirmApply}
+                                onCancelApply={handleCancelApply}
                             />
                         )}
 
