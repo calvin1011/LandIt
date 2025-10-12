@@ -115,7 +115,6 @@ except Exception as e:
         logger.warning(" Using pretrained model only")
 
 
-# --- NEW LIFESPAN MANAGER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -132,7 +131,6 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
     logger.info("APScheduler shut down.")
 
-# --- CORRECT APP INITIALIZATION ---
 app = FastAPI(
     title="LandIt Intelligent Resume Parser",
     version="3.1.0",
@@ -1284,7 +1282,7 @@ def generate_learning_plan(request: LearningPlanRequest):
         for key in keys_to_remove:
             del recent_learning_requests[key]
 
-        # IMPORTANT: Mark this request as processing immediately
+        # Mark this request as processing immediately
         recent_learning_requests[request_hash] = {
             'timestamp': now,
             'processing': True,

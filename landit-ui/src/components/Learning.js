@@ -19,7 +19,8 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       setMessages([{
         id: 1,
         type: 'bot',
-        content: `Hi! I'm your AI Learning Coach. I can help you create personalized learning plans, suggest projects, and answer questions about skill development. What would you like to work on today?`,
+        content: `Hi! I'm your AI Learning Coach. I can help you create personalized learning plans, suggest projects, 
+        and answer questions about skill development. What would you like to work on today?`,
         timestamp: new Date()
       }]);
     }
@@ -47,7 +48,6 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const handleGeneratePlan = async (jobData) => {
       setIsLoading(true);
 
-      // FIX: Only require job_id, recommendation_id is optional
       if (!jobData || !jobData.job_id) {
         const errorMessage = {
           id: Date.now() + 1,
@@ -85,7 +85,6 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
         const errorMessage = {
           id: Date.now() + 1,
           type: 'bot',
-          // Fix the error message display
           content: `I encountered an error generating your learning plan: ${error.message || 'Unknown error'}. Please try again or select another job.`,
           timestamp: new Date(),
           isError: true
