@@ -162,12 +162,17 @@ function App() {
     };
 
     const handleQuickApply = (job) => {
+        console.log('Job URL:', job.job_url);
+        console.log('Full job data:', job);
+
         sessionStorage.setItem('pendingApplicationConfirmation', JSON.stringify(job));
         setJobToConfirm(job);
 
         if (job.job_url) {
+            console.log('Opening direct URL:', job.job_url);
             window.open(job.job_url, '_blank');
         } else {
+            console.log('No URL found, using Google search');
             const searchQuery = `${job.title} ${job.company} careers`;
             const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
             window.open(searchUrl, '_blank');

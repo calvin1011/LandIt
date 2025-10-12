@@ -293,14 +293,18 @@ class DatabaseConnection:
                            salary_max, \
                            experience_level, \
                            skills_required,
+                           remote_allowed, \
+                           job_url, \
+                           source,
                            description_embedding, \
                            requirements_embedding, \
                            title_embedding
                     FROM jobs
                     WHERE is_active = true
+                      AND source NOT IN ('test', 'manual')
+                      AND job_url IS NOT NULL
                     ORDER BY posted_date DESC; \
                     """
-
             cursor.execute(query)
             results = cursor.fetchall()
             cursor.close()
@@ -552,14 +556,19 @@ class DatabaseConnection:
                            title, \
                            company, \
                            description, \
-                           location, \
+                           location,
                            salary_min, \
-                           salary_max,
+                           salary_max, \
                            experience_level, \
                            skills_required,
+                           remote_allowed, \
+                           job_url, \
+                           source,
                            (1 - (description_embedding <=> %s::vector)) as similarity_score
                     FROM jobs
                     WHERE is_active = true
+                      AND source NOT IN ('test', 'manual') 
+                      AND job_url IS NOT NULL           
                       AND (1 - (description_embedding <=> %s::vector)) > %s
                     ORDER BY description_embedding <=> %s::vector
                         LIMIT %s; \
