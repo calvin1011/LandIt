@@ -130,64 +130,223 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   return (
     <div style={{
       background: 'rgba(255, 255, 255, 0.95)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '20px',
-      border: '1px solid rgba(255,255,255,0.2)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '24px',
+      border: '1px solid rgba(255,255,255,0.3)',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
       height: '80vh',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      overflow: 'hidden'
     }}>
-      <div className="p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <MessageSquare className="w-6 h-6 text-blue-600" />
-              AI Learning Coach
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">
+      {/* Modern Header with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '24px',
+        color: 'white'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <MessageSquare className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>AI Learning Coach</h1>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: '14px' }}>
               Get personalized learning plans and career guidance
-          </p>
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      {/* Quick Action Buttons */}
+      {messages.length <= 2 && (
+        <div style={{
+          padding: '20px',
+          borderBottom: '1px solid rgba(0,0,0,0.05)'
+        }}>
+          <p style={{
+            fontSize: '14px',
+            color: '#6b7280',
+            marginBottom: '12px',
+            textAlign: 'center'
+          }}>
+            Quick actions:
+          </p>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            {[
+              'Create learning plan',
+              'Skill gap analysis',
+              'Career path advice',
+              'Project suggestions'
+            ].map((action, index) => (
+              <button
+                key={index}
+                onClick={() => setInputMessage(action)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(102, 126, 234, 0.1)',
+                  color: '#667eea',
+                  border: '1px solid rgba(102, 126, 234, 0.2)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.background = 'rgba(102, 126, 234, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.background = 'rgba(102, 126, 234, 0.1)';
+                }}
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chat Messages Area */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
         {messages.map((message) => (
-          <div key={message.id} className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            key={message.id}
+            className={`flex gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            style={{ animation: 'fadeInUp 0.3s ease-out' }}
+          >
             {message.type === 'bot' && (
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-white" />
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Bot className="w-5 h-5 text-white" />
               </div>
             )}
-            <div className={`max-w-[80%] ${message.type === 'user' ? 'order-first' : ''}`}>
-              <div className={`rounded-lg p-3 ${
-                message.type === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : message.isError
-                    ? 'bg-red-50 border border-red-200'
-                    : 'bg-gray-100'
-              }`}>
-                <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{color: message.isError ? '#991B1B' : 'inherit'}}>
-                  {message.content}
-                </div>
+
+            <div style={{
+              maxWidth: '70%',
+              background: message.type === 'user'
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : message.isError
+                  ? '#fef2f2'
+                  : 'rgba(255,255,255,0.8)',
+              color: message.type === 'user' ? 'white' : message.isError ? '#dc2626' : '#1f2937',
+              padding: '16px 20px',
+              borderRadius: message.type === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+              border: message.type === 'bot' && !message.isError ? '1px solid rgba(0,0,0,0.05)' :
+                     message.isError ? '1px solid #fecaca' : 'none',
+              boxShadow: message.type === 'bot' && !message.isError ? '0 4px 12px rgba(0,0,0,0.05)' :
+                        message.type === 'user' ? '0 4px 12px rgba(102, 126, 234, 0.2)' :
+                        message.isError ? '0 4px 12px rgba(220, 38, 38, 0.1)' : 'none',
+              lineHeight: '1.5'
+            }}>
+              <div className="whitespace-pre-wrap text-sm">
+                {message.content}
               </div>
-              <div className={`text-xs text-gray-500 mt-1 ${message.type === 'user' ? 'text-right' : 'text-left'}`}>
+              <div style={{
+                fontSize: '11px',
+                opacity: 0.7,
+                marginTop: '8px',
+                textAlign: message.type === 'user' ? 'right' : 'left'
+              }}>
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
+
             {message.type === 'user' && (
-              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-white" />
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <User className="w-5 h-5 text-white" />
               </div>
             )}
           </div>
         ))}
+
+        {/* Enhanced Loading State */}
         {isLoading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <Bot className="w-4 h-4 text-white" />
+          <div className="flex gap-4 justify-start">
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Bot className="w-5 h-5 text-white" />
             </div>
-            <div className="bg-gray-100 rounded-lg p-3">
-              <div className="flex items-center gap-2 text-gray-600">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Generating your plan...</span>
+            <div style={{
+              background: 'rgba(255,255,255,0.8)',
+              padding: '16px 20px',
+              borderRadius: '18px 18px 18px 6px',
+              border: '1px solid rgba(0,0,0,0.05)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+            }}>
+              <div className="flex items-center gap-3 text-gray-600">
+                <div className="flex gap-1">
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#667eea',
+                    borderRadius: '50%',
+                    animation: 'bounce 1.4s infinite ease-in-out both'
+                  }}></div>
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#667eea',
+                    borderRadius: '50%',
+                    animation: 'bounce 1.4s infinite ease-in-out both',
+                    animationDelay: '0.16s'
+                  }}></div>
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#667eea',
+                    borderRadius: '50%',
+                    animation: 'bounce 1.4s infinite ease-in-out both',
+                    animationDelay: '0.32s'
+                  }}></div>
+                </div>
+                <span className="text-sm">Generating your learning plan...</span>
               </div>
             </div>
           </div>
@@ -195,30 +354,89 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6 border-t border-gray-200">
-        <div className="flex gap-3">
+      {/* Modern Input Area */}
+      <div style={{
+        padding: '20px',
+        background: 'rgba(248, 250, 252, 0.8)',
+        borderTop: '1px solid rgba(0,0,0,0.05)'
+      }}>
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          background: 'white',
+          borderRadius: '16px',
+          padding: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          border: '1px solid rgba(0,0,0,0.05)'
+        }}>
           <textarea
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask a question or select a job to create a plan..."
-            className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ask about skill development, learning paths, or career guidance..."
+            style={{
+              flex: 1,
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              resize: 'none',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              outline: 'none',
+              background: 'transparent',
+              minHeight: '44px',
+              maxHeight: '120px'
+            }}
             rows="1"
             disabled={isLoading}
           />
           <button
             onClick={sendMessage}
             disabled={!inputMessage.trim() || isLoading}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center justify-center ${
-              inputMessage.trim() && !isLoading
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            style={{
+              width: '44px',
+              height: '44px',
+              background: inputMessage.trim() && !isLoading
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                : '#e5e7eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: inputMessage.trim() && !isLoading ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s ease',
+              opacity: inputMessage.trim() && !isLoading ? 1 : 0.6
+            }}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </button>
         </div>
       </div>
+
+      {/* Add CSS for animations */}
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes bounce {
+          0%, 80%, 100% {
+            transform: scale(0);
+          }
+          40% {
+            transform: scale(1);
+          }
+        }
+      `}</style>
     </div>
   );
 };
