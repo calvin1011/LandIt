@@ -728,7 +728,6 @@ def find_job_matches(match_request: JobMatchRequest):
 
             # Append Match if it Meets Threshold
             if overall_score >= match_request.min_similarity:
-                # (The rest of the logic to append the match stays the same)
                 user_skills = extract_user_skills(user_resume)
                 job_skills = job.get('skills_required', [])
                 skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
@@ -845,6 +844,8 @@ def find_job_matches(match_request: JobMatchRequest):
             )
             recommendation_ids.append(rec_id)
             match['recommendation_id'] = rec_id
+
+        matches = [ensure_consistent_job_structure(match) for match in matches]
 
         processing_time = time.time() - start_time
 
@@ -1548,8 +1549,7 @@ async def parse_resume_file(
         job_description_text: Optional[str] = Form(None)
 ):
     """
-    Parse resume from uploaded file (PDF, DOCX, TXT)
-    This endpoint replaces your Node.js backend functionality
+    Parse resume from uploaded file (PDF, DOCX, TXT) with consistent job matching structure
     """
     start_time = time.time()
 
@@ -1590,8 +1590,7 @@ async def parse_resume_file(
         if not text.strip():
             raise HTTPException(status_code=400, detail="No text could be extracted from the file")
 
-        logger.info(f" Extracted {len(text)} characters from {file.filename}")
-
+        # Extract skills and perform analysis
         resume_skills = extract_skills(text)
         missing_skills = []
 
@@ -1606,24 +1605,66 @@ async def parse_resume_file(
             missing_skills = sorted(list(jd_skills_set - resume_skills_set))
             logger.info(f"Found {len(missing_skills)} missing skills")
 
+        # Get parsing results
         spacy_results = safe_context_extraction(text)
         semantic_results = semantic_extractor.extract_semantic_entities(text)
         merged_results = merge_extraction_results(spacy_results, semantic_results, text)
 
-        # Get Job Recommendations
-        logger.info("Fetching job recommendations based on resume skills.")
-
+        # Enhanced job recommendations with consistent scoring structure
         recommended_jobs = []
         if embedding_service and resume_skills:
             # Generate embedding from skills list
             skills_embedding = embedding_service.generate_skills_embedding(resume_skills)
-            recommended_jobs = db.find_similar_jobs_by_vector(skills_embedding, limit=50)
+            basic_jobs = db.find_similar_jobs_by_vector(skills_embedding, limit=20)
+
+            # Convert to consistent scoring structure
+            for job in basic_jobs:
+                # Calculate scores similar to /jobs/find-matches
+                user_skills_set = set(resume_skills)
+                job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
+
+                # Calculate various scores
+                keyword_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
+                skills_similarity = apply_confidence_boost(keyword_score, factor=1.5)
+
+                # Estimate other scores
+                user_years = merged_results.get("experience_metrics", {}).get("total_years", 0)
+                job_level = job.get('experience_level', 'mid')
+                experience_match = calculate_experience_match(user_years, job_level)
+
+                # Create consistent job object
+                enhanced_job = {
+                    'job_id': job['id'],
+                    'title': job['title'],
+                    'company': job['company'],
+                    'job_url': job.get('job_url', ''),
+                    'location': job.get('location'),
+                    'remote_allowed': job.get('remote_allowed', False),
+                    'salary_min': job.get('salary_min'),
+                    'salary_max': job.get('salary_max'),
+                    'experience_level': job.get('experience_level'),
+                    'skills_required': job.get('skills_required', []),
+                    'overall_score': round(skills_similarity * 0.7 + experience_match * 0.3, 3),
+                    'skills_similarity': round(skills_similarity, 3),
+                    'experience_match': round(experience_match, 3),
+                    'location_match': 0.8,  # Default moderate match
+                    'skill_matches': list(user_skills_set & job_skills_set),
+                    'skill_gaps': list(job_skills_set - user_skills_set)[:3],
+                    'match_explanation': generate_basic_match_explanation(
+                        skills_similarity,
+                        list(user_skills_set & job_skills_set),
+                        list(job_skills_set - user_skills_set),
+                        experience_match
+                    )
+                }
+                recommended_jobs.append(enhanced_job)
 
         processing_time = time.time() - start_time
         logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
 
-        # Return a response with missing_skills
+        # Return consistent response structure
         return {
+            "success": True,
             "entities": merged_results.get("entities", []),
             "structured_data": {
                 "personal_info": merged_results.get("personal_info", {}),
@@ -1638,7 +1679,8 @@ async def parse_resume_file(
             },
             "missing_skills": missing_skills,
             "recommended_jobs": recommended_jobs,
-            "resume_skills": resume_skills
+            "resume_skills": resume_skills,
+            "processing_time": processing_time
         }
 
     except HTTPException as e:
@@ -1647,98 +1689,66 @@ async def parse_resume_file(
         logger.error(f"  File processing error: {e}")
         raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
-        # Choose processing method based on use_hybrid parameter
-        if use_hybrid and semantic_extractor:
-            # Use hybrid processing for optimal results
-            logger.info("Using hybrid processing for optimal extraction")
 
-            try:
-                # Get spaCy results (intelligent analysis)
-                if intelligence_analyzer:
-                    spacy_results = intelligence_analyzer.analyze_resume(text)
-                    logger.info(f" spaCy analysis: {len(spacy_results.get('entities', []))} entities")
-                else:
-                    spacy_results = safe_context_extraction(text)
-                    logger.info(f" Basic spaCy analysis: {len(spacy_results.get('entities', []))} entities")
-            except Exception as e:
-                logger.error(f"spaCy analysis failed: {str(e)}")
-                spacy_results = {"entities": [], "experience_metrics": {"average_tenure": 0.0}}
+def generate_basic_match_explanation(skills_score: float, skill_matches: List[str], skill_gaps: List[str],
+                                     experience_match: float) -> str:
+    """Generate basic match explanation for resume upload results"""
+    overall_score = (skills_score * 0.7 + experience_match * 0.3)
 
-            # Get semantic results
-            try:
-                semantic_results = semantic_extractor.extract_semantic_entities(text)
-                logger.info(f" Semantic analysis: {len(semantic_results.get('entities', []))} entities")
-            except Exception as e:
-                logger.error(f"Semantic analysis failed: {str(e)}")
-                semantic_results = {"entities": []}
+    if overall_score >= 0.8:
+        quality = "Excellent"
+    elif overall_score >= 0.6:
+        quality = "Good"
+    elif overall_score >= 0.4:
+        quality = "Fair"
+    else:
+        quality = "Poor"
 
-            # Merge results intelligently
-            try:
-                merged_results = merge_extraction_results(spacy_results, semantic_results, text)
-                logger.info(f" Hybrid merge: {len(merged_results.get('entities', []))} total entities")
-            except Exception as e:
-                logger.error(f"Merge failed: {str(e)}")
-                # Fallback: use spaCy results only
-                merged_results = spacy_results
+    explanation = f"{quality} match based on your skills. "
 
-            processing_time = time.time() - start_time
+    if skill_matches:
+        explanation += f"Your skills in {', '.join(skill_matches[:2])} align well. "
 
-            # Build comprehensive hybrid response
-            response = {
-                "entities": merged_results.get("entities", []),
-                "personal_info": merged_results.get("personal_info", {}),
-                "work_experience": merged_results.get("work_experience", []),
-                "education": merged_results.get("education", []),
-                "skills": merged_results.get("skills", {}),
-                "achievements": merged_results.get("achievements", []),
-                "resume_analytics": merged_results.get("resume_analytics", {}),
-                "experience_metrics": merged_results.get("experience_metrics", {"average_tenure": 0.0}),
-                "processing_stats": {
-                    "processing_time_seconds": processing_time,
-                    "total_entities": len(merged_results.get("entities", [])),
-                    "spacy_entities": len(spacy_results.get("entities", [])),
-                    "semantic_entities": len(semantic_results.get("entities", [])),
-                    "method": "hybrid_optimal",
-                    "improvement": len(merged_results.get("entities", [])) - len(spacy_results.get("entities", []))
-                },
-                "file_info": {
-                    "filename": file.filename,
-                    "content_type": file.content_type,
-                    "size_bytes": len(file_content),
-                    "text_length": len(text)
-                },
-                "model_info": {
-                    "model_type": training_info.get("model_type", "unknown"),
-                    "version": "3.0.0",
-                    "processing_method": "hybrid_automatic"
-                }
-            }
+    if skill_gaps:
+        explanation += f"Consider developing {', '.join(skill_gaps[:2])} to improve your match. "
 
-        else:
-            # Use standard intelligent processing
-            logger.info(" Using standard intelligent processing")
-            data = ResumeText(text=text, analysis_level=analysis_level, include_suggestions=include_suggestions)
-            response = parse_resume_intelligent(data)
+    return explanation
 
-            # Add file metadata to result
-            response["file_info"] = {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "size_bytes": len(file_content),
-                "text_length": len(text)
-            }
-
-        processing_time = time.time() - start_time
-        logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
-        return response
-
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-    except Exception as e:
-        logger.error(f" File processing error: {e}")
-        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
-
+def ensure_consistent_job_structure(job_data: Dict) -> Dict:
+    """Ensure job data has all required fields for frontend consistency"""
+    return {
+        'job_id': job_data.get('id', job_data.get('job_id', 0)),
+        'title': job_data.get('title', ''),
+        'company': job_data.get('company', ''),
+        'job_url': job_data.get('job_url', ''),
+        'location': job_data.get('location', ''),
+        'remote_allowed': job_data.get('remote_allowed', False),
+        'salary_min': job_data.get('salary_min'),
+        'salary_max': job_data.get('salary_max'),
+        'experience_level': job_data.get('experience_level', 'mid'),
+        'skills_required': job_data.get('skills_required', []),
+        'overall_score': job_data.get('overall_score', 0.5),
+        'skills_similarity': job_data.get('skills_similarity', 0.5),
+        'experience_match': job_data.get('experience_match', 0.7),
+        'location_match': job_data.get('location_match', 0.8),
+        'skill_matches': job_data.get('skill_matches', []),
+        'skill_gaps': job_data.get('skill_gaps', []),
+        'skill_gaps_detailed': job_data.get('skill_gaps_detailed', {
+            'critical': job_data.get('skill_gaps', []),
+            'important': [],
+            'nice_to_have': [],
+            'trending': []
+        }),
+        'gap_analysis': job_data.get('gap_analysis', {
+            'total_gaps': len(job_data.get('skill_gaps', [])),
+            'critical_gaps': len(job_data.get('skill_gaps', [])),
+            'estimated_learning_weeks': max(4, len(job_data.get('skill_gaps', [])) * 2),
+            'difficulty_level': 'high' if len(job_data.get('skill_gaps', [])) > 3 else 'medium'
+        }),
+        'match_explanation': job_data.get('match_explanation', 'Based on your profile analysis'),
+        'improvement_summary': job_data.get('improvement_summary', 'Focus on developing key skills'),
+        'recommendation_id': job_data.get('recommendation_id', f"temp_{job_data.get('id', job_data.get('job_id', 0))}")
+    }
 
 @app.post("/parse-resume", response_model=Dict[str, Any])
 def parse_resume_intelligent(data: ResumeText):

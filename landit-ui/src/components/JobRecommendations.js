@@ -437,6 +437,52 @@ const JobCard = ({ job, userEmail, onGenerateLearningPlan, savedJobs, appliedJob
     );
 };
 
+const normalizeJobData = (job) => {
+    // Handle both formats: detailed from /jobs/find-matches and basic from /parse-resume-file
+    return {
+        job_id: job.job_id || job.id,
+        title: job.title,
+        company: job.company,
+        job_url: job.job_url || '',
+        location: job.location,
+        remote_allowed: job.remote_allowed || false,
+        salary_min: job.salary_min,
+        salary_max: job.salary_max,
+        experience_level: job.experience_level,
+        skills_required: job.skills_required || [],
+
+        // Normalize scores - handle both formats
+        overall_score: job.overall_score || job.match_score || 0.5,
+        skills_similarity: job.skills_similarity || job.skill_match_score || 0.5,
+        experience_match: job.experience_match || 0.7,
+        location_match: job.location_match || 0.8,
+
+        // Normalize skill data
+        skill_matches: job.skill_matches || [],
+        skill_gaps: job.skill_gaps || [],
+        skill_gaps_detailed: job.skill_gaps_detailed || {
+            critical: job.skill_gaps || [],
+            important: [],
+            nice_to_have: [],
+            trending: []
+        },
+
+        // Normalize analysis data
+        gap_analysis: job.gap_analysis || {
+            total_gaps: (job.skill_gaps || []).length,
+            critical_gaps: (job.skill_gaps || []).length,
+            estimated_learning_weeks: Math.max(4, (job.skill_gaps || []).length * 2),
+            difficulty_level: (job.skill_gaps || []).length > 3 ? 'high' : 'medium'
+        },
+
+        match_explanation: job.match_explanation || `Based on your skills and experience`,
+        improvement_summary: job.improvement_summary || `Focus on key skills to improve your match`,
+
+        // Add recommendation_id if missing
+        recommendation_id: job.recommendation_id || `temp_${job.job_id || job.id}`
+    };
+};
+
 const JobRecommendations = ({
   userEmail,
   onNavigateToLearning,
@@ -502,22 +548,23 @@ const JobRecommendations = ({
     };
 
     const sortedAndFilteredRecommendations = recommendations
-        .filter(job => {
-            if (remoteOnly && !job.remote_allowed) return false;
-            if (experienceFilter !== 'all' && job.experience_level !== experienceFilter) return false;
-            return true;
-        })
-        .sort((a, b) => {
-            switch (sortBy) {
-                case 'salary':
-                    return (b.salary_max || 0) - (a.salary_max || 0);
-                case 'recent':
-                    return new Date(b.posted_date) - new Date(a.posted_date);
-                case 'match':
-                default:
-                    return b.overall_score - a.overall_score;
-            }
-        });
+    .map(normalizeJobData) // Normalize all job data first
+    .filter(job => {
+        if (remoteOnly && !job.remote_allowed) return false;
+        if (experienceFilter !== 'all' && job.experience_level !== experienceFilter) return false;
+        return true;
+    })
+    .sort((a, b) => {
+        switch (sortBy) {
+            case 'salary':
+                return (b.salary_max || 0) - (a.salary_max || 0);
+            case 'recent':
+                return new Date(b.posted_date) - new Date(a.posted_date);
+            case 'match':
+            default:
+                return b.overall_score - a.overall_score;
+        }
+    });
 
     if (loading && recommendations.length === 0) {
         return (
