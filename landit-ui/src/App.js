@@ -347,19 +347,12 @@ function App() {
     const handleUploadSuccess = (data) => {
         setShowUploader(false);
 
-        // Set parsed resume data
+        // Set parsed resume data and missing skills
         setParsedData(data.entities || []);
-
-        // Set the missing skills to state
         setMissingSkills(data.missing_skills || []);
 
-        // Set recommended jobs to state
-        setRecommendedJobs(data.recommended_jobs || []);
-
-        // Update job recommendations with the new jobs from resume analysis
-        if (data.recommended_jobs && data.recommended_jobs.length > 0) {
-            setJobRecommendations(data.recommended_jobs);
-        }
+        // Fetch fresh job recommendations, clearing any old ones
+        fetchJobRecommendations(true);
 
         // Save the entire data object to sessionStorage
         sessionStorage.setItem('resumeAnalysisData', JSON.stringify(data));
