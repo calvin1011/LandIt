@@ -8,21 +8,25 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activePlan, setActivePlan] = useState(null);
   const [activeJobContext, setActiveJobContext] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   useEffect(() => {
     if (messages.length === 0) {
-      setMessages([{
-        id: 1,
-        type: 'bot',
-        content: `Hi! I'm your AI Learning Coach. I can help you create personalized learning plans, suggest projects, 
-        and answer questions about skill development. What would you like to work on today?`,
-        timestamp: new Date()
-      }]);
+      setIsTyping(true);
+      setTimeout(() => {
+        setMessages([{
+          id: 1,
+          type: 'bot',
+          content: `Hi! I'm your AI Learning Coach. I can help you create personalized learning plans, suggest projects, and answer questions about skill development. What would you like to work on today?`,
+          timestamp: new Date()
+        }]);
+        setIsTyping(false);
+      }, 1500); // Simulate typing delay
     }
   }, [messages.length]);
 
@@ -45,6 +49,21 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       }
     }, [jobContext, onClearJobContext]);
 
+  const simulateTyping = (responseText, callback) => {
+    setIsTyping(true);
+
+    // Calculate typing speed (adjust for longer/shorter messages)
+    const baseDelay = 30; // ms per character
+    const minDelay = 1000; // minimum typing time
+    const maxDelay = 3000; // maximum typing time
+    const calculatedDelay = Math.min(maxDelay, Math.max(minDelay, responseText.length * baseDelay));
+
+    setTimeout(() => {
+      callback();
+      setIsTyping(false);
+    }, calculatedDelay);
+  };
+
   const handleGeneratePlan = async (jobData) => {
       setIsLoading(true);
 
@@ -56,12 +75,15 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           timestamp: new Date(),
           isError: true
         };
-        setMessages(prev => [...prev, errorMessage]);
+
+        simulateTyping(errorMessage.content, () => {
+          setMessages(prev => [...prev, errorMessage]);
+        });
+
         setIsLoading(false);
         return;
       }
 
-      // Use the same parameter names as old code
       try {
         const response = await fetch('http://localhost:8000/generate-learning-plan', {
           method: 'POST',
@@ -69,7 +91,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           body: JSON.stringify({
             user_email: userEmail,
             job_id: jobData.job_id,
-            recommendation_id: jobData.recommendation_id // This can be undefined/null
+            recommendation_id: jobData.recommendation_id
           })
         });
 
@@ -89,20 +111,53 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           timestamp: new Date(),
           isError: true
         };
-        setMessages(prev => [...prev, errorMessage]);
+
+        simulateTyping(errorMessage.content, () => {
+          setMessages(prev => [...prev, errorMessage]);
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
   const sendMessage = () => {
-    if (!inputMessage.trim() || isLoading) return;
-    const userMessage = { id: Date.now(), type: 'user', content: inputMessage, timestamp: new Date() };
+    if (!inputMessage.trim() || isLoading || isTyping) return;
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: inputMessage,
+      timestamp: new Date()
+    };
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
 
-    const botMessage = { id: Date.now() + 1, type: 'bot', content: "To generate a plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'.", timestamp: new Date() };
-    setMessages(prev => [...prev, botMessage]);
+    // Simulate AI thinking and responding
+    setIsTyping(true);
+
+    setTimeout(() => {
+      const botMessage = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: "To generate a personalized learning plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'. I can then create a customized roadmap to help you bridge any skill gaps for that specific role.",
+        timestamp: new Date()
+      };
+
+      simulateTyping(botMessage.content, () => {
+        setMessages(prev => [...prev, botMessage]);
+      });
+    }, 800); // Small delay before starting to "type"
+  };
+
+  const handleQuickAction = (action) => {
+    if (isLoading || isTyping) return;
+
+    setInputMessage(action);
+    // Auto-send after a brief moment
+    setTimeout(() => {
+      sendMessage();
+    }, 100);
   };
 
   const handleKeyPress = (e) => {
@@ -126,7 +181,60 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     );
   }
 
-  // Chat Interface
+  // Typing Indicator Component
+  const TypingIndicator = () => (
+    <div className="flex gap-4 justify-start" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+      <div style={{
+        width: '40px',
+        height: '40px',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}>
+        <Bot className="w-5 h-5 text-white" />
+      </div>
+      <div style={{
+        background: 'rgba(255,255,255,0.8)',
+        padding: '16px 20px',
+        borderRadius: '18px 18px 18px 6px',
+        border: '1px solid rgba(0,0,0,0.05)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+      }}>
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="flex gap-1">
+            <div style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: '#667eea',
+              borderRadius: '50%',
+              animation: 'typingBounce 1.4s infinite ease-in-out both'
+            }}></div>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: '#667eea',
+              borderRadius: '50%',
+              animation: 'typingBounce 1.4s infinite ease-in-out both',
+              animationDelay: '0.16s'
+            }}></div>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: '#667eea',
+              borderRadius: '50%',
+              animation: 'typingBounce 1.4s infinite ease-in-out both',
+              animationDelay: '0.32s'
+            }}></div>
+          </div>
+          <span className="text-sm" style={{ color: '#667eea', fontWeight: '500' }}>AI is thinking...</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{
       background: 'rgba(255, 255, 255, 0.95)',
@@ -168,7 +276,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       </div>
 
       {/* Quick Action Buttons */}
-      {messages.length <= 2 && (
+      {messages.length <= 2 && !isTyping && (
         <div style={{
           padding: '20px',
           borderBottom: '1px solid rgba(0,0,0,0.05)'
@@ -195,7 +303,8 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
             ].map((action, index) => (
               <button
                 key={index}
-                onClick={() => setInputMessage(action)}
+                onClick={() => handleQuickAction(action)}
+                disabled={isTyping}
                 style={{
                   padding: '8px 16px',
                   background: 'rgba(102, 126, 234, 0.1)',
@@ -204,14 +313,21 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
                   borderRadius: '20px',
                   fontSize: '12px',
                   fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  cursor: isTyping ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: isTyping ? 0.6 : 1
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.background = 'rgba(102, 126, 234, 0.2)';
+                  if (!isTyping) {
+                    e.target.style.background = 'rgba(102, 126, 234, 0.2)';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.background = 'rgba(102, 126, 234, 0.1)';
+                  if (!isTyping) {
+                    e.target.style.background = 'rgba(102, 126, 234, 0.1)';
+                    e.target.style.transform = 'translateY(0)';
+                  }
                 }}
               >
                 {action}
@@ -298,7 +414,10 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           </div>
         ))}
 
-        {/* Enhanced Loading State */}
+        {/* Typing Indicator */}
+        {isTyping && <TypingIndicator />}
+
+        {/* Enhanced Loading State for Plan Generation */}
         {isLoading && (
           <div className="flex gap-4 justify-start">
             <div style={{
@@ -388,15 +507,15 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
               maxHeight: '120px'
             }}
             rows="1"
-            disabled={isLoading}
+            disabled={isLoading || isTyping}
           />
           <button
             onClick={sendMessage}
-            disabled={!inputMessage.trim() || isLoading}
+            disabled={!inputMessage.trim() || isLoading || isTyping}
             style={{
               width: '44px',
               height: '44px',
-              background: inputMessage.trim() && !isLoading
+              background: inputMessage.trim() && !isLoading && !isTyping
                 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
                 : '#e5e7eb',
               color: 'white',
@@ -405,9 +524,9 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: inputMessage.trim() && !isLoading ? 'pointer' : 'not-allowed',
+              cursor: inputMessage.trim() && !isLoading && !isTyping ? 'pointer' : 'not-allowed',
               transition: 'all 0.2s ease',
-              opacity: inputMessage.trim() && !isLoading ? 1 : 0.6
+              opacity: inputMessage.trim() && !isLoading && !isTyping ? 1 : 0.6
             }}
           >
             <Send className="w-5 h-5" />
@@ -434,6 +553,17 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           }
           40% {
             transform: scale(1);
+          }
+        }
+        
+        @keyframes typingBounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.4;
+          }
+          30% {
+            transform: translateY(-10px);
+            opacity: 1;
           }
         }
       `}</style>

@@ -149,3 +149,21 @@ input, button {
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: rgba(102, 126, 234, 0.5);
 }
+
+/* typing animations */
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+/* Smooth transitions for typing indicator */
+.typing-indicator {
+  transition: all 0.3s ease-in-out;
+}
