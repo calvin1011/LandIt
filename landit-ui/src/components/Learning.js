@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, MessageSquare, ChevronDown, ChevronRight, CheckCircle, Clock, Target, BookOpen, ExternalLink, TrendingUp, AlertCircle, Award } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, ChevronDown, ChevronRight, CheckCircle, Clock, Target, BookOpen, ExternalLink, TrendingUp, AlertCircle, Award, Calendar, Star, Zap } from 'lucide-react';
 
 const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [messages, setMessages] = useState([]);
@@ -105,7 +105,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       const planMessage = {
         id: Date.now() + 1,
         type: 'bot',
-        content: `I've created a personalized learning plan for the ${jobData.title} position at ${jobData.company}! Here's your customized roadmap:`,
+        content: `I've developed a personalized learning plan for the **${jobData.title}** position at **${jobData.company}**! Here's your customized roadmap:`,
         timestamp: new Date(),
         isPlan: true,
         learningPlan: data.learning_plan,
@@ -140,135 +140,229 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }));
   };
 
-  // Learning Plan Component (rendered within chat)
+  // Enhanced Learning Plan Component with Professional Formatting
   const LearningPlanMessage = ({ plan, jobContext }) => {
     const [activeTab, setActiveTab] = useState('critical');
 
+    // Enhanced project card with better styling
     const ProjectCard = ({ project, category, index }) => {
       const projectId = `${category}-${index}`;
       const isExpanded = expandedProjects[projectId];
 
       const getDifficultyColor = (difficulty) => {
         switch (difficulty?.toLowerCase()) {
-          case 'beginner': return { text: 'text-green-700', bg: 'bg-green-100', border: 'border-green-200' };
-          case 'intermediate': return { text: 'text-yellow-700', bg: 'bg-yellow-100', border: 'border-yellow-200' };
-          case 'advanced': return { text: 'text-red-700', bg: 'bg-red-100', border: 'border-red-200' };
-          default: return { text: 'text-gray-700', bg: 'bg-gray-100', border: 'border-gray-200' };
+          case 'beginner': return {
+            text: 'text-green-700',
+            bg: 'bg-green-50',
+            border: 'border-green-200',
+            badge: 'text-green-800 bg-green-100 border-green-300'
+          };
+          case 'intermediate': return {
+            text: 'text-yellow-700',
+            bg: 'bg-yellow-50',
+            border: 'border-yellow-200',
+            badge: 'text-yellow-800 bg-yellow-100 border-yellow-300'
+          };
+          case 'advanced': return {
+            text: 'text-red-700',
+            bg: 'bg-red-50',
+            border: 'border-red-200',
+            badge: 'text-red-800 bg-red-100 border-red-300'
+          };
+          default: return {
+            text: 'text-gray-700',
+            bg: 'bg-gray-50',
+            border: 'border-gray-200',
+            badge: 'text-gray-800 bg-gray-100 border-gray-300'
+          };
         }
       };
 
-      const getCategoryIcon = (cat) => {
+      const getCategoryConfig = (cat) => {
         switch (cat) {
-          case 'critical': return <AlertCircle className="w-4 h-4 text-red-500" />;
-          case 'important': return <Target className="w-4 h-4 text-orange-500" />;
-          case 'trending': return <TrendingUp className="w-4 h-4 text-blue-500" />;
-          default: return <BookOpen className="w-4 h-4 text-gray-500" />;
+          case 'critical':
+            return {
+              icon: <AlertCircle className="w-4 h-4 text-red-500" />,
+              text: 'text-red-800',
+              bg: 'bg-red-50',
+              border: 'border-red-200',
+              label: 'High Priority',
+              gradient: 'from-red-500 to-orange-500'
+            };
+          case 'important':
+            return {
+              icon: <Target className="w-4 h-4 text-orange-500" />,
+              text: 'text-orange-800',
+              bg: 'bg-orange-50',
+              border: 'border-orange-200',
+              label: 'Core Skills',
+              gradient: 'from-orange-500 to-amber-500'
+            };
+          case 'trending':
+            return {
+              icon: <TrendingUp className="w-4 h-4 text-blue-500" />,
+              text: 'text-blue-800',
+              bg: 'bg-blue-50',
+              border: 'border-blue-200',
+              label: 'Emerging Skills',
+              gradient: 'from-blue-500 to-cyan-500'
+            };
+          default:
+            return {
+              icon: <BookOpen className="w-4 h-4 text-gray-500" />,
+              text: 'text-gray-800',
+              bg: 'bg-gray-50',
+              border: 'border-gray-200',
+              label: 'Additional Skills',
+              gradient: 'from-gray-500 to-gray-600'
+            };
         }
       };
 
       const difficultyColors = getDifficultyColor(project.difficulty);
+      const categoryConfig = getCategoryConfig(category);
 
       return (
-        <div className={`border ${difficultyColors.border} rounded-lg mb-3 overflow-hidden bg-white shadow-sm`}>
+        <div className={`border ${categoryConfig.border} rounded-xl mb-4 overflow-hidden bg-white shadow-sm hover:shadow-lg transition-all duration-300`}>
+          {/* Project Header */}
           <div
-            className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+            className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
             onClick={() => toggleProjectExpansion(projectId)}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  {getCategoryIcon(category)}
-                  <h4 className="font-semibold text-gray-900 text-sm">{project.title}</h4>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${difficultyColors.border} ${difficultyColors.bg} ${difficultyColors.text}`}>
-                    {project.difficulty}
-                  </span>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2 rounded-lg ${categoryConfig.bg}`}>
+                    {categoryConfig.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h4 className="font-bold text-gray-900 text-base">{project.title}</h4>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${difficultyColors.badge}`}>
+                        {project.difficulty}
+                      </span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${categoryConfig.bg} ${categoryConfig.text} border ${categoryConfig.border}`}>
+                        {categoryConfig.label}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 text-sm mt-2 leading-relaxed">{project.description}</p>
+                  </div>
                 </div>
-                <p className="text-gray-600 text-xs mb-2">{project.description}</p>
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{project.estimated_weeks} weeks</span>
+
+                {/* Project Metadata */}
+                <div className="flex items-center gap-6 text-sm text-gray-600 mt-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-500" />
+                    <span className="font-medium">{project.estimated_weeks} weeks</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <BookOpen className="w-3 h-3" />
-                    <span>{project.skills_addressed?.length || 0} skills</span>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-gray-500" />
+                    <span className="font-medium">{project.skills_addressed?.length || 0} key skills</span>
                   </div>
+                  {project.portfolio_value && (
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-gray-500" />
+                      <span className="font-medium text-blue-600">Portfolio-ready</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="ml-2 pt-1">
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+              <div className="ml-4 pt-2">
+                {isExpanded ?
+                  <ChevronDown className="w-5 h-5 text-gray-400" /> :
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                }
               </div>
             </div>
           </div>
 
+          {/* Expanded Content */}
           {isExpanded && (
-            <div className="border-t border-gray-200 p-4 bg-gray-50">
-              <div className="grid grid-cols-1 gap-4">
+            <div className={`border-t ${categoryConfig.border} p-6 ${categoryConfig.bg}`}>
+              <div className="grid md:grid-cols-2 gap-8">
+                {/* Learning Outcomes */}
                 <div>
-                  <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3 text-green-600" />
+                  <h5 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
                     Learning Outcomes
                   </h5>
-                  <ul className="space-y-1 text-xs text-gray-700">
+                  <ul className="space-y-3">
                     {project.learning_outcomes?.map((outcome, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">•</span>
-                        {outcome}
+                      <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
+                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <CheckCircle className="w-3 h-3 text-green-600" />
+                        </div>
+                        <span className="leading-relaxed">{outcome}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
+                {/* Milestones */}
                 <div>
-                  <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-blue-600" />
-                    Milestones
+                  <h5 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    Project Milestones
                   </h5>
-                  <div className="space-y-1 text-xs text-gray-700">
+                  <div className="space-y-3">
                     {project.milestones?.map((milestone, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                      <div key={i} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {i + 1}
                         </div>
-                        {milestone}
+                        <span className="text-sm text-gray-700 leading-relaxed">{milestone}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
+                {/* Resources */}
                 {project.resources && project.resources.length > 0 && (
-                  <div>
-                    <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
-                      <ExternalLink className="w-3 h-3 text-purple-600" />
-                      Resources
+                  <div className="md:col-span-2">
+                    <h5 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
+                      <BookOpen className="w-4 h-4 text-purple-600" />
+                      Learning Resources
                     </h5>
-                    <div className="space-y-1 text-xs">
+                    <div className="grid md:grid-cols-2 gap-3">
                       {project.resources.map((resource, i) => (
-                        <div key={i} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 cursor-pointer">
-                          <ExternalLink className="w-3 h-3" />
-                          <span>{resource.title || resource}</span>
-                        </div>
+                        <a
+                          key={i}
+                          href={resource.url || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 group"
+                        >
+                          <ExternalLink className="w-4 h-4 text-blue-500 group-hover:text-blue-600 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 group-hover:text-blue-600 font-medium">
+                            {resource.title || resource}
+                          </span>
+                        </a>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {(project.portfolio_value || project.market_relevance) && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {project.portfolio_value && (
-                      <div className="bg-white p-2 rounded border border-gray-200">
-                        <h6 className="font-semibold text-gray-800 text-xs">Portfolio Value</h6>
-                        <p className="text-gray-600 text-xs">{project.portfolio_value}</p>
-                      </div>
-                    )}
-                    {project.market_relevance && (
-                      <div className="bg-white p-2 rounded border border-gray-200">
-                        <h6 className="font-semibold text-gray-800 text-xs">Market Relevance</h6>
-                        <p className="text-gray-600 text-xs">{project.market_relevance}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Value Metrics */}
+                <div className="md:col-span-2 grid md:grid-cols-2 gap-4">
+                  {project.portfolio_value && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <h6 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <Award className="w-4 h-4 text-green-600" />
+                        Portfolio Value
+                      </h6>
+                      <p className="text-sm text-gray-600">{project.portfolio_value}</p>
+                    </div>
+                  )}
+                  {project.market_relevance && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <h6 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-blue-600" />
+                        Market Relevance
+                      </h6>
+                      <p className="text-sm text-gray-600">{project.market_relevance}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -282,42 +376,71 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       trending: plan.trending_projects?.length || 0
     };
 
+    // Enhanced tab configuration
+    const tabConfig = {
+      critical: { label: 'High Priority', count: projectCounts.critical },
+      important: { label: 'Core Skills', count: projectCounts.important },
+      trending: { label: 'Emerging Skills', count: projectCounts.trending }
+    };
+
     return (
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm mt-2 max-w-2xl">
-        {/* Plan Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Award className="w-4 h-4 text-blue-600" />
-            <h3 className="font-bold text-gray-900 text-sm">
-              Learning Plan: {jobContext.title} at {jobContext.company}
-            </h3>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg mt-4 max-w-4xl mx-auto">
+        {/* Enhanced Plan Header */}
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <Award className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">
+                Learning Plan: {jobContext.title}
+              </h3>
+              <p className="text-gray-600 text-sm">
+                {jobContext.company} • Personalized Development Roadmap
+              </p>
+            </div>
           </div>
-          <p className="text-gray-600 text-xs">{plan.overview}</p>
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2 text-sm">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              Strategic Overview
+            </h4>
+            <p className="text-gray-700 text-sm leading-relaxed">
+              {plan.overview || `This personalized learning plan is designed to bridge key skill gaps and prepare you for the ${jobContext.title} role at ${jobContext.company}. Focus on hands-on projects that build both technical skills and portfolio value.`}
+            </p>
+          </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex px-4 -mb-px">
-            {['critical', 'important', 'trending'].map(tab => (
-              projectCounts[tab] > 0 && (
+        {/* Enhanced Navigation Tabs */}
+        <div className="border-b border-gray-200 bg-gray-50">
+          <nav className="flex px-6 -mb-px">
+            {Object.entries(tabConfig).map(([tab, config]) => (
+              config.count > 0 && (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`py-2 px-3 border-b-2 font-medium text-xs capitalize ${
+                  className={`py-4 px-4 border-b-2 font-semibold text-sm transition-all duration-200 ${
                     activeTab === tab 
-                      ? 'border-blue-500 text-blue-600' 
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      ? 'border-blue-500 text-blue-600 bg-white rounded-t-lg' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  {tab} ({projectCounts[tab]})
+                  {config.label}
+                  <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                    activeTab === tab 
+                      ? 'bg-blue-100 text-blue-600' 
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {config.count}
+                  </span>
                 </button>
               )
             ))}
           </nav>
         </div>
 
-        {/* Projects */}
-        <div className="p-4 max-h-96 overflow-y-auto">
+        {/* Projects Section */}
+        <div className="p-6 max-h-96 overflow-y-auto">
           {activeTab === 'critical' && plan.critical_projects?.map((project, i) => (
             <ProjectCard key={i} project={project} category="critical" index={i} />
           ))}
@@ -327,22 +450,30 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           {activeTab === 'trending' && plan.trending_projects?.map((project, i) => (
             <ProjectCard key={i} project={project} category="trending" index={i} />
           ))}
+
+          {!plan[`${activeTab}_projects`]?.length && (
+            <div className="text-center py-8 text-gray-500">
+              <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium">No projects in this category</p>
+              <p className="text-sm">Focus on completing projects from other priority levels</p>
+            </div>
+          )}
         </div>
 
-        {/* Next Steps */}
+        {/* Enhanced Next Steps */}
         {plan.next_steps && plan.next_steps.length > 0 && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <h4 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
-              <Target className="w-3 h-3 text-green-600" />
-              Next Steps
+          <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+            <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2 uppercase tracking-wide">
+              <Target className="w-4 h-4 text-green-600" />
+              Recommended Next Steps
             </h4>
-            <div className="space-y-1 text-xs text-gray-700">
+            <div className="grid md:grid-cols-2 gap-3">
               {plan.next_steps.map((step, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
+                <div key={i} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {i + 1}
-                  </span>
-                  {step}
+                  </div>
+                  <span className="text-gray-700 text-sm font-medium leading-relaxed">{step}</span>
                 </div>
               ))}
             </div>
