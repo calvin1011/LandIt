@@ -425,11 +425,11 @@ function App() {
                 <Login onLoginSuccess={handleLoginSuccess} />
             ) : (
                 <div style={{
-                    minHeight: '100vh',
+                    height: '100vh',
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'auto'
                 }}>
                     {/* Animated Background Elements */}
                     <div style={{
