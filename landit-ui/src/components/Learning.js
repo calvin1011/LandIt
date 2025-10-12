@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
-import LearningPlan from './LearningPlan';
+import { Send, Bot, User, MessageSquare, ChevronDown, ChevronRight, CheckCircle, Clock, Target, BookOpen, ExternalLink, TrendingUp, AlertCircle, Award } from 'lucide-react';
 
 const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activePlan, setActivePlan] = useState(null);
-  const [activeJobContext, setActiveJobContext] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [expandedProjects, setExpandedProjects] = useState({});
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -26,36 +24,37 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
           timestamp: new Date()
         }]);
         setIsTyping(false);
-      }, 1500); // Simulate typing delay
+      }, 1500);
     }
   }, [messages.length]);
 
   useEffect(() => {
-      if (jobContext) {
-        console.log('Job Context received:', jobContext);
-        console.log('Job ID:', jobContext.job_id);
-        console.log('Recommendation ID:', jobContext.recommendation_id);
+    if (jobContext) {
+      console.log('Job Context received:', jobContext);
 
-        const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
-        const userMessage = { id: Date.now(), type: 'user', content: jobMessage, timestamp: new Date() };
+      const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
+      const userMessage = {
+        id: Date.now(),
+        type: 'user',
+        content: jobMessage,
+        timestamp: new Date()
+      };
 
-        setMessages(prev => [...prev, userMessage]);
-        setActiveJobContext(jobContext);
-        handleGeneratePlan(jobContext);
+      setMessages(prev => [...prev, userMessage]);
+      handleGeneratePlan(jobContext);
 
-        if (onClearJobContext) {
-          onClearJobContext();
-        }
+      if (onClearJobContext) {
+        onClearJobContext();
       }
-    }, [jobContext, onClearJobContext]);
+    }
+  }, [jobContext, onClearJobContext]);
 
-  const simulateTyping = (responseText, callback) => {
+  const simulateTyping = (responseText, callback, isPlan = false) => {
     setIsTyping(true);
 
-    // Calculate typing speed (adjust for longer/shorter messages)
-    const baseDelay = 30; // ms per character
-    const minDelay = 1000; // minimum typing time
-    const maxDelay = 3000; // maximum typing time
+    const baseDelay = isPlan ? 50 : 30;
+    const minDelay = isPlan ? 2000 : 1000;
+    const maxDelay = isPlan ? 4000 : 3000;
     const calculatedDelay = Math.min(maxDelay, Math.max(minDelay, responseText.length * baseDelay));
 
     setTimeout(() => {
@@ -65,60 +64,293 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   };
 
   const handleGeneratePlan = async (jobData) => {
-      setIsLoading(true);
+    setIsLoading(true);
 
-      if (!jobData || !jobData.job_id) {
-        const errorMessage = {
-          id: Date.now() + 1,
-          type: 'bot',
-          content: `I'm sorry, but I'm missing required information (job ID) to generate this plan. Please try selecting the job again.`,
-          timestamp: new Date(),
-          isError: true
-        };
+    if (!jobData || !jobData.job_id) {
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: `I'm sorry, but I'm missing required information to generate this plan. Please try selecting the job again.`,
+        timestamp: new Date(),
+        isError: true
+      };
 
-        simulateTyping(errorMessage.content, () => {
-          setMessages(prev => [...prev, errorMessage]);
-        });
+      simulateTyping(errorMessage.content, () => {
+        setMessages(prev => [...prev, errorMessage]);
+      });
 
-        setIsLoading(false);
-        return;
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/generate-learning-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: userEmail,
+          job_id: jobData.job_id,
+          recommendation_id: jobData.recommendation_id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate the learning plan.');
       }
 
-      try {
-        const response = await fetch('http://localhost:8000/generate-learning-plan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_email: userEmail,
-            job_id: jobData.job_id,
-            recommendation_id: jobData.recommendation_id
-          })
-        });
+      const data = await response.json();
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to generate the learning plan.');
+      // Create a rich learning plan message instead of redirecting
+      const planMessage = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: `I've created a personalized learning plan for the ${jobData.title} position at ${jobData.company}! Here's your customized roadmap:`,
+        timestamp: new Date(),
+        isPlan: true,
+        learningPlan: data.learning_plan,
+        jobContext: jobData
+      };
+
+      simulateTyping(planMessage.content, () => {
+        setMessages(prev => [...prev, planMessage]);
+      }, true);
+
+    } catch (error) {
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: `I encountered an error generating your learning plan: ${error.message || 'Unknown error'}. Please try again or select another job.`,
+        timestamp: new Date(),
+        isError: true
+      };
+
+      simulateTyping(errorMessage.content, () => {
+        setMessages(prev => [...prev, errorMessage]);
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleProjectExpansion = (projectId) => {
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId]
+    }));
+  };
+
+  // Learning Plan Component (rendered within chat)
+  const LearningPlanMessage = ({ plan, jobContext }) => {
+    const [activeTab, setActiveTab] = useState('critical');
+
+    const ProjectCard = ({ project, category, index }) => {
+      const projectId = `${category}-${index}`;
+      const isExpanded = expandedProjects[projectId];
+
+      const getDifficultyColor = (difficulty) => {
+        switch (difficulty?.toLowerCase()) {
+          case 'beginner': return { text: 'text-green-700', bg: 'bg-green-100', border: 'border-green-200' };
+          case 'intermediate': return { text: 'text-yellow-700', bg: 'bg-yellow-100', border: 'border-yellow-200' };
+          case 'advanced': return { text: 'text-red-700', bg: 'bg-red-100', border: 'border-red-200' };
+          default: return { text: 'text-gray-700', bg: 'bg-gray-100', border: 'border-gray-200' };
         }
+      };
 
-        const data = await response.json();
-        setActivePlan(data.learning_plan);
+      const getCategoryIcon = (cat) => {
+        switch (cat) {
+          case 'critical': return <AlertCircle className="w-4 h-4 text-red-500" />;
+          case 'important': return <Target className="w-4 h-4 text-orange-500" />;
+          case 'trending': return <TrendingUp className="w-4 h-4 text-blue-500" />;
+          default: return <BookOpen className="w-4 h-4 text-gray-500" />;
+        }
+      };
 
-      } catch (error) {
-        const errorMessage = {
-          id: Date.now() + 1,
-          type: 'bot',
-          content: `I encountered an error generating your learning plan: ${error.message || 'Unknown error'}. Please try again or select another job.`,
-          timestamp: new Date(),
-          isError: true
-        };
+      const difficultyColors = getDifficultyColor(project.difficulty);
 
-        simulateTyping(errorMessage.content, () => {
-          setMessages(prev => [...prev, errorMessage]);
-        });
-      } finally {
-        setIsLoading(false);
-      }
+      return (
+        <div className={`border ${difficultyColors.border} rounded-lg mb-3 overflow-hidden bg-white shadow-sm`}>
+          <div
+            className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => toggleProjectExpansion(projectId)}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  {getCategoryIcon(category)}
+                  <h4 className="font-semibold text-gray-900 text-sm">{project.title}</h4>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${difficultyColors.border} ${difficultyColors.bg} ${difficultyColors.text}`}>
+                    {project.difficulty}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-xs mb-2">{project.description}</p>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>{project.estimated_weeks} weeks</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" />
+                    <span>{project.skills_addressed?.length || 0} skills</span>
+                  </div>
+                </div>
+              </div>
+              <div className="ml-2 pt-1">
+                {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+              </div>
+            </div>
+          </div>
+
+          {isExpanded && (
+            <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-green-600" />
+                    Learning Outcomes
+                  </h5>
+                  <ul className="space-y-1 text-xs text-gray-700">
+                    {project.learning_outcomes?.map((outcome, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-green-500 mt-0.5">•</span>
+                        {outcome}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-blue-600" />
+                    Milestones
+                  </h5>
+                  <div className="space-y-1 text-xs text-gray-700">
+                    {project.milestones?.map((milestone, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+                        </div>
+                        {milestone}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {project.resources && project.resources.length > 0 && (
+                  <div>
+                    <h5 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3 text-purple-600" />
+                      Resources
+                    </h5>
+                    <div className="space-y-1 text-xs">
+                      {project.resources.map((resource, i) => (
+                        <div key={i} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 cursor-pointer">
+                          <ExternalLink className="w-3 h-3" />
+                          <span>{resource.title || resource}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(project.portfolio_value || project.market_relevance) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {project.portfolio_value && (
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <h6 className="font-semibold text-gray-800 text-xs">Portfolio Value</h6>
+                        <p className="text-gray-600 text-xs">{project.portfolio_value}</p>
+                      </div>
+                    )}
+                    {project.market_relevance && (
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <h6 className="font-semibold text-gray-800 text-xs">Market Relevance</h6>
+                        <p className="text-gray-600 text-xs">{project.market_relevance}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
     };
+
+    const projectCounts = {
+      critical: plan.critical_projects?.length || 0,
+      important: plan.important_projects?.length || 0,
+      trending: plan.trending_projects?.length || 0
+    };
+
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm mt-2 max-w-2xl">
+        {/* Plan Header */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Award className="w-4 h-4 text-blue-600" />
+            <h3 className="font-bold text-gray-900 text-sm">
+              Learning Plan: {jobContext.title} at {jobContext.company}
+            </h3>
+          </div>
+          <p className="text-gray-600 text-xs">{plan.overview}</p>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="flex px-4 -mb-px">
+            {['critical', 'important', 'trending'].map(tab => (
+              projectCounts[tab] > 0 && (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`py-2 px-3 border-b-2 font-medium text-xs capitalize ${
+                    activeTab === tab 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab} ({projectCounts[tab]})
+                </button>
+              )
+            ))}
+          </nav>
+        </div>
+
+        {/* Projects */}
+        <div className="p-4 max-h-96 overflow-y-auto">
+          {activeTab === 'critical' && plan.critical_projects?.map((project, i) => (
+            <ProjectCard key={i} project={project} category="critical" index={i} />
+          ))}
+          {activeTab === 'important' && plan.important_projects?.map((project, i) => (
+            <ProjectCard key={i} project={project} category="important" index={i} />
+          ))}
+          {activeTab === 'trending' && plan.trending_projects?.map((project, i) => (
+            <ProjectCard key={i} project={project} category="trending" index={i} />
+          ))}
+        </div>
+
+        {/* Next Steps */}
+        {plan.next_steps && plan.next_steps.length > 0 && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50">
+            <h4 className="font-semibold text-gray-800 text-xs mb-2 flex items-center gap-1">
+              <Target className="w-3 h-3 text-green-600" />
+              Next Steps
+            </h4>
+            <div className="space-y-1 text-xs text-gray-700">
+              {plan.next_steps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
+                    {i + 1}
+                  </span>
+                  {step}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const sendMessage = () => {
     if (!inputMessage.trim() || isLoading || isTyping) return;
@@ -133,31 +365,25 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
 
-    // Simulate AI thinking and responding
     setIsTyping(true);
-
     setTimeout(() => {
       const botMessage = {
         id: Date.now() + 1,
         type: 'bot',
-        content: "To generate a personalized learning plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'. I can then create a customized roadmap to help you bridge any skill gaps for that specific role.",
+        content: "I'd be happy to help! To create a personalized learning plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'. I can then analyze the role and build a customized roadmap for you.",
         timestamp: new Date()
       };
 
       simulateTyping(botMessage.content, () => {
         setMessages(prev => [...prev, botMessage]);
       });
-    }, 800); // Small delay before starting to "type"
+    }, 800);
   };
 
   const handleQuickAction = (action) => {
     if (isLoading || isTyping) return;
-
     setInputMessage(action);
-    // Auto-send after a brief moment
-    setTimeout(() => {
-      sendMessage();
-    }, 100);
+    setTimeout(() => sendMessage(), 100);
   };
 
   const handleKeyPress = (e) => {
@@ -166,20 +392,6 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       sendMessage();
     }
   };
-
-  if (activePlan && activeJobContext) {
-    return (
-      <LearningPlan
-        userEmail={userEmail}
-        jobMatch={activeJobContext}
-        existingPlan={activePlan}
-        onBack={() => {
-          setActivePlan(null);
-          setActiveJobContext(null);
-        }}
-      />
-    );
-  }
 
   // Typing Indicator Component
   const TypingIndicator = () => (
@@ -205,29 +417,9 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
       }}>
         <div className="flex items-center gap-3 text-gray-600">
           <div className="flex gap-1">
-            <div style={{
-              width: '8px',
-              height: '8px',
-              backgroundColor: '#667eea',
-              borderRadius: '50%',
-              animation: 'typingBounce 1.4s infinite ease-in-out both'
-            }}></div>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              backgroundColor: '#667eea',
-              borderRadius: '50%',
-              animation: 'typingBounce 1.4s infinite ease-in-out both',
-              animationDelay: '0.16s'
-            }}></div>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              backgroundColor: '#667eea',
-              borderRadius: '50%',
-              animation: 'typingBounce 1.4s infinite ease-in-out both',
-              animationDelay: '0.32s'
-            }}></div>
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#667eea', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out both' }}></div>
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#667eea', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out both', animationDelay: '0.16s' }}></div>
+            <div style={{ width: '8px', height: '8px', backgroundColor: '#667eea', borderRadius: '50%', animation: 'typingBounce 1.4s infinite ease-in-out both', animationDelay: '0.32s' }}></div>
           </div>
           <span className="text-sm" style={{ color: '#667eea', fontWeight: '500' }}>AI is thinking...</span>
         </div>
@@ -367,34 +559,43 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
               </div>
             )}
 
-            <div style={{
-              maxWidth: '70%',
-              background: message.type === 'user'
-                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                : message.isError
-                  ? '#fef2f2'
-                  : 'rgba(255,255,255,0.8)',
-              color: message.type === 'user' ? 'white' : message.isError ? '#dc2626' : '#1f2937',
-              padding: '16px 20px',
-              borderRadius: message.type === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
-              border: message.type === 'bot' && !message.isError ? '1px solid rgba(0,0,0,0.05)' :
-                     message.isError ? '1px solid #fecaca' : 'none',
-              boxShadow: message.type === 'bot' && !message.isError ? '0 4px 12px rgba(0,0,0,0.05)' :
-                        message.type === 'user' ? '0 4px 12px rgba(102, 126, 234, 0.2)' :
-                        message.isError ? '0 4px 12px rgba(220, 38, 38, 0.1)' : 'none',
-              lineHeight: '1.5'
-            }}>
-              <div className="whitespace-pre-wrap text-sm">
-                {message.content}
-              </div>
+            <div style={{ maxWidth: '70%' }}>
               <div style={{
-                fontSize: '11px',
-                opacity: 0.7,
-                marginTop: '8px',
-                textAlign: message.type === 'user' ? 'right' : 'left'
+                background: message.type === 'user'
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : message.isError
+                    ? '#fef2f2'
+                    : 'rgba(255,255,255,0.8)',
+                color: message.type === 'user' ? 'white' : message.isError ? '#dc2626' : '#1f2937',
+                padding: '16px 20px',
+                borderRadius: message.type === 'user' ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+                border: message.type === 'bot' && !message.isError ? '1px solid rgba(0,0,0,0.05)' :
+                       message.isError ? '1px solid #fecaca' : 'none',
+                boxShadow: message.type === 'bot' && !message.isError ? '0 4px 12px rgba(0,0,0,0.05)' :
+                          message.type === 'user' ? '0 4px 12px rgba(102, 126, 234, 0.2)' :
+                          message.isError ? '0 4px 12px rgba(220, 38, 38, 0.1)' : 'none',
+                lineHeight: '1.5'
               }}>
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="whitespace-pre-wrap text-sm">
+                  {message.content}
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  opacity: 0.7,
+                  marginTop: '8px',
+                  textAlign: message.type === 'user' ? 'right' : 'left'
+                }}>
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
+
+              {/* Render Learning Plan if this message contains one */}
+              {message.isPlan && message.learningPlan && (
+                <LearningPlanMessage
+                  plan={message.learningPlan}
+                  jobContext={message.jobContext}
+                />
+              )}
             </div>
 
             {message.type === 'user' && (
