@@ -14,6 +14,8 @@ const initialUserInfo = {
     fullName: '',
     age: '',
     profession: '',
+    city: '',
+    state: '',
     country: ''
 };
 
@@ -455,20 +457,20 @@ function App() {
 
                     {/* Header */}
                     <div style={{
-                        background: 'rgba(255, 255, 255, 0.1)',
+                        background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%)',
                         backdropFilter: 'blur(20px) saturate(180%)',
                         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-                        borderBottom: '1px solid rgba(255,255,255,0.18)',
+                        borderBottom: '1px solid rgba(255,255,255,0.3)',
                         padding: '20px 40px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        position: 'fixed', // Changed from 'sticky' to 'fixed'
+                        position: 'fixed',
                         top: 0,
                         left: 0,
                         right: 0,
-                        zIndex: 1000, // Increased z-index
-                        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)'
+                        zIndex: 1000,
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                             <div style={{
@@ -790,11 +792,11 @@ function App() {
 
                     <div style={{
                         padding: '30px 40px',
-                        paddingTop: '120px',
+                        paddingTop: '130px',
                         width: '100%',
                         boxSizing: 'border-box',
                         animation: 'fadeIn 0.6s ease-out',
-                        minHeight: 'calc(100vh - 120px)'
+                        minHeight: 'calc(100vh - 130px)'
                     }}>
                         {/* Profile Section */}
                         <Profile userInfo={userInfo} setUserInfo={setUserInfo} />

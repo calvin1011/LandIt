@@ -53,6 +53,8 @@ const Profile = ({ userInfo, setUserInfo }) => {
                     { key: 'fullName', label: 'Full Name', icon: '👤' },
                     { key: 'age', label: 'Age', icon: '📅' },
                     { key: 'profession', label: 'Profession', icon: '💼' },
+                    { key: 'city', label: 'City', icon: '🏙️', required: true },
+                    { key: 'state', label: 'State', icon: '📍', required: true },
                     { key: 'country', label: 'Country', icon: '🌍' }
                 ].map(field => (
                     <div key={field.key} style={{
@@ -71,7 +73,7 @@ const Profile = ({ userInfo, setUserInfo }) => {
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px'
                         }}>
-                            {field.icon} {field.label}
+                            {field.icon} {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                         </label>
                         {editing ? (
                             <input
