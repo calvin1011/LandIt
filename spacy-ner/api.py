@@ -288,6 +288,98 @@ class QuickApplyRequest(BaseModel):
     job_id: int
 
 
+def extract_user_location_preferences(text: str, entities: List[Dict]) -> List[str]:
+    """
+    Extract user's location preferences from resume text and entities.
+
+    Returns a list of location strings that represent where the user is or wants to work.
+    """
+    locations = []
+
+    # 1. Extract from entities (GPE = Geopolitical Entity in spaCy)
+    for entity in entities:
+        if isinstance(entity, dict):
+            label = entity.get('label', '')
+            entity_text = entity.get('text', '')
+
+            # Look for location entities
+            if label in ['GPE', 'LOC', 'LOCATION'] and entity_text:
+                # Filter out common non-location words
+                if entity_text.lower() not in ['remote', 'hybrid', 'onsite', 'office']:
+                    locations.append(entity_text.strip())
+
+    # 2. Look for explicit location indicators in text
+    text_lower = text.lower()
+
+    # Common patterns in resumes
+    location_patterns = [
+        r'location[:\s]+([^\n]+)',
+        r'based in[:\s]+([^\n]+)',
+        r'residing in[:\s]+([^\n]+)',
+        r'currently in[:\s]+([^\n]+)',
+        r'address[:\s]+([^\n]+)',
+        r'willing to relocate to[:\s]+([^\n]+)',
+        r'open to[:\s]+([^\n]+)',
+        r'seeking opportunities in[:\s]+([^\n]+)',
+    ]
+
+    for pattern in location_patterns:
+        matches = re.findall(pattern, text_lower, re.IGNORECASE)
+        for match in matches:
+            # Clean the match
+            location = match.strip().split('\n')[0].strip()
+            # Remove common suffixes
+            location = re.sub(r'\s*\|.*$', '', location)
+            location = re.sub(r'\s*•.*$', '', location)
+
+            if location and len(location) > 2 and len(location) < 100:
+                locations.append(location)
+
+    # 3. Look for phone numbers with area codes (US-specific, optional)
+    # US phone patterns can hint at location
+    phone_pattern = r'\((\d{3})\)'
+    area_codes = re.findall(phone_pattern, text)
+
+    # You could map area codes to regions, but that's optional and complex
+    # We'll skip this for simplicity
+
+    # 4. Clean and deduplicate
+    cleaned_locations = []
+    seen = set()
+
+    for loc in locations:
+        loc_clean = loc.strip().title()  # Capitalize properly
+        loc_lower = loc_clean.lower()
+
+        # Skip if we've seen it or if it's too generic
+        if loc_lower in seen or loc_lower in ['', 'n/a', 'various', 'multiple']:
+            continue
+
+        seen.add(loc_lower)
+        cleaned_locations.append(loc_clean)
+
+    # Return top 3 most relevant locations
+    return cleaned_locations[:3] if cleaned_locations else []
+
+
+def enhance_personal_info_with_location(personal_info: Dict[str, Any], text: str, entities: List[Dict]) -> Dict[
+    str, Any]:
+    """
+    Enhance personal_info dictionary with location preferences.
+    This modifies the personal_info dict in place and returns it.
+    """
+    # Only extract if not already present
+    if 'preferred_locations' not in personal_info or not personal_info['preferred_locations']:
+        locations = extract_user_location_preferences(text, entities)
+        personal_info['preferred_locations'] = locations
+
+    # Also set a single 'location' field if available
+    if locations := personal_info.get('preferred_locations', []):
+        if 'location' not in personal_info:
+            personal_info['location'] = locations[0]
+
+    return personal_info
+
 def extract_skills(text: str) -> List[str]:
     """
     Extracts skills from a given text using the NER model, dependency parsing,
@@ -686,7 +778,7 @@ def find_job_matches(match_request: JobMatchRequest):
             job_level = job.get('experience_level', 'mid')
             experience_match = calculate_experience_match(user_years, job_level)
             location_match = calculate_location_match(
-                user_resume.get('preferred_locations', []),
+                extract_user_locations(user_resume),
                 job.get('location', ''),
                 job.get('remote_allowed', False)
             )
@@ -1018,20 +1110,109 @@ def calculate_experience_match(user_years: int, job_level: str) -> float:
 
 
 def calculate_location_match(user_locations: List[str], job_location: str, remote_allowed: bool) -> float:
-    """Calculate location preference match"""
+    """
+    Enhanced location preference matching with fuzzy matching and intelligent scoring
+
+    Returns a score from 0.0 to 1.0 where:
+    - 1.0 = Perfect match (remote job or exact location match)
+    - 0.8-0.9 = Strong match (same city/state)
+    - 0.5-0.7 = Moderate match (same state or nearby)
+    - 0.3-0.4 = Weak match (different state but same country)
+    - 0.0-0.2 = Poor match (different country or very far)
+    """
+
+    # Remote jobs get perfect score
     if remote_allowed:
-        return 1.0  # Perfect match for remote work
+        return 1.0
 
+    # No user location data - return neutral moderate score
     if not user_locations or not job_location:
-        return 0.6  # Neutral if no location data
+        return 0.5
 
-    # Simple location matching (you can enhance this)
-    job_location_lower = job_location.lower()
+    # Normalize job location
+    job_location_clean = job_location.lower().strip()
+
+    # Check for "remote" in job location string
+    if 'remote' in job_location_clean or 'anywhere' in job_location_clean:
+        return 1.0
+
+    best_match_score = 0.0
+
     for user_loc in user_locations:
-        if user_loc.lower() in job_location_lower or job_location_lower in user_loc.lower():
+        user_loc_clean = user_loc.lower().strip()
+
+        # Exact match (case-insensitive)
+        if user_loc_clean == job_location_clean:
             return 1.0
 
-    return 0.3  # Low match for different locations
+        # Fuzzy match using token_set_ratio (handles word order and extra words)
+        fuzzy_score = fuzz.token_set_ratio(user_loc_clean, job_location_clean)
+
+        # Convert fuzzy score (0-100) to our scale
+        if fuzzy_score >= 90:  # Near-exact match
+            match_score = 1.0
+        elif fuzzy_score >= 75:  # Strong match (likely same city)
+            match_score = 0.85
+        elif fuzzy_score >= 60:  # Good match (same state/region)
+            match_score = 0.7
+        elif fuzzy_score >= 40:  # Moderate match (nearby or partial match)
+            match_score = 0.5
+        else:  # Weak match
+            match_score = 0.3
+
+        # Check for state matches (common US state abbreviations and names)
+        user_state = extract_state(user_loc_clean)
+        job_state = extract_state(job_location_clean)
+
+        if user_state and job_state and user_state == job_state:
+            # Same state boosts score
+            match_score = max(match_score, 0.75)
+
+        best_match_score = max(best_match_score, match_score)
+
+    return best_match_score
+
+
+def extract_state(location_string: str) -> Optional[str]:
+    """Extract state abbreviation or name from location string"""
+
+    # Common US state abbreviations mapping
+    state_mapping = {
+        'alabama': 'al', 'alaska': 'ak', 'arizona': 'az', 'arkansas': 'ar',
+        'california': 'ca', 'colorado': 'co', 'connecticut': 'ct', 'delaware': 'de',
+        'florida': 'fl', 'georgia': 'ga', 'hawaii': 'hi', 'idaho': 'id',
+        'illinois': 'il', 'indiana': 'in', 'iowa': 'ia', 'kansas': 'ks',
+        'kentucky': 'ky', 'louisiana': 'la', 'maine': 'me', 'maryland': 'md',
+        'massachusetts': 'ma', 'michigan': 'mi', 'minnesota': 'mn', 'mississippi': 'ms',
+        'missouri': 'mo', 'montana': 'mt', 'nebraska': 'ne', 'nevada': 'nv',
+        'new hampshire': 'nh', 'new jersey': 'nj', 'new mexico': 'nm', 'new york': 'ny',
+        'north carolina': 'nc', 'north dakota': 'nd', 'ohio': 'oh', 'oklahoma': 'ok',
+        'oregon': 'or', 'pennsylvania': 'pa', 'rhode island': 'ri', 'south carolina': 'sc',
+        'south dakota': 'sd', 'tennessee': 'tn', 'texas': 'tx', 'utah': 'ut',
+        'vermont': 'vt', 'virginia': 'va', 'washington': 'wa', 'west virginia': 'wv',
+        'wisconsin': 'wi', 'wyoming': 'wy'
+    }
+
+    # Reverse mapping (abbreviation to abbreviation)
+    abbrev_set = set(state_mapping.values())
+
+    location_lower = location_string.lower()
+
+    # Look for state abbreviations (2-letter codes)
+    # Pattern: comma or space followed by 2 capital letters
+    abbrev_pattern = r'\b([a-z]{2})\b'
+    matches = re.findall(abbrev_pattern, location_lower)
+
+    for match in matches:
+        if match in abbrev_set:
+            return match
+
+    # Look for full state names
+    for state_name, state_abbrev in state_mapping.items():
+        if state_name in location_lower:
+            return state_abbrev
+
+    return None
 
 
 def extract_user_skills(user_resume: Dict) -> List[str]:
@@ -1061,6 +1242,88 @@ def extract_user_skills(user_resume: Dict) -> List[str]:
 
     return list(set(skills))  # Remove duplicates
 
+def extract_user_locations(user_resume: Dict) -> List[str]:
+    """
+    Extract user's preferred locations from resume data.
+    Handles multiple storage formats (preferred_locations, city/state, personal_info, etc.)
+    """
+    locations = []
+
+    # 1. Check for preferred_locations array (from our extraction)
+    if 'preferred_locations' in user_resume and user_resume['preferred_locations']:
+        locations.extend(user_resume['preferred_locations'])
+
+    # 2. Check personal_info for preferred_locations
+    personal_info = user_resume.get('personal_info', {})
+    if isinstance(personal_info, dict):
+        if 'preferred_locations' in personal_info and personal_info['preferred_locations']:
+            locations.extend(personal_info['preferred_locations'])
+
+        # Also check for single location field
+        if 'location' in personal_info and personal_info['location']:
+            locations.append(personal_info['location'])
+
+    # 3. Check for city/state fields (from manual input)
+    city = user_resume.get('city') or user_resume.get('location_city')
+    state = user_resume.get('state') or user_resume.get('location_state')
+
+    if city and state:
+        # Format as "City, State"
+        locations.append(f"{city}, {state}")
+    elif city:
+        locations.append(city)
+    elif state:
+        locations.append(state)
+
+    # 4. Check structured_data for location info
+    structured_data = user_resume.get('structured_data')
+    if structured_data:
+        if isinstance(structured_data, str):
+            try:
+                structured_data = json.loads(structured_data)
+            except:
+                structured_data = {}
+
+        if isinstance(structured_data, dict):
+            struct_personal = structured_data.get('personal_info', {})
+            if isinstance(struct_personal, dict):
+                if 'preferred_locations' in struct_personal:
+                    locations.extend(struct_personal['preferred_locations'])
+                if 'location' in struct_personal:
+                    locations.append(struct_personal['location'])
+
+    # 5. Remove duplicates and clean
+    cleaned_locations = []
+    seen = set()
+
+    for loc in locations:
+        if not loc:
+            continue
+
+        loc_clean = str(loc).strip()
+        loc_lower = loc_clean.lower()
+
+        if loc_lower in seen or loc_lower in ['', 'none', 'null']:
+            continue
+
+        seen.add(loc_lower)
+        cleaned_locations.append(loc_clean)
+
+    return cleaned_locations
+
+def debug_user_location(user_resume: Dict) -> Dict:
+    """
+    Debug helper to see what location data is available in user resume
+    """
+    debug_info = {
+        'preferred_locations': user_resume.get('preferred_locations'),
+        'city': user_resume.get('city'),
+        'state': user_resume.get('state'),
+        'personal_info_location': user_resume.get('personal_info', {}).get('location'),
+        'personal_info_preferred': user_resume.get('personal_info', {}).get('preferred_locations'),
+        'extracted_locations': extract_user_locations(user_resume)
+    }
+    return debug_info
 
 def generate_match_explanation(overall_score: float, skill_matches: List[str], skill_gaps: List[str],
                                experience_match: float) -> str:
@@ -1645,7 +1908,11 @@ async def parse_resume_file(
                     'overall_score': round(skills_similarity * 0.7 + experience_match * 0.3, 3),
                     'skills_similarity': round(skills_similarity, 3),
                     'experience_match': round(experience_match, 3),
-                    'location_match': 0.8,  # Default moderate match
+                    'location_match': calculate_location_match(
+                        merged_results.get('personal_info', {}).get('preferred_locations', []),
+                        job.get('location', ''),
+                        job.get('remote_allowed', False)
+                    ),
                     'skill_matches': list(user_skills_set & job_skills_set),
                     'skill_gaps': list(job_skills_set - user_skills_set)[:3],
                     'match_explanation': generate_basic_match_explanation(
@@ -2526,6 +2793,12 @@ def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, origin
             if value and isinstance(value, str):
                 if field not in merged["personal_info"] or not merged["personal_info"].get(field):
                     merged["personal_info"][field] = value
+
+        merged["personal_info"] = enhance_personal_info_with_location(
+            merged["personal_info"],
+            original_text,
+            merged["entities"]
+        )
 
         # Enhance skills with semantic findings
         semantic_skills = semantic_structured.get("skills", [])
