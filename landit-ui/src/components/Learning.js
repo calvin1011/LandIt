@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
-import LearningPlan from './LearningPlan'; // Import the improved LearningPlan component
+import LearningPlan from './LearningPlan';
 
 const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [messages, setMessages] = useState([]);
@@ -10,12 +10,10 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [activeJobContext, setActiveJobContext] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Initial greeting
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([{
@@ -27,67 +25,85 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }
   }, [messages.length]);
 
-  // Handle incoming job context to auto-start a plan
   useEffect(() => {
-    if (jobContext) {
-      const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
-      const userMessage = { id: Date.now(), type: 'user', content: jobMessage, timestamp: new Date() };
+      if (jobContext) {
+        console.log('Job Context received:', jobContext);
+        console.log('Job ID:', jobContext.job_id);
+        console.log('Recommendation ID:', jobContext.recommendation_id);
 
-      setMessages(prev => [...prev, userMessage]);
-      setActiveJobContext(jobContext);
-      handleGeneratePlan(jobContext); // Directly call plan generation
+        const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
+        const userMessage = { id: Date.now(), type: 'user', content: jobMessage, timestamp: new Date() };
 
-      if (onClearJobContext) {
-        onClearJobContext();
+        setMessages(prev => [...prev, userMessage]);
+        setActiveJobContext(jobContext);
+        handleGeneratePlan(jobContext);
+
+        if (onClearJobContext) {
+          onClearJobContext();
+        }
       }
-    }
-  }, [jobContext, onClearJobContext]);
+    }, [jobContext, onClearJobContext]);
 
-  const handleGeneratePlan = async (job) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('http://localhost:8000/generate-learning-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_email: userEmail,
-          job_id: job.job_id,
-          recommendation_id: job.recommendation_id
-        })
-      });
+  const handleGeneratePlan = async (jobData) => {
+      setIsLoading(true);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to generate learning plan');
+      // FIX: Only require job_id, recommendation_id is optional
+      if (!jobData || !jobData.job_id) {
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'bot',
+          content: `I'm sorry, but I'm missing required information (job ID) to generate this plan. Please try selecting the job again.`,
+          timestamp: new Date(),
+          isError: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setIsLoading(false);
+        return;
       }
 
-      const data = await response.json();
-      setActivePlan(data.learning_plan);
-      // We no longer add the plan to the chat history
-    } catch (error) {
-      const errorMessage = {
-        id: Date.now() + 1,
-        type: 'bot',
-        content: `I encountered an error generating your learning plan: ${error.message}. Let me help you in another way - what specific skills would you like to focus on?`,
-        timestamp: new Date(),
-        isError: true
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      // Use the same parameter names as old code
+      try {
+        const response = await fetch('http://localhost:8000/generate-learning-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_email: userEmail,
+            job_id: jobData.job_id,
+            recommendation_id: jobData.recommendation_id // This can be undefined/null
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to generate the learning plan.');
+        }
+
+        const data = await response.json();
+        setActivePlan(data.learning_plan);
+
+      } catch (error) {
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'bot',
+          // Fix the error message display
+          content: `I encountered an error generating your learning plan: ${error.message || 'Unknown error'}. Please try again or select another job.`,
+          timestamp: new Date(),
+          isError: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   const sendMessage = () => {
-     if (!inputMessage.trim() || isLoading) return;
-     // For simplicity, this is now a placeholder. The main functionality
-     // is generating a plan from a job context.
-     const userMessage = { id: Date.now(), type: 'user', content: inputMessage, timestamp: new Date() };
-     setMessages(prev => [...prev, userMessage]);
-     setInputMessage('');
+    if (!inputMessage.trim() || isLoading) return;
+    const userMessage = { id: Date.now(), type: 'user', content: inputMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
 
-     const botMessage = { id: Date.now() + 1, type: 'bot', content: "To generate a plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'.", timestamp: new Date() };
-     setMessages(prev => [...prev, botMessage]);
+    const botMessage = { id: Date.now() + 1, type: 'bot', content: "To generate a plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'.", timestamp: new Date() };
+    setMessages(prev => [...prev, botMessage]);
   };
 
   const handleKeyPress = (e) => {
@@ -97,7 +113,6 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }
   };
 
-  // Main View: either show the Learning Plan or the Chat
   if (activePlan && activeJobContext) {
     return (
       <LearningPlan
@@ -105,8 +120,8 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
         jobMatch={activeJobContext}
         existingPlan={activePlan}
         onBack={() => {
-            setActivePlan(null);
-            setActiveJobContext(null);
+          setActivePlan(null);
+          setActiveJobContext(null);
         }}
       />
     );
