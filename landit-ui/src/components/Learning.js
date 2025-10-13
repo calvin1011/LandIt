@@ -483,7 +483,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     );
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || isTyping) return;
 
     const userMessage = {
@@ -496,19 +496,60 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
 
+    setIsLoading(true);
     setIsTyping(true);
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('http://localhost:8000/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: userEmail,
+          message: inputMessage,
+          conversation_history: messages
+            .filter(m => m.type === 'user' || m.type === 'bot')
+            .slice(-6) // Last 6 messages for context
+            .map(m => ({
+              role: m.type === 'user' ? 'user' : 'assistant',
+              content: m.content
+            }))
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+
       const botMessage = {
         id: Date.now() + 1,
         type: 'bot',
-        content: "I'd be happy to help! To create a personalized learning plan, please select a job from the 'Jobs' tab and click 'Get Learning Plan'. I can then analyze the role and build a customized roadmap for you.",
+        content: data.response,
         timestamp: new Date()
       };
 
       simulateTyping(botMessage.content, () => {
         setMessages(prev => [...prev, botMessage]);
       });
-    }, 800);
+
+    } catch (error) {
+      console.error('Chat error:', error);
+
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: "I'm having trouble connecting to my AI service right now. Please try again in a moment, or use the 'Get Learning Plan' feature for structured guidance.",
+        timestamp: new Date(),
+        isError: true
+      };
+
+      simulateTyping(errorMessage.content, () => {
+        setMessages(prev => [...prev, errorMessage]);
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleQuickAction = (action) => {

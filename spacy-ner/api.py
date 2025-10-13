@@ -287,6 +287,14 @@ class QuickApplyRequest(BaseModel):
     user_email: str
     job_id: int
 
+class ChatRequest(BaseModel):
+    user_email: str
+    message: str
+    conversation_history: Optional[List[Dict]] = []
+
+class ChatResponse(BaseModel):
+    response: str
+    conversation_id: Optional[str] = None
 
 def extract_user_location_preferences(text: str, entities: List[Dict]) -> List[str]:
     """
@@ -1676,6 +1684,77 @@ def generate_learning_plan(request: LearningPlanRequest):
             status_code=500,
             detail=f"Learning plan generation failed: {str(e)}"
         )
+
+@app.post("/ai/chat")
+def ai_chat_endpoint(request: ChatRequest):
+    """
+    General AI chat endpoint for career guidance and skill questions
+    Uses the same OpenAI integration as learning plan generation
+    """
+    try:
+        # Use your existing AIProjectGenerator's OpenAI setup
+        from ai_project_generator import AIProjectGenerator
+
+        # Initialize with your existing API key
+        ai_generator = AIProjectGenerator()
+
+        # Build conversation context for career coaching
+        system_prompt = """You are an AI Career Coach specializing in tech careers, learning paths, and skill development. 
+        You help users with:
+        - Career guidance and path recommendations
+        - Skill development advice and learning resources
+        - Interview preparation and resume tips
+        - Tech industry insights and trends
+        - Project recommendations and portfolio building
+
+        Be helpful, encouraging, and provide actionable advice. When users ask about specific skills or careers, 
+        provide concrete learning steps and practical resources.
+
+        IMPORTANT: If users ask about creating learning plans, guide them to use the 'Get Learning Plan' button 
+        on specific jobs for personalized, structured roadmaps. For general career questions, provide direct helpful answers."""
+
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        # Add conversation history if provided
+        if request.conversation_history:
+            messages.extend(request.conversation_history)
+
+        # Add current message
+        messages.append({"role": "user", "content": request.message})
+
+        # Use the same OpenAI client from your AIProjectGenerator
+        response = ai_generator.client.chat.completions.create(
+            model=ai_generator.model,  # Use the same model as learning plans
+            messages=messages,
+            max_tokens=800,  # Slightly more for detailed answers
+            temperature=0.7
+        )
+
+        ai_response = response.choices[0].message.content
+
+        return ChatResponse(
+            response=ai_response,
+            conversation_id=f"conv_{hash(request.user_email)}"
+        )
+
+    except Exception as e:
+        logger.error(f"AI chat failed: {e}")
+        # Fallback to basic responses if OpenAI fails
+        fallback_responses = {
+            "sql": "For SQL skills, focus on: complex queries, optimization, database design, and working with large datasets. Practice with real-world scenarios like e-commerce or analytics databases.",
+            "skills": "Top in-demand tech skills: Cloud (AWS/Azure), AI/ML, DevOps, Cybersecurity, Full Stack Development, Data Analytics, and Containerization (Docker/Kubernetes).",
+            "career": "For career advice, consider your current skills and interests. I can help more specifically if you share your background or target roles.",
+            "default": "I'd be happy to help with career guidance! For personalized learning plans, select a job from the Jobs tab. For general advice, tell me what you're working on."
+        }
+
+        user_message_lower = request.message.lower()
+        for keyword, response in fallback_responses.items():
+            if keyword in user_message_lower and keyword != "default":
+                return ChatResponse(response=response)
+
+        return ChatResponse(response=fallback_responses["default"])
 
 @app.get("/learning-plans/{user_email}")
 def get_user_learning_plans(user_email: str, limit: int = 10):
