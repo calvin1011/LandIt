@@ -758,6 +758,40 @@ class DatabaseConnection:
             logger.error(f" Failed to update learning progress: {e}")
             raise
 
+    def deactivate_old_jobs(self, days_old: int = 30) -> int:
+        """
+        Deactivate jobs older than specified days
+
+        Args:
+            days_old: Jobs older than this many days will be deactivated
+
+        Returns:
+            Number of jobs deactivated
+        """
+        try:
+            cursor = self.get_cursor()
+
+            query = """
+                    UPDATE jobs
+                    SET is_active  = false,
+                        updated_at = NOW()
+                    WHERE is_active = true
+                      AND posted_date < NOW() - INTERVAL '%s days'
+                        RETURNING id; \
+                    """
+
+            cursor.execute(query, (days_old,))
+            results = cursor.fetchall()
+            count = len(results)
+            cursor.close()
+
+            logger.info(f"Deactivated {count} jobs older than {days_old} days")
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to deactivate old jobs: {e}")
+            return 0
+
     # Utility methods
 
     def test_connection(self) -> bool:

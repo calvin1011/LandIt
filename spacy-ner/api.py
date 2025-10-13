@@ -37,8 +37,18 @@ def run_all_job_imports():
     except Exception as e:
         logger.error(f"SCHEDULER: Exception during automated job import: {e}")
 
+def run_job_cleanup():
+    """Scheduled job to clean up old postings"""
+    logger.info("SCHEDULER: Running job cleanup...")
+    try:
+        count = db.deactivate_old_jobs(days_old=4)  # Remove jobs older than "" days
+        logger.info(f"SCHEDULER: Deactivated {count} old jobs")
+    except Exception as e:
+        logger.error(f"SCHEDULER: Job cleanup failed: {e}")
+
 # Schedule job imports every 6 hours
 scheduler.add_job(run_all_job_imports, 'interval', hours=6, next_run_time=datetime.now() + timedelta(seconds=10))
+scheduler.add_job(run_job_cleanup, 'cron', hour=2, minute=0)
 
 # simple in memory cache for requests
 recent_learning_requests = {}
@@ -1515,6 +1525,19 @@ def generate_improvement_summary(skill_gaps_detailed: Dict, gap_analysis: Dict) 
 
     return ". ".join(summary_parts) + "."
 
+@app.post("/admin/cleanup-old-jobs")
+def cleanup_old_jobs(days_old: int = 30):
+    """Remove jobs older than X days"""
+    try:
+        count = db.deactivate_old_jobs(days_old)
+        return {
+            "success": True,
+            "deactivated_count": count,
+            "message": f"Deactivated {count} jobs older than {days_old} days"
+        }
+    except Exception as e:
+        logger.error(f"Job cleanup failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate-learning-plan")
 def generate_learning_plan(request: LearningPlanRequest):
