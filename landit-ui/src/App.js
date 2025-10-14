@@ -796,8 +796,8 @@ function App() {
                         animation: 'fadeIn 0.6s ease-out',
                         minHeight: 'calc(100vh - 130px)'
                     }}>
-                        {/* Profile Section */}
-                        <Profile userInfo={userInfo} setUserInfo={setUserInfo} />
+                        {/* Profile Section - Only show on Resume tab */}
+                        {activeTab === 'resume' && <Profile userInfo={userInfo} setUserInfo={setUserInfo} />}
 
                         {/* Job Description Text Area */}
                         {activeTab === 'resume' && (
