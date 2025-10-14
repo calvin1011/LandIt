@@ -101,9 +101,8 @@ class AdzunaJobImporter:
 
                 # Handle rate limiting
                 if response.status_code == 429:
-                    logger.warning("Rate limit hit, waiting 60 seconds...")
-                    time.sleep(60)
-                    continue  # Retry the same page
+                    logger.warning("Rate limit hit for keyword '{keyword}'. Moving to the next keyword.")
+                    break
 
                 if response.status_code == 400:
                     logger.error(f"Bad Request (400) for keyword '{keyword}' page {page}")
