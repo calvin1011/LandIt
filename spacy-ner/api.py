@@ -25,6 +25,109 @@ import requests
 from contextlib import asynccontextmanager
 from thefuzz import fuzz
 
+from spacy.matcher import PhraseMatcher
+
+COMPREHENSIVE_SKILL_LIBRARY = {
+    # Programming Languages
+    "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "Go", "Rust",
+    "Ruby", "PHP", "Swift", "Kotlin", "Scala", "R", "MATLAB", "Perl", "C",
+    "Objective-C", "Dart", "Elixir", "Haskell", "Lua", "VBA",
+
+    # Frontend Technologies
+    "React", "Angular", "Vue", "Vue.js", "Svelte", "Next.js", "Nuxt.js",
+    "HTML", "HTML5", "CSS", "CSS3", "Sass", "SCSS", "Less", "Tailwind CSS",
+    "Bootstrap", "Material-UI", "Ant Design", "Chakra UI", "jQuery",
+    "Redux", "MobX", "Zustand", "Recoil", "Webpack", "Vite", "Rollup",
+    "Babel", "Parcel", "ESLint", "Prettier",
+
+    # Backend Technologies
+    "Node.js", "Express", "Express.js", "Django", "Flask", "FastAPI",
+    "Spring", "Spring Boot", "ASP.NET", ".NET", "Ruby on Rails", "Laravel",
+    "Symfony", "NestJS", "Koa", "Hapi", "Fastify", "GraphQL", "REST",
+    "RESTful API", "gRPC", "WebSocket", "Socket.io", "tRPC",
+
+    # Databases
+    "SQL", "MySQL", "PostgreSQL", "MongoDB", "Redis", "Cassandra",
+    "DynamoDB", "Oracle", "SQL Server", "SQLite", "MariaDB", "Couchbase",
+    "Elasticsearch", "Neo4j", "Snowflake", "BigQuery", "Firestore",
+    "Supabase", "PlanetScale", "CockroachDB", "TimescaleDB",
+
+    # Cloud & Infrastructure
+    "AWS", "Azure", "GCP", "Google Cloud", "DigitalOcean", "Heroku",
+    "Vercel", "Netlify", "Cloudflare", "EC2", "S3", "Lambda", "RDS",
+    "ECS", "EKS", "CloudFormation", "CloudWatch", "IAM", "Route53",
+    "Azure DevOps", "App Service", "Functions", "Cosmos DB",
+    "Compute Engine", "App Engine", "Cloud Functions", "Cloud Run",
+
+    # DevOps & Tools
+    "Docker", "Kubernetes", "Jenkins", "GitLab CI", "GitHub Actions",
+    "CircleCI", "Travis CI", "Terraform", "Ansible", "Puppet", "Chef",
+    "Vagrant", "Nginx", "Apache", "HAProxy", "Istio", "Prometheus",
+    "Grafana", "ELK Stack", "Datadog", "New Relic", "Splunk",
+
+    # Version Control
+    "Git", "GitHub", "GitLab", "Bitbucket", "SVN", "Mercurial",
+
+    # Data Science & ML
+    "Machine Learning", "Deep Learning", "Neural Networks", "TensorFlow",
+    "PyTorch", "Keras", "Scikit-learn", "XGBoost", "LightGBM", "CatBoost",
+    "Pandas", "NumPy", "SciPy", "Matplotlib", "Seaborn", "Plotly",
+    "Jupyter", "Jupyter Notebook", "JupyterLab", "Anaconda",
+    "NLP", "Natural Language Processing", "Computer Vision", "OpenCV",
+    "YOLO", "BERT", "GPT", "Transformers", "Hugging Face", "spaCy",
+    "NLTK", "Gensim", "MLflow", "Kubeflow", "SageMaker", "Vertex AI",
+
+    # Data Engineering
+    "Apache Spark", "PySpark", "Hadoop", "Kafka", "Airflow", "dbt",
+    "ETL", "Data Pipeline", "Data Warehouse", "Data Lake", "Databricks",
+    "Flink", "Storm", "Beam", "Presto", "Hive", "Pig",
+
+    # Mobile Development
+    "iOS", "Android", "React Native", "Flutter", "SwiftUI", "UIKit",
+    "Jetpack Compose", "Kotlin Multiplatform", "Xamarin", "Ionic",
+    "Cordova", "Capacitor",
+
+    # Testing
+    "Jest", "Mocha", "Chai", "Jasmine", "Pytest", "unittest", "JUnit",
+    "TestNG", "Selenium", "Cypress", "Playwright", "Puppeteer",
+    "Testing Library", "Enzyme", "Postman", "Insomnia", "JMeter",
+
+    # Business & Analytics Tools
+    "Excel", "PowerPoint", "Word", "Outlook", "Access", "Visio",
+    "Tableau", "Power BI", "Looker", "Qlik", "Mode", "Metabase",
+    "Google Analytics", "Google Tag Manager", "Adobe Analytics",
+    "Salesforce", "HubSpot", "Marketo", "Pardot", "Mailchimp",
+    "JIRA", "Confluence", "Asana", "Trello", "Monday.com", "Notion",
+    "Slack", "Microsoft Teams", "Zoom",
+
+    # Design Tools
+    "Figma", "Sketch", "Adobe XD", "InVision", "Zeplin", "Abstract",
+    "Photoshop", "Illustrator", "After Effects", "Premiere Pro",
+    "Final Cut Pro", "Blender", "Maya", "Unity", "Unreal Engine",
+
+    # E-commerce & CMS
+    "Shopify", "WooCommerce", "Magento", "BigCommerce", "WordPress",
+    "Drupal", "Joomla", "Contentful", "Strapi", "Sanity",
+
+    # Project Management & Methodologies
+    "Agile", "Scrum", "Kanban", "Waterfall", "SAFe", "Lean", "Six Sigma",
+    "PMBOK", "PRINCE2", "PMP", "Product Management", "Project Management",
+
+    # Blockchain & Web3
+    "Blockchain", "Ethereum", "Solidity", "Web3", "Smart Contracts",
+    "Cryptocurrency", "DeFi", "NFT",
+
+    # Security & Networking
+    "Cybersecurity", "Penetration Testing", "OWASP", "SSL", "TLS",
+    "VPN", "Firewall", "IDS", "IPS", "SIEM", "OAuth", "JWT", "SAML",
+    "Active Directory", "LDAP", "Kerberos", "TCP/IP", "DNS", "DHCP",
+
+    # Soft Skills (optional, can help with matching)
+    "Leadership", "Team Management", "Communication", "Problem Solving",
+    "Critical Thinking", "Time Management", "Collaboration", "Mentoring",
+    "Presentation Skills", "Stakeholder Management", "Strategic Planning"
+}
+
 # Scheduler for automated job imports
 scheduler = BackgroundScheduler()
 
@@ -400,57 +503,86 @@ def enhance_personal_info_with_location(personal_info: Dict[str, Any], text: str
 
 def extract_skills(text: str) -> List[str]:
     """
-    Extracts skills from a given text using the NER model, dependency parsing,
-    and pattern matching.
+    Enhanced skill extraction combining multiple approaches:
+    1. Custom spaCy NER (existing - currently broken but keep for when model improves)
+    2. Comprehensive keyword matching (NEW)
+    3. Dependency parsing (existing - keep)
+    4. Pattern matching (existing - keep)
+
+    This is a HYBRID approach that works even when your model is broken.
     """
     if not text:
         return []
 
     doc = nlp(text)
-    skills = set() # Use a set to automatically handle duplicates
+    skills = set()  # Use set to automatically handle duplicates
 
-    # NER-based Extraction
     for ent in doc.ents:
-        if ent.label_ in ["TECHNOLOGY", "HARD_SKILL", "SKILL"]:
+        if ent.label_ in ["TECHNOLOGY", "HARD_SKILL", "SKILL", "SOFT_SKILL"]:
             skills.add(ent.text.strip())
 
-    # Dependency Parsing for Contextual Skills
-    skill_verbs = {"developed", "managed", "led", "built", "created", "implemented", "used", "leveraged"}
-    skill_prepositions = {"with", "in", "using"}
+    text_lower = text.lower()
+
+    # Direct keyword matching with case-insensitive search
+    for skill in COMPREHENSIVE_SKILL_LIBRARY:
+        skill_lower = skill.lower()
+
+        # Use word boundaries to avoid partial matches
+        # e.g., "Java" shouldn't match "JavaScript"
+        pattern = r'\b' + re.escape(skill_lower) + r'\b'
+        if re.search(pattern, text_lower):
+            # Add the skill with proper capitalization from library
+            skills.add(skill)
+
+    skill_verbs = {"developed", "managed", "led", "built", "created",
+                   "implemented", "used", "leveraged", "worked with",
+                   "experience with", "proficient in", "skilled in"}
+    skill_prepositions = {"with", "in", "using", "including"}
 
     for token in doc:
         # Find skills that are objects of skill-related verbs
         if token.pos_ == "VERB" and token.lemma_ in skill_verbs:
             for child in token.children:
-                if child.dep_ == "dobj": # Direct object
-                    skills.add(child.text)
+                if child.dep_ == "dobj":  # Direct object
+                    potential_skill = child.text.strip()
+                    # Check if it's in our skill library (validates it's a real skill)
+                    for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                        if skill.lower() == potential_skill.lower():
+                            skills.add(skill)
+                            break
 
-        # Find skills that are objects of prepositions after a verb
-        if token.pos_ == "ADP" and token.text.lower() in skill_prepositions: # ADP is a preposition
+        # Find skills that are objects of prepositions
+        if token.pos_ == "ADP" and token.text.lower() in skill_prepositions:
             for child in token.children:
-                if child.dep_ == "pobj": # Object of preposition
-                    skills.add(child.text)
+                if child.dep_ == "pobj":  # Object of preposition
+                    potential_skill = child.text.strip()
+                    # Validate against skill library
+                    for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                        if skill.lower() == potential_skill.lower():
+                            skills.add(skill)
+                            break
 
-    # Check for noun phrases that look like skills
     for chunk in doc.noun_chunks:
-        # A simple rule: if a noun chunk is 2-4 words long and contains a relevant keyword,
-        # it's likely a skill. This avoids overly generic single words.
-        if 1 < len(chunk.text.split()) < 5:
-            if any(keyword in chunk.text.lower() for keyword in ['management', 'analysis', 'development', 'design']):
-                skills.add(chunk.text.strip())
+        chunk_text = chunk.text.strip()
+        # Check against skill library for validation
+        for skill in COMPREHENSIVE_SKILL_LIBRARY:
+            if skill.lower() == chunk_text.lower():
+                skills.add(skill)
+                break
 
-    for line in text.split('\\n'):
+    for line in text.split('\n'):
         line = line.strip()
         if line.startswith(('*', '-', '•')):
             potential_skill = line[1:].strip()
-            if 1 < len(potential_skill) < 50: # Basic filter
-                skills.add(potential_skill)
+            # Validate against skill library
+            for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                if skill.lower() in potential_skill.lower():
+                    skills.add(skill)
 
-    # Clean up and return the final list
-    # Convert to lowercase and remove very short, likely noisy, items
-    final_skills = {s.lower() for s in skills if len(s) > 1}
+    final_skills = {s for s in skills if len(s) > 1}
+
+    # Sort for consistency
     return sorted(list(final_skills))
-
 
 def _extract_skills_list(resume_data: Dict) -> List[str]:
     """Extract a clean list of skills from resume data"""
