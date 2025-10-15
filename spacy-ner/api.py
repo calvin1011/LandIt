@@ -122,10 +122,289 @@ COMPREHENSIVE_SKILL_LIBRARY = {
     "VPN", "Firewall", "IDS", "IPS", "SIEM", "OAuth", "JWT", "SAML",
     "Active Directory", "LDAP", "Kerberos", "TCP/IP", "DNS", "DHCP",
 
-    # Soft Skills (optional, can help with matching)
-    "Leadership", "Team Management", "Communication", "Problem Solving",
-    "Critical Thinking", "Time Management", "Collaboration", "Mentoring",
-    "Presentation Skills", "Stakeholder Management", "Strategic Planning"
+    # RETAIL & CUSTOMER SERVICE
+    # Point of Sale Systems
+    "POS", "Point of Sale", "Cash Register", "Square", "Clover", "Toast POS",
+    "Shopify POS", "Lightspeed", "Vend", "NCR", "Micros", "Aloha POS",
+    "Revel Systems", "TouchBistro", "ShopKeep",
+
+    # Retail Operations
+    "Cash Handling", "Money Management", "Register Operations", "Cashiering",
+    "Opening Procedures", "Closing Procedures", "Cash Reconciliation",
+    "Till Balancing", "Payment Processing", "Credit Card Processing",
+    "Returns Processing", "Exchange Processing", "Refund Management",
+    "Gift Card Processing", "Coupon Handling", "Price Checking",
+    "Barcode Scanning", "UPC Scanning", "Inventory Management",
+    "Stock Replenishment", "Merchandising", "Visual Merchandising",
+    "Product Display", "Shelf Stocking", "Inventory Counting",
+    "Stock Rotation", "FIFO", "Loss Prevention", "Shrinkage Control",
+    "Security Tagging", "Customer Queue Management", "Line Management",
+
+    # Customer Service
+    "Customer Service", "Customer Relations", "Guest Services",
+    "Customer Satisfaction", "Customer Retention", "Customer Engagement",
+    "Complaint Resolution", "Conflict Resolution", "Problem Resolution",
+    "Active Listening", "Empathy", "Patience", "Friendliness",
+    "Greeting Customers", "Product Knowledge", "Product Recommendations",
+    "Upselling", "Cross-selling", "Sales Techniques", "Closing Sales",
+    "Customer Loyalty Programs", "Rewards Programs", "Membership Programs",
+
+    # FOOD SERVICE & HOSPITALITY
+    # Fast Food & Quick Service
+    "Fast Food Service", "Quick Service", "Drive-Thru Operations",
+    "Order Taking", "Order Accuracy", "Speed of Service", "Food Assembly",
+    "Burger Preparation", "Sandwich Making", "Food Portioning",
+    "Food Safety", "Food Handling", "ServSafe", "Food Handler Certification",
+    "Temperature Control", "Cross-Contamination Prevention",
+    "Allergen Awareness", "Dietary Restrictions", "Special Orders",
+    "Grill Operation", "Fryer Operation", "Food Prep", "Prep Work",
+    "Food Storage", "Cleaning Protocols", "Sanitization", "Health Code Compliance",
+
+    # Restaurant & Dining
+    "Table Service", "Fine Dining", "Casual Dining", "Server Experience",
+    "Waiter", "Waitress", "Bartending", "Mixology", "Cocktail Preparation",
+    "Wine Knowledge", "Beer Knowledge", "Spirits Knowledge", "Menu Knowledge",
+    "POS Systems", "Micros POS", "Toast", "Order Management",
+    "Table Management", "Seating Management", "Reservation Management",
+    "OpenTable", "Resy", "Host Experience", "Hostess Experience",
+    "Bussing Tables", "Table Setting", "Place Setting", "Food Running",
+    "Tray Service", "Plate Carrying", "Drink Service", "Catering",
+    "Banquet Service", "Event Service", "Tip Reporting", "Cash Tips",
+
+    # Kitchen & Cooking
+    "Line Cook", "Prep Cook", "Short Order Cook", "Sauté", "Grill",
+    "Fry Station", "Salad Station", "Garde Manger", "Pastry",
+    "Baking", "Knife Skills", "Food Plating", "Presentation",
+    "Recipe Following", "Batch Cooking", "Kitchen Equipment",
+    "Commercial Kitchen", "Industrial Kitchen", "Kitchen Safety",
+    "Dishwashing", "Pot Washing", "Kitchen Cleaning", "Dish Machine",
+
+    # Coffee & Beverage
+    "Barista", "Espresso Machine", "Latte Art", "Coffee Brewing",
+    "Coffee Knowledge", "Tea Knowledge", "Beverage Preparation",
+    "Frother Operation", "Grinder Operation", "Steam Wand",
+
+    # HEALTHCARE & PHARMACY
+    # Pharmacy
+    "Pharmacy Technician", "Pharmacy Assistant", "Prescription Processing",
+    "Medication Dispensing", "Drug Inventory", "Pharmacy Software",
+    "Insurance Claims", "Prior Authorization", "Drug Interaction Checking",
+    "Prescription Insurance", "Medicare Part D", "Medicaid",
+    "Controlled Substances", "DEA Regulations", "HIPAA Compliance",
+    "Medication Counseling", "Patient Records", "Prescription Refills",
+    "Compounding", "Immunization Administration", "Vaccine Administration",
+    "Inventory Management", "Drug Ordering", "Expired Medication Disposal",
+
+    # Medical & Clinical
+    "Patient Care", "Vital Signs", "Blood Pressure", "Temperature Taking",
+    "Pulse Oximetry", "Medical Terminology", "Patient Records",
+    "EHR", "Electronic Health Records", "Epic", "Cerner", "Meditech",
+    "Patient Intake", "Insurance Verification", "Medical Billing",
+    "CPT Codes", "ICD-10", "Medical Coding", "Patient Scheduling",
+    "Appointment Scheduling", "Medical Reception", "Phlebotomy",
+    "IV Administration", "Medication Administration", "Wound Care",
+    "First Aid", "CPR", "BLS", "ACLS", "Basic Life Support",
+    "Emergency Response", "Triage", "Patient Assessment",
+
+    # Caregiving
+    "Personal Care", "Activities of Daily Living", "ADL Assistance",
+    "Bathing Assistance", "Feeding Assistance", "Mobility Assistance",
+    "Transfer Techniques", "Wheelchair Assistance", "Walker Assistance",
+    "Companionship", "Dementia Care", "Alzheimer's Care", "Memory Care",
+    "Medication Reminders", "Vital Sign Monitoring", "Fall Prevention",
+    "Safety Monitoring", "Care Planning", "Documentation",
+
+    # MANAGEMENT & SUPERVISION
+    # Store & Retail Management
+    "Store Management", "Retail Management", "Assistant Manager",
+    "Shift Supervisor", "Team Lead", "Department Manager",
+    "Staff Scheduling", "Employee Scheduling", "Labor Management",
+    "Shift Planning", "Break Management", "Time & Attendance",
+    "Employee Training", "Staff Training", "Onboarding", "New Hire Training",
+    "Performance Management", "Performance Reviews", "Coaching",
+    "Disciplinary Action", "Staff Meetings", "Daily Reports",
+    "Sales Reports", "Inventory Reports", "P&L Management",
+    "Profit and Loss", "Budget Management", "Cost Control",
+    "Labor Cost Management", "Payroll Management", "Hiring",
+    "Interviewing", "Candidate Screening", "Background Checks",
+
+    # Operations Management
+    "Operations Management", "Standard Operating Procedures", "SOP",
+    "Process Improvement", "Efficiency", "Workflow Optimization",
+    "Quality Control", "Quality Assurance", "Audit Compliance",
+    "Health Inspections", "Safety Inspections", "Vendor Management",
+    "Supplier Relations", "Ordering", "Purchase Orders", "Receiving",
+    "Delivery Management", "Logistics Coordination",
+
+    # WAREHOUSE & LOGISTICS
+    "Warehouse Operations", "Forklift Operation", "Pallet Jack",
+    "Order Picking", "Order Packing", "Shipping", "Receiving",
+    "Loading", "Unloading", "Inventory Control", "Cycle Counting",
+    "RF Scanner", "Barcode Scanner", "WMS", "Warehouse Management System",
+    "SAP", "Oracle WMS", "Manhattan Associates", "Order Fulfillment",
+    "Pick and Pack", "Quality Inspection", "Packaging", "Labeling",
+    "Sorting", "Palletizing", "Shrink Wrapping", "Box Making",
+    "Material Handling", "Heavy Lifting", "Weight Lifting",
+    "Safety Compliance", "OSHA Compliance", "PPE", "Personal Protective Equipment",
+
+    # CLEANING & MAINTENANCE
+    "Housekeeping", "Janitorial", "Custodial", "Cleaning",
+    "Sanitizing", "Disinfecting", "Mopping", "Sweeping", "Vacuuming",
+    "Dusting", "Window Cleaning", "Floor Care", "Carpet Cleaning",
+    "Bathroom Cleaning", "Restroom Maintenance", "Trash Removal",
+    "Waste Management", "Recycling", "Chemical Handling",
+    "Cleaning Chemicals", "Floor Buffers", "Commercial Cleaning Equipment",
+    "Laundry", "Linen Management", "Room Turnover", "Deep Cleaning",
+
+    # Maintenance & Facilities
+    "Building Maintenance", "Facility Maintenance", "General Maintenance",
+    "Preventive Maintenance", "Repairs", "Troubleshooting",
+    "HVAC", "Plumbing", "Electrical", "Carpentry", "Painting",
+    "Drywall Repair", "Light Fixture Repair", "Door Repair",
+    "Lock Repair", "Equipment Maintenance", "Grounds Keeping",
+    "Landscaping", "Snow Removal", "Parking Lot Maintenance",
+
+    # TRANSPORTATION & DELIVERY
+    "Delivery Driver", "CDL", "Commercial Driver's License",
+    "Class A CDL", "Class B CDL", "Truck Driving", "Van Driving",
+    "Route Planning", "GPS Navigation", "Google Maps", "Waze",
+    "Delivery Management", "Package Handling", "Signature Collection",
+    "Proof of Delivery", "DOT Compliance", "Vehicle Inspection",
+    "Pre-Trip Inspection", "Post-Trip Inspection", "Load Securing",
+    "Cargo Management", "Fuel Management", "Mileage Tracking",
+    "Electronic Logging Device", "ELD", "Hours of Service",
+    "Defensive Driving", "Safe Driving Record", "Clean Driving Record",
+
+    # Rideshare & Passenger
+    "Rideshare Driver", "Uber", "Lyft", "Customer Transportation",
+    "Passenger Service", "Route Optimization", "Vehicle Maintenance",
+    "Vehicle Cleanliness", "Navigation", "Local Knowledge",
+
+    # SECURITY & SAFETY
+    "Security Guard", "Security Officer", "Loss Prevention Officer",
+    "Access Control", "Surveillance", "CCTV Monitoring", "Patrol",
+    "Incident Reporting", "Emergency Procedures", "Evacuation Procedures",
+    "Crowd Control", "De-escalation", "Conflict Management",
+    "Report Writing", "Security Systems", "Alarm Systems",
+    "Metal Detector", "X-ray Scanner", "Badge Verification",
+
+    # EDUCATION & CHILDCARE
+    "Childcare", "Daycare", "Preschool", "Child Supervision",
+    "Child Safety", "Age-Appropriate Activities", "Behavior Management",
+    "Positive Reinforcement", "Diaper Changing", "Bottle Feeding",
+    "Naptime Management", "Playground Supervision", "Arts and Crafts",
+    "Story Time", "Early Childhood Education", "Child Development",
+    "Parent Communication", "Incident Reports", "Emergency Protocols",
+    "CPR Certified", "Pediatric First Aid", "Background Check",
+
+    # Tutoring & Education Support
+    "Tutoring", "Academic Support", "Homework Help", "Test Prep",
+    "Study Skills", "Teaching", "Instructional Support", "Classroom Management",
+    "Lesson Planning", "Student Assessment", "Parent-Teacher Communication",
+    "Educational Software", "Learning Management Systems", "Canvas", "Blackboard",
+
+    # ADMINISTRATIVE & CLERICAL
+    "Data Entry", "Typing", "Filing", "Document Management",
+    "Scanning", "Photocopying", "Mail Sorting", "Package Processing",
+    "Phone Answering", "Call Center", "Receptionist", "Front Desk",
+    "Appointment Setting", "Calendar Management", "Email Management",
+    "Office Equipment", "Multi-line Phone", "Switchboard",
+    "Fax Machine", "Copy Machine", "Postage Meter", "10-Key",
+    "10-Key Calculator", "Alphanumeric Data Entry", "WPM", "Words Per Minute",
+
+    # SALES & MARKETING
+    "Cold Calling", "Lead Generation", "Prospecting", "Sales Calls",
+    "Closing Techniques", "Negotiation", "Price Negotiation",
+    "Contract Negotiation", "CRM", "Customer Relationship Management",
+    "Sales Pipeline", "Quota Management", "Territory Management",
+    "B2B Sales", "B2C Sales", "Retail Sales", "Outside Sales",
+    "Inside Sales", "Account Management", "Client Relations",
+    "Relationship Building", "Networking", "Trade Shows",
+
+    # TRADES & CONSTRUCTION
+    "Construction", "Carpentry", "Framing", "Drywall Installation",
+    "Painting", "Electrical Work", "Electrician", "Wiring",
+    "Circuit Installation", "Plumbing", "Pipe Fitting", "Welding",
+    "Blueprint Reading", "Measurement", "Power Tools", "Hand Tools",
+    "Safety Equipment", "Hard Hat", "Safety Harness", "Fall Protection",
+    "Scaffolding", "Ladder Safety", "Site Cleanup", "Material Hauling",
+
+    # HVAC & Mechanical
+    "HVAC Installation", "HVAC Repair", "Air Conditioning", "Heating Systems",
+    "Refrigeration", "Ductwork", "Thermostat Installation",
+    "Equipment Calibration", "System Diagnostics", "Preventive Maintenance",
+
+    # Automotive
+    "Auto Repair", "Auto Maintenance", "Oil Changes", "Tire Rotation",
+    "Brake Service", "Engine Diagnostics", "ASE Certification",
+    "Vehicle Inspection", "Parts Installation", "Customer Vehicles",
+
+    # BEAUTY & PERSONAL CARE
+    "Hair Styling", "Hair Cutting", "Hair Coloring", "Highlights",
+    "Blowouts", "Updos", "Braiding", "Extensions", "Cosmetology",
+    "Cosmetology License", "Barbering", "Barber License", "Shaving",
+    "Beard Trimming", "Manicures", "Pedicures", "Nail Art", "Gel Nails",
+    "Acrylic Nails", "Waxing", "Facials", "Skincare", "Makeup Application",
+    "Bridal Makeup", "Special Effects Makeup", "Esthetician",
+    "Massage Therapy", "Swedish Massage", "Deep Tissue Massage",
+    "Spa Services", "Client Consultation", "Product Sales",
+
+    # FITNESS & WELLNESS
+    "Personal Training", "Fitness Training", "Group Fitness",
+    "Yoga Instruction", "Pilates", "Spinning", "Cycling Instruction",
+    "Fitness Assessment", "Workout Planning", "Nutrition Coaching",
+    "Weight Loss Coaching", "Strength Training", "Cardio Training",
+    "HIIT", "CrossFit", "CPR Certified", "AED", "First Aid",
+    "Fitness Certifications", "NASM", "ACE", "ACSM", "ISSA",
+
+    # AGRICULTURE & LANDSCAPING
+    "Landscaping", "Lawn Care", "Mowing", "Trimming", "Edging",
+    "Pruning", "Tree Trimming", "Planting", "Mulching", "Weeding",
+    "Fertilizing", "Irrigation", "Sprinkler Systems", "Garden Maintenance",
+    "Power Equipment", "Lawn Mower", "Weed Eater", "Leaf Blower",
+    "Chainsaw", "Hedge Trimmer", "Seasonal Cleanup",
+
+    # MANUFACTURING & PRODUCTION
+    "Assembly Line", "Production Line", "Machine Operation",
+    "Quality Control", "Quality Inspection", "Product Assembly",
+    "Component Assembly", "Hand Tools", "Power Tools", "Drill Press",
+    "Lathe", "CNC", "CNC Machine", "Manufacturing Equipment",
+    "Production Standards", "Blueprint Reading", "Measurement Tools",
+    "Calipers", "Micrometer", "Safety Protocols", "Lean Manufacturing",
+    "5S", "Kaizen", "Production Reporting", "Downtime Tracking",
+
+    # SOFT SKILLS (ESSENTIAL FOR ALL JOBS)
+    "Reliability", "Punctuality", "Attendance", "Dependability",
+    "Work Ethic", "Strong Work Ethic", "Positive Attitude",
+    "Team Player", "Teamwork", "Collaboration", "Communication",
+    "Verbal Communication", "Written Communication", "Interpersonal Skills",
+    "Customer Service Skills", "Problem Solving", "Critical Thinking",
+    "Attention to Detail", "Multitasking", "Time Management",
+    "Organizational Skills", "Adaptability", "Flexibility",
+    "Fast-Paced Environment", "Stress Management", "Conflict Resolution",
+    "Decision Making", "Initiative", "Self-Motivated", "Professional",
+    "Professionalism", "Confidentiality", "Discretion", "Honesty",
+    "Integrity", "Cultural Sensitivity", "Diversity Awareness",
+    "Bilingual", "Spanish", "Mandarin", "French", "German",
+
+    # Leadership & Management (All Levels)
+    "Leadership", "Team Management", "Supervision", "Mentoring",
+    "Training", "Delegation", "Goal Setting", "Motivation",
+    "Performance Monitoring", "Feedback", "Constructive Feedback",
+    "Accountability", "Resource Management", "Prioritization",
+    "Strategic Planning", "Planning", "Organizing", "Coordinating",
+    "Stakeholder Management", "Presentation Skills", "Public Speaking",
+    "Report Writing", "Documentation", "Record Keeping",
+
+    # CERTIFICATIONS & LICENSES
+    "ServSafe Certified", "Food Handler Card", "Alcohol Service License",
+    "TIPS Certified", "Forklift Certified", "OSHA 10", "OSHA 30",
+    "CPR/AED Certified", "First Aid Certified", "Lifeguard Certified",
+    "Real Estate License", "Insurance License", "Notary Public",
+    "Security License", "Guard Card", "Concealed Carry Permit",
+    "Medical Assistant Certification", "CNA", "Certified Nursing Assistant",
+    "Phlebotomy Certification", "EMT", "Paramedic", "RN", "LPN",
+    "Teaching Credential", "Teaching Certificate", "Background Cleared",
 }
 
 # Scheduler for automated job imports
