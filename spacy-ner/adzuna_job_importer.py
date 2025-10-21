@@ -37,13 +37,19 @@ class AdzunaJobImporter:
 
     def import_jobs(self, keywords: List[str] = None, max_jobs: int = 50, location: str = "United States"):
         """Import jobs from Adzuna API with proper limits"""
-        if keywords is None:
+        if keywords is None or not keywords:
             keywords = [
-                "software engineer",
-                "data scientist",
-                "product manager",
-                "full stack developer",
-                "machine learning engineer"
+                # Core Tech Roles
+                "Software Engineer", "Data Scientist", "DevOps Engineer",
+                "Cloud Architect", "Frontend Developer",
+
+                # Business/Finance Roles
+                "Financial Analyst", "Marketing Manager", "Business Development",
+                "Operations Manager", "Human Resources",
+
+                # Healthcare/Other Roles
+                "Registered Nurse", "Logistics Coordinator", "Skilled Trades",
+                "Retail Manager", "Customer Service"
             ]
 
         logger.info(f" Starting Adzuna job import for {len(keywords)} keywords, max {max_jobs} total jobs...")

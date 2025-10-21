@@ -1266,7 +1266,12 @@ def find_job_matches(match_request: JobMatchRequest):
                 skills_similarity = apply_confidence_boost(skills_similarity, factor=1.5)
 
                 # Use original weights for non-junior roles.
-                weights = {"skills": 0.45, "semantic": 0.25, "experience": 0.20, "location": 0.10}
+                weights = {
+                    "skills": 0.35,
+                    "semantic": 0.20,
+                    "experience": 0.35,
+                    "location": 0.10
+                }
                 overall_score = (
                         skills_similarity * weights["skills"] +
                         semantic_similarity * weights["semantic"] +
@@ -2844,7 +2849,7 @@ def test_all_importers():
 
     return results
 
-def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from potentially unlimited
+def import_all_jobs_direct(max_jobs_per_source: int = 300):
     """Direct function to run all job imports (for scheduler use)"""
     summaries = {}
 
@@ -2896,6 +2901,15 @@ def import_all_jobs_direct(max_jobs_per_source: int = 25):  # Reduced from poten
     except Exception as e:
         logger.error(f"USAJOBS import failed: {e}")
         summaries['usajobs'] = {'error': str(e)}
+
+    try:
+        greenhouse_importer = GreenhouseJobImporter()
+        greenhouse_importer.import_jobs(max_jobs_per_source)
+        summaries['greenhouse'] = greenhouse_importer.get_import_summary()
+    except Exception as e:
+        logger.error(f"Greenhouse import failed: {e}")
+        summaries['greenhouse'] = {'error': str(e)}
+
 
     return {"status": "completed", "summaries": summaries}
 
@@ -3177,6 +3191,24 @@ def import_usajobs_jobs(keywords: List[str] = None, max_jobs: int = 50):
         }
     except Exception as e:
         logger.error(f"USAJOBS import failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/import-greenhouse-jobs")
+def import_greenhouse_jobs(max_jobs: int = 50):
+    """Import jobs from selected Greenhouse job boards (Tech-focused)."""
+    try:
+        start_time = time.time()
+        importer = GreenhouseJobImporter()
+        importer.import_jobs(max_jobs_per_source=max_jobs)
+        summary = importer.get_import_summary()
+        processing_time = time.time() - start_time
+        return {
+            "success": True,
+            "summary": summary,
+            "processing_time": processing_time
+        }
+    except Exception as e:
+        logger.error(f"Greenhouse import failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/import-remotive-jobs")
