@@ -129,13 +129,25 @@ class GreenhouseJobImporter:
 
         posted_date = datetime.now()
 
+        location_parts = []
+        offices = job_data.get('offices', [])
+        for office in offices:
+            if isinstance(office, dict) and office.get('location'):
+                location_obj = office['location']
+                if isinstance(location_obj, dict) and location_obj.get('name'):
+                    location_parts.append(location_obj['name'])
+                elif isinstance(location_obj, str):
+                    location_parts.append(location_obj)
+
+        location = ', '.join(location_parts) if location_parts else ''
+
         job_dict = {
             'title': job_data.get('title', ''),
             'company': company_name,
             'description': description_clean,
             'requirements': description_clean,
             'responsibilities': '',
-            'location': ', '.join([o['location']['name'] for o in job_data.get('offices', []) if o.get('location')]),
+            'location': location,
             'job_url': job_data.get('absolute_url', ''),
             'source': 'greenhouse',
             'external_id': str(job_data.get('id', '')),
@@ -150,7 +162,7 @@ class GreenhouseJobImporter:
         if self._is_duplicate_job(job_dict['title'], job_dict['company']):
             return False
 
-        # Embedding generation - FIXED: Use the same pattern as other importers
+        # Embedding generation
         embeddings = {}
         if self.embedding_service:
             try:
@@ -173,7 +185,7 @@ class GreenhouseJobImporter:
                 else:
                     logger.warning(f"Empty embeddings generated for job: {job_dict['title']}")
                     # Create dummy embeddings to avoid database error
-                    dummy_embedding = np.random.rand(384)  # Assuming 384-dim embeddings
+                    dummy_embedding = np.random.rand(384)
                     embeddings = {
                         'description': dummy_embedding,
                         'title': dummy_embedding,
