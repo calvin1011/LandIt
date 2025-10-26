@@ -24,6 +24,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 from contextlib import asynccontextmanager
 from thefuzz import fuzz
+from greenhouse_job_importer import GreenhouseJobImporter
 
 from spacy.matcher import PhraseMatcher
 
@@ -2902,6 +2903,7 @@ def import_all_jobs_direct(max_jobs_per_source: int = 300):
         logger.error(f"USAJOBS import failed: {e}")
         summaries['usajobs'] = {'error': str(e)}
 
+    # Greenhouse Importer
     try:
         greenhouse_importer = GreenhouseJobImporter()
         greenhouse_importer.import_jobs(max_jobs_per_source)
@@ -2910,9 +2912,7 @@ def import_all_jobs_direct(max_jobs_per_source: int = 300):
         logger.error(f"Greenhouse import failed: {e}")
         summaries['greenhouse'] = {'error': str(e)}
 
-
     return {"status": "completed", "summaries": summaries}
-
 
 @app.post("/admin/test-job-apis-comprehensive")
 def test_job_apis_comprehensive():

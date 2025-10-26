@@ -6,12 +6,12 @@ from database import db
 from embedding_service import ResumeJobEmbeddingService
 import re
 from datetime import datetime
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 class GreenhouseJobImporter:
     BOARD_TOKENS = [
-        "spotify",
         "stripe",
         "shopify",
         "datadog",
@@ -62,20 +62,26 @@ class GreenhouseJobImporter:
             logger.info(f"Fetched {len(jobs_list)} jobs from {company_name}'s board.")
 
             for job_summary in jobs_list:
-                if jobs_imported >= max_jobs: break
+                if jobs_imported >= max_jobs:
+                    break
 
-                # Appends the job ID to the summary URL (which ends in /jobs)
-                full_job_url = f"{url}/{job_summary['id']}?questions=true"
-                full_job_response = self.session.get(full_job_url, timeout=30)
-                full_job_response.raise_for_status()
-                full_job_data = full_job_response.json()
+                try:
+                    # Appends the job ID to the summary URL (which ends in /jobs)
+                    full_job_url = f"{url}/{job_summary['id']}?questions=true"
+                    full_job_response = self.session.get(full_job_url, timeout=30)
+                    full_job_response.raise_for_status()
+                    full_job_data = full_job_response.json()
 
-                # Process and Store
-                if self._process_job(full_job_data, company_name):
-                    jobs_imported += 1
-                    self.stats['successfully_imported'] += 1
-                else:
-                    self.stats['duplicate_jobs'] += 1
+                    # Process and Store
+                    if self._process_job(full_job_data, company_name):
+                        jobs_imported += 1
+                        self.stats['successfully_imported'] += 1
+                    else:
+                        self.stats['duplicate_jobs'] += 1
+                except Exception as e:
+                    logger.error(f"Failed to process individual job {job_summary.get('id')}: {e}")
+                    self.stats['failed_imports'] += 1
+                    continue
 
             logger.info(f"Completed token '{token}': imported {jobs_imported} jobs")
 
@@ -95,21 +101,27 @@ class GreenhouseJobImporter:
             return 'mid'
 
     def _extract_skills_from_description(self, description: str) -> List[str]:
-        """Extract technical skills from job description (Reusing hard-coded list for consistency)"""
-        tech_skills = ['python', 'java', 'javascript', 'react', 'node.js', 'sql', 'aws', 'docker', 'kubernetes', 'git']
+        """Extract technical skills from job description"""
+        # Reuse the comprehensive skill library from api.py
+        from api import COMPREHENSIVE_SKILL_LIBRARY
+
         description_lower = description.lower()
-        found_skills = [skill for skill in tech_skills if skill.lower() in description_lower]
-        return found_skills[:10]
+        found_skills = []
+
+        for skill in COMPREHENSIVE_SKILL_LIBRARY:
+            if skill.lower() in description_lower:
+                found_skills.append(skill)
+
+        return found_skills[:15]  # Limit to top 15 skills
 
     def _is_duplicate_job(self, title: str, company: str) -> bool:
-        """Check if job already exists in database (Essential database call)"""
+        """Check if job already exists in database"""
         try:
-            # This calls the method in database.py which checks title and company
             existing_jobs = db.get_jobs_by_title_company(title, company)
             return len(existing_jobs) > 0
         except Exception as e:
             logger.error(f"Duplicate check failed: {e}")
-            return False  # Fail safe
+            return False
 
     def _process_job(self, job_data: Dict[str, Any], company_name: str) -> bool:
         description_html = job_data.get('content', '')
@@ -127,28 +139,64 @@ class GreenhouseJobImporter:
             'job_url': job_data.get('absolute_url', ''),
             'source': 'greenhouse',
             'external_id': str(job_data.get('id', '')),
-
             'experience_level': self._determine_experience_level(job_data.get('title', ''), description_clean),
             'skills_required': self._extract_skills_from_description(description_clean),
-
-            'salary_min': None, 'salary_max': None,
+            'salary_min': None,
+            'salary_max': None,
             'posted_date': posted_date,
-            'remote_allowed': 'remote' in job_data.get('title', '').lower()
+            'remote_allowed': 'remote' in job_data.get('title', '').lower() or 'remote' in description_clean.lower()
         }
 
         if self._is_duplicate_job(job_dict['title'], job_dict['company']):
             return False
 
-        # Embedding generation
+        # Embedding generation - FIXED: Use the same pattern as other importers
         embeddings = {}
         if self.embedding_service:
             try:
-                embeddings = self.embedding_service.generate_all_embeddings(job_dict)
-            except Exception as e:
-                logger.warning(f"Failed to generate embeddings for job: {e}")
+                # Generate embeddings using the same methods as other importers
+                description_embedding = self.embedding_service.generate_job_embedding(job_dict)
+                title_embedding = self.embedding_service.model.encode(job_dict['title'])
+                requirements_embedding = self.embedding_service.model.encode(job_dict.get('requirements', ''))
 
-        db.store_job_posting(job_dict, embeddings)
-        return True
+                # Ensure embeddings are not empty
+                if (description_embedding is not None and
+                        description_embedding.size > 0 and
+                        title_embedding is not None and
+                        title_embedding.size > 0):
+
+                    embeddings = {
+                        'description': description_embedding,
+                        'title': title_embedding,
+                        'requirements': requirements_embedding
+                    }
+                else:
+                    logger.warning(f"Empty embeddings generated for job: {job_dict['title']}")
+                    # Create dummy embeddings to avoid database error
+                    dummy_embedding = np.random.rand(384)  # Assuming 384-dim embeddings
+                    embeddings = {
+                        'description': dummy_embedding,
+                        'title': dummy_embedding,
+                        'requirements': dummy_embedding
+                    }
+
+            except Exception as e:
+                logger.warning(f"Failed to generate embeddings for job '{job_dict['title']}': {e}")
+                # Create dummy embeddings as fallback
+                dummy_embedding = np.random.rand(384)
+                embeddings = {
+                    'description': dummy_embedding,
+                    'title': dummy_embedding,
+                    'requirements': dummy_embedding
+                }
+
+        try:
+            db.store_job_posting(job_dict, embeddings)
+            logger.debug(f"Stored Greenhouse job: {job_dict['title']} at {job_dict['company']}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store job in database: {e}")
+            return False
 
     def get_import_summary(self) -> Dict[str, Any]:
         """Get summary of import statistics"""

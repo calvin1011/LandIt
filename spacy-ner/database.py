@@ -67,6 +67,9 @@ class DatabaseConnection:
 
     def vector_to_db(self, vector: np.ndarray) -> str:
         """Convert numpy array to PostgreSQL vector format"""
+        if vector is None or vector.size == 0:
+            return '[]'  # Return empty vector string
+
         return '[' + ','.join(map(str, vector.tolist())) + ']'
 
     def db_to_vector(self, db_vector: str) -> np.ndarray:
