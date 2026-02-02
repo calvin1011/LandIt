@@ -217,11 +217,11 @@ class MuseJobImporter:
 
         text_lower = text.lower()
 
-        # Comprehensive list of tech skills to look for
+        # Comprehensive list of tech skills to look for ('golang' not 'go' to avoid "go to market"; no bare 'r')
         tech_skills = [
             # Programming Languages
-            'python', 'javascript', 'java', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift',
-            'kotlin', 'typescript', 'scala', 'r', 'matlab', 'sql', 'html', 'css',
+            'python', 'javascript', 'java', 'c++', 'c#', 'php', 'ruby', 'golang', 'rust', 'swift',
+            'kotlin', 'typescript', 'scala', 'matlab', 'sql', 'html', 'css', 'rstudio',
 
             # Frontend Frameworks/Libraries
             'react', 'angular', 'vue', 'svelte', 'jquery', 'bootstrap', 'tailwind',
@@ -266,6 +266,8 @@ class MuseJobImporter:
                     found_skills.append('C#')
                 elif skill == 'asp.net':
                     found_skills.append('ASP.NET')
+                elif skill == 'golang':
+                    found_skills.append('Go')
                 else:
                     found_skills.append(skill.title())
 

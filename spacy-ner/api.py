@@ -408,6 +408,15 @@ COMPREHENSIVE_SKILL_LIBRARY = {
     "Teaching Credential", "Teaching Certificate", "Background Cleared",
 }
 
+# Skills that are common words or single letters: only match with clear tech context
+# to avoid e.g. "go" in "go to market" or "go live" being tagged as Go (language)
+AMBIGUOUS_SKILLS = frozenset({"Go", "R", "C"})
+AMBIGUOUS_SKILL_CONTEXT_PATTERNS = {
+    "Go": re.compile(r"\b(?:golang|go\s+language)\b", re.IGNORECASE),
+    "R": re.compile(r"\b(?:r\s+language|r\s+programming|rstudio)\b", re.IGNORECASE),
+    "C": re.compile(r"\b(?:c\s+language|c\s+programming)\b", re.IGNORECASE),
+}
+
 # Scheduler for automated job imports
 scheduler = BackgroundScheduler()
 
@@ -824,6 +833,9 @@ def extract_skills(text: str) -> List[str]:
                 span = doc[start:end]
                 # Find the original skill name from library (proper capitalization)
                 span_lower = span.text.lower()
+                # Skip ambiguous skills here; they are added only via context patterns below
+                if span_lower in {s.lower() for s in AMBIGUOUS_SKILLS}:
+                    continue
                 for skill in COMPREHENSIVE_SKILL_LIBRARY:
                     if skill.lower() == span_lower:
                         skills.add(skill)
@@ -836,11 +848,19 @@ def extract_skills(text: str) -> List[str]:
     text_lower = text.lower()
 
     for skill in COMPREHENSIVE_SKILL_LIBRARY:
+        # Skip ambiguous skills; they require context (see AMBIGUOUS_SKILL_CONTEXT_PATTERNS)
+        if skill in AMBIGUOUS_SKILLS:
+            continue
         skill_lower = skill.lower()
 
         # Use word boundaries to avoid partial matches
         pattern = r'\b' + re.escape(skill_lower) + r'\b'
         if re.search(pattern, text_lower):
+            skills.add(skill)
+
+    # Ambiguous skills: only add when clear tech context is present
+    for skill, context_pattern in AMBIGUOUS_SKILL_CONTEXT_PATTERNS.items():
+        if context_pattern.search(text_lower):
             skills.add(skill)
 
     # Dependency Parsing
@@ -855,8 +875,10 @@ def extract_skills(text: str) -> List[str]:
             for child in token.children:
                 if child.dep_ == "dobj":  # Direct object
                     potential_skill = child.text.strip()
-                    # Validate against skill library
+                    # Validate against skill library (skip ambiguous; they need context)
                     for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                        if skill in AMBIGUOUS_SKILLS:
+                            continue
                         if skill.lower() == potential_skill.lower():
                             skills.add(skill)
                             break
@@ -866,8 +888,10 @@ def extract_skills(text: str) -> List[str]:
             for child in token.children:
                 if child.dep_ == "pobj":  # Object of preposition
                     potential_skill = child.text.strip()
-                    # Validate against skill library
+                    # Validate against skill library (skip ambiguous; they need context)
                     for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                        if skill in AMBIGUOUS_SKILLS:
+                            continue
                         if skill.lower() == potential_skill.lower():
                             skills.add(skill)
                             break
@@ -875,8 +899,10 @@ def extract_skills(text: str) -> List[str]:
     # Noun Chunks (existing - unchanged)
     for chunk in doc.noun_chunks:
         chunk_text = chunk.text.strip()
-        # Validate against skill library
+        # Validate against skill library (skip ambiguous; they need context)
         for skill in COMPREHENSIVE_SKILL_LIBRARY:
+            if skill in AMBIGUOUS_SKILLS:
+                continue
             if skill.lower() == chunk_text.lower():
                 skills.add(skill)
                 break
@@ -886,8 +912,10 @@ def extract_skills(text: str) -> List[str]:
         line = line.strip()
         if line.startswith(('*', '-', '•')):
             potential_skill = line[1:].strip()
-            # Validate against skill library
+            # Validate against skill library (skip ambiguous; they need context)
             for skill in COMPREHENSIVE_SKILL_LIBRARY:
+                if skill in AMBIGUOUS_SKILLS:
+                    continue
                 if skill.lower() in potential_skill.lower():
                     skills.add(skill)
 
