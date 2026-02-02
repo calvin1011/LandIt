@@ -1,3 +1,4 @@
+import re
 import requests
 import logging
 import time
@@ -353,11 +354,11 @@ class JSearchJobImporter:
         if not description:
             return []
 
-        # Comprehensive tech skills list
+        # Comprehensive tech skills list ('golang' not 'go' to avoid "go to market"; no bare 'r')
         tech_skills = [
             # Programming Languages
-            'python', 'java', 'javascript', 'typescript', 'go', 'rust', 'c++', 'c#', 'php', 'ruby',
-            'swift', 'kotlin', 'scala', 'r', 'matlab', 'perl', 'shell', 'bash', 'powershell',
+            'python', 'java', 'javascript', 'typescript', 'golang', 'rust', 'c++', 'c#', 'php', 'ruby',
+            'swift', 'kotlin', 'scala', 'matlab', 'perl', 'shell', 'bash', 'powershell', 'rstudio',
 
             # Web Technologies
             'html', 'css', 'react', 'vue.js', 'angular', 'node.js', 'express', 'django', 'flask',
@@ -388,8 +389,10 @@ class JSearchJobImporter:
         found_skills = []
 
         for skill in tech_skills:
-            if skill.lower() in description_lower:
-                found_skills.append(skill)
+            # Word boundary so "java" doesn't match "javascript", etc.
+            if re.search(r'\b' + re.escape(skill) + r'\b', description_lower):
+                # Normalize to canonical name for matching (resume side uses "Go")
+                found_skills.append('Go' if skill == 'golang' else skill)
 
         return found_skills[:15]  # Limit to top 15 skills
 

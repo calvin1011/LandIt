@@ -1,3 +1,4 @@
+import re
 import requests
 import logging
 import time
@@ -335,11 +336,12 @@ class AdzunaJobImporter:
     def _extract_skills_from_description(self, description: str) -> List[str]:
         """Extract technical skills from job description"""
         # Common tech skills to look for
+        # Use 'golang' not 'go' to avoid matching "go to market", "go live", etc.
         tech_skills = [
             'python', 'java', 'javascript', 'react', 'node.js', 'sql', 'aws', 'docker',
             'kubernetes', 'git', 'linux', 'mongodb', 'postgresql', 'redis', 'elasticsearch',
             'machine learning', 'tensorflow', 'pytorch', 'scikit-learn', 'pandas', 'numpy',
-            'html', 'css', 'vue.js', 'angular', 'typescript', 'go', 'rust', 'c++', 'c#',
+            'html', 'css', 'vue.js', 'angular', 'typescript', 'golang', 'rust', 'c++', 'c#',
             'azure', 'gcp', 'terraform', 'jenkins', 'ci/cd', 'agile', 'scrum'
         ]
 
@@ -347,8 +349,10 @@ class AdzunaJobImporter:
         found_skills = []
 
         for skill in tech_skills:
-            if skill.lower() in description_lower:
-                found_skills.append(skill)
+            # Word boundary so "java" doesn't match "javascript", etc.
+            if re.search(r'\b' + re.escape(skill) + r'\b', description_lower):
+                # Normalize to canonical name for matching (resume side uses "Go")
+                found_skills.append('Go' if skill == 'golang' else skill)
 
         return found_skills[:10]  # Limit to top 10 skills
 
