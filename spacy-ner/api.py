@@ -2464,7 +2464,19 @@ async def parse_resume_file(
         processing_time = time.time() - start_time
         logger.info(f" Successfully processed {file.filename} in {processing_time:.2f}s")
 
-        # Return consistent response structure
+        skills_merged = merged_results.get("skills", {}).copy()
+        if resume_skills:
+            existing = set()
+            for skill_list in skills_merged.values():
+                for s in skill_list:
+                    if isinstance(s, dict):
+                        existing.add((s.get("name", "") or "").lower())
+                    else:
+                        existing.add(str(s).lower())
+            extracted = [s for s in resume_skills if s and str(s).strip().lower() not in existing]
+            if extracted:
+                skills_merged["Extracted"] = list(extracted)
+
         return {
             "success": True,
             "entities": merged_results.get("entities", []),
@@ -2472,7 +2484,7 @@ async def parse_resume_file(
                 "personal_info": merged_results.get("personal_info", {}),
                 "work_experience": merged_results.get("work_experience", []),
                 "education": merged_results.get("education", []),
-                "skills": merged_results.get("skills", {})
+                "skills": skills_merged
             },
             "file_info": {
                 "filename": file.filename,
