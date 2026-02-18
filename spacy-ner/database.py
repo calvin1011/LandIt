@@ -113,15 +113,32 @@ class DatabaseConnection:
             if work_exp:
                 current_job_title = work_exp[0].get('title', '')
 
-            # Extract top skills
-            skills_data = resume_data.get('structured_data', {}).get('skills', {})
-            top_skills = []
-            for category, skills_list in skills_data.items():
-                for skill in skills_list[:3]:  # Top 3 per category
-                    if isinstance(skill, dict):
-                        top_skills.append(skill.get('name', ''))
-                    else:
-                        top_skills.append(str(skill))
+            resume_skills_list = resume_data.get('resume_skills')
+            if resume_skills_list and isinstance(resume_skills_list, list):
+                seen = set()
+                top_skills = []
+                for s in resume_skills_list:
+                    if s is None:
+                        continue
+                    v = str(s).strip().lower()
+                    if v and v not in seen:
+                        seen.add(v)
+                        top_skills.append(v)
+            else:
+                skills_data = resume_data.get('structured_data', {}).get('skills', {})
+                seen = set()
+                top_skills = []
+                for category, skills_list in (skills_data or {}).items():
+                    if not isinstance(skills_list, list):
+                        continue
+                    for skill in skills_list:
+                        if isinstance(skill, dict):
+                            name = (skill.get('name') or '').strip().lower()
+                        else:
+                            name = str(skill).strip().lower()
+                        if name and name not in seen:
+                            seen.add(name)
+                            top_skills.append(name)
 
             # Convert embeddings to database format
             full_resume_embedding = self.vector_to_db(embeddings.get('full_resume', np.array([])))
