@@ -206,8 +206,8 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
             setUploadStatus('idle');
             return;
         }
-        if (selectedFile.size > 5 * 1024 * 1024) {
-            setErrorMessage('File size must be less than 5MB');
+        if (selectedFile.size > 10 * 1024 * 1024) {
+            setErrorMessage('File size must be less than 10MB');
             setUploadStatus('idle');
             return;
         }
@@ -420,7 +420,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
                         </label>
                     </div>
                     <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '20px', margin: 0 }}>
-                        Supports PDF, DOCX, TXT • Max file size: 5MB
+                        Supports PDF, DOCX, TXT • Max file size: 10MB
                     </p>
                 </div>
             )}
