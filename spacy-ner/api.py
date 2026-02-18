@@ -962,6 +962,10 @@ def extract_text_from_docx(file_content: bytes) -> str:
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    text += cell.text + "\n"
         return text.strip()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"DOCX extraction failed: {str(e)}")
