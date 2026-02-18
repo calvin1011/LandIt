@@ -496,6 +496,8 @@ try:
         logger.error(f"✗ Failed to initialize skill matcher: {e}")
         skill_matcher = None
 
+    SKILL_LOWER_TO_CANONICAL = {s.lower(): s for s in COMPREHENSIVE_SKILL_LIBRARY}
+
     metadata_path = Path(model_path) / "training_info.json"
     if metadata_path.exists():
         with open(metadata_path, 'r') as f:
@@ -507,6 +509,8 @@ try:
 
 except Exception as e:
     logger.error(f" Failed to load hybrid model: {e}")
+    skill_matcher = None
+    SKILL_LOWER_TO_CANONICAL = {s.lower(): s for s in COMPREHENSIVE_SKILL_LIBRARY}
     try:
         nlp = spacy.load("output_hybrid")
         training_info = {"model_type": "custom_only"}
@@ -816,18 +820,14 @@ def extract_skills(text: str) -> List[str]:
             skills.add(ent.text.strip())
 
     # PhraseMatcher
-    # This handles 90% of cases instantly
     if skill_matcher:
         try:
             matches = skill_matcher(doc)
             for match_id, start, end in matches:
                 span = doc[start:end]
-                # Find the original skill name from library (proper capitalization)
-                span_lower = span.text.lower()
-                for skill in COMPREHENSIVE_SKILL_LIBRARY:
-                    if skill.lower() == span_lower:
-                        skills.add(skill)
-                        break
+                canonical = SKILL_LOWER_TO_CANONICAL.get(span.text.lower())
+                if canonical:
+                    skills.add(canonical)
         except Exception as e:
             logger.warning(f"PhraseMatcher failed, falling back to regex only: {e}")
 
@@ -850,46 +850,32 @@ def extract_skills(text: str) -> List[str]:
     skill_prepositions = {"with", "in", "using", "including"}
 
     for token in doc:
-        # Find skills that are objects of skill-related verbs
         if token.pos_ == "VERB" and token.lemma_ in skill_verbs:
             for child in token.children:
-                if child.dep_ == "dobj":  # Direct object
-                    potential_skill = child.text.strip()
-                    # Validate against skill library
-                    for skill in COMPREHENSIVE_SKILL_LIBRARY:
-                        if skill.lower() == potential_skill.lower():
-                            skills.add(skill)
-                            break
+                if child.dep_ == "dobj":
+                    canonical = SKILL_LOWER_TO_CANONICAL.get(child.text.strip().lower())
+                    if canonical:
+                        skills.add(canonical)
 
-        # Find skills that are objects of prepositions
         if token.pos_ == "ADP" and token.text.lower() in skill_prepositions:
             for child in token.children:
-                if child.dep_ == "pobj":  # Object of preposition
-                    potential_skill = child.text.strip()
-                    # Validate against skill library
-                    for skill in COMPREHENSIVE_SKILL_LIBRARY:
-                        if skill.lower() == potential_skill.lower():
-                            skills.add(skill)
-                            break
+                if child.dep_ == "pobj":
+                    canonical = SKILL_LOWER_TO_CANONICAL.get(child.text.strip().lower())
+                    if canonical:
+                        skills.add(canonical)
 
-    # Noun Chunks (existing - unchanged)
     for chunk in doc.noun_chunks:
-        chunk_text = chunk.text.strip()
-        # Validate against skill library
-        for skill in COMPREHENSIVE_SKILL_LIBRARY:
-            if skill.lower() == chunk_text.lower():
-                skills.add(skill)
-                break
+        canonical = SKILL_LOWER_TO_CANONICAL.get(chunk.text.strip().lower())
+        if canonical:
+            skills.add(canonical)
 
-    # Bullet Point Pattern Matching
     for line in text.split('\n'):
         line = line.strip()
         if line.startswith(('*', '-', '•')):
-            potential_skill = line[1:].strip()
-            # Validate against skill library
-            for skill in COMPREHENSIVE_SKILL_LIBRARY:
-                if skill.lower() in potential_skill.lower():
-                    skills.add(skill)
+            potential_lower = line[1:].strip().lower()
+            for skill_lower, canonical in SKILL_LOWER_TO_CANONICAL.items():
+                if skill_lower in potential_lower:
+                    skills.add(canonical)
 
     final_skills = {s for s in skills if len(s) > 1}
 
