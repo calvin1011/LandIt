@@ -442,12 +442,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # File processing imports
+PDF_MAX_PAGES = 10
+
+try:
+    import fitz
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+
 try:
     import PyPDF2
-
-    PDF_AVAILABLE = True
+    PYPDF2_AVAILABLE = True
 except ImportError:
-    PDF_AVAILABLE = False
+    PYPDF2_AVAILABLE = False
+
+PDF_AVAILABLE = PYMUPDF_AVAILABLE or PYPDF2_AVAILABLE
 
 try:
     import docx
@@ -935,19 +944,43 @@ def _extract_skills_list(resume_data: Dict) -> List[str]:
         return []
 
 def extract_text_from_pdf(file_content: bytes) -> str:
-    """Extract text from PDF bytes"""
+    """Extract text from PDF bytes. Uses PyMuPDF first, PyPDF2 as fallback. Enforces PDF_MAX_PAGES."""
     if not PDF_AVAILABLE:
-        raise HTTPException(status_code=400, detail="PDF processing not available. Install PyPDF2: pip install PyPDF2")
+        raise HTTPException(status_code=400, detail="PDF processing not available. Install pymupdf or PyPDF2")
 
-    try:
-        pdf_file = io.BytesIO(file_content)
-        reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-        return text.strip()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
+    if PYMUPDF_AVAILABLE:
+        try:
+            doc = fitz.open(stream=file_content, filetype="pdf")
+            try:
+                if len(doc) > PDF_MAX_PAGES:
+                    raise HTTPException(status_code=400, detail="PDF must have at most 10 pages")
+                text = ""
+                for page in doc:
+                    text += page.get_text() + "\n"
+                return text.strip()
+            finally:
+                doc.close()
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    if PYPDF2_AVAILABLE:
+        try:
+            pdf_file = io.BytesIO(file_content)
+            reader = PyPDF2.PdfReader(pdf_file)
+            if len(reader.pages) > PDF_MAX_PAGES:
+                raise HTTPException(status_code=400, detail="PDF must have at most 10 pages")
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
+
+    raise HTTPException(status_code=400, detail="PDF processing not available. Install pymupdf or PyPDF2")
 
 
 def extract_text_from_docx(file_content: bytes) -> str:
@@ -2371,10 +2404,10 @@ async def parse_resume_file(
                 detail=f"Unsupported file type: {file.content_type}. Supported: PDF, DOCX, TXT"
             )
 
-        # Validate file size (5MB limit)
+        # Validate file size (10MB limit)
         file_content = await file.read()
-        if len(file_content) > 5 * 1024 * 1024:  # 5MB
-            raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+        if len(file_content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size must be less than 10MB")
 
         if len(file_content) == 0:
             raise HTTPException(status_code=400, detail="File is empty")
