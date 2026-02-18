@@ -15,7 +15,20 @@ spacy-ner/output/
 spacy-ner/output_hybrid/
 
 spacy-ner/train_data.json
+spacy-ner/train_data_*.json
+spacy-ner/*_training_data.json
+spacy-ner/kaggle_prelabeled_*.json
+spacy-ner/extraction_test_results.json
 
 spacy-ner/__pycache__/
 .idea/
 node_modules/
+
+.cursor/
+
+spacy-ner/Skills.txt
+spacy-ner/scripts/
+spacy-ner/requirements-full.txt
+spacy-ner/spacy_api.py
+spacy-ner/test_*.py
+landit-ui/src/components/SpacyModelDemo.js
