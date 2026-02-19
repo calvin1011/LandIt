@@ -101,18 +101,9 @@ class GreenhouseJobImporter:
             return 'mid'
 
     def _extract_skills_from_description(self, description: str) -> List[str]:
-        """Extract technical skills from job description"""
-        # Reuse the comprehensive skill library from api.py
-        from api import COMPREHENSIVE_SKILL_LIBRARY
-
-        description_lower = description.lower()
-        found_skills = []
-
-        for skill in COMPREHENSIVE_SKILL_LIBRARY:
-            if skill.lower() in description_lower:
-                found_skills.append(skill)
-
-        return found_skills[:15]  # Limit to top 15 skills
+        """Extract technical skills from job description using shared skill taxonomy."""
+        from api import extract_skills_for_jobs
+        return extract_skills_for_jobs(description, max_skills=20)
 
     def _is_duplicate_job(self, title: str, company: str) -> bool:
         """Check if job already exists in database"""

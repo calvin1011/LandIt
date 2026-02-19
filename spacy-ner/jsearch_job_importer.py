@@ -349,49 +349,9 @@ class JSearchJobImporter:
         return any(keyword in description_lower for keyword in remote_keywords)
 
     def _extract_skills_from_description(self, description: str) -> List[str]:
-        """Extract technical skills from job description"""
-        if not description:
-            return []
-
-        # Comprehensive tech skills list
-        tech_skills = [
-            # Programming Languages
-            'python', 'java', 'javascript', 'typescript', 'go', 'rust', 'c++', 'c#', 'php', 'ruby',
-            'swift', 'kotlin', 'scala', 'r', 'matlab', 'perl', 'shell', 'bash', 'powershell',
-
-            # Web Technologies
-            'html', 'css', 'react', 'vue.js', 'angular', 'node.js', 'express', 'django', 'flask',
-            'spring', 'laravel', 'rails', 'asp.net', 'jquery', 'bootstrap', 'sass', 'less',
-
-            # Databases
-            'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch', 'cassandra',
-            'dynamodb', 'oracle', 'sqlite', 'mariadb', 'neo4j', 'influxdb',
-
-            # Cloud & DevOps
-            'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins', 'gitlab',
-            'github actions', 'circleci', 'ansible', 'puppet', 'chef', 'vagrant', 'helm',
-
-            # Data & ML
-            'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn',
-            'pandas', 'numpy', 'jupyter', 'spark', 'hadoop', 'kafka', 'airflow', 'dbt',
-
-            # Tools & Platforms
-            'git', 'linux', 'unix', 'windows', 'macos', 'vim', 'vscode', 'intellij',
-            'eclipse', 'postman', 'swagger', 'jira', 'confluence', 'slack', 'teams',
-
-            # Methodologies
-            'agile', 'scrum', 'kanban', 'ci/cd', 'tdd', 'bdd', 'devops', 'microservices',
-            'restful', 'graphql', 'api', 'oauth', 'jwt', 'ssl', 'https'
-        ]
-
-        description_lower = description.lower()
-        found_skills = []
-
-        for skill in tech_skills:
-            if skill.lower() in description_lower:
-                found_skills.append(skill)
-
-        return found_skills[:15]  # Limit to top 15 skills
+        """Extract technical skills from job description using shared skill taxonomy."""
+        from api import extract_skills_for_jobs
+        return extract_skills_for_jobs(description, max_skills=20)
 
     def _is_duplicate_job(self, title: str, company: str) -> bool:
         """Check if job already exists in database"""
