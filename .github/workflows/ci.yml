@@ -14,6 +14,28 @@ jobs:
       run:
         working-directory: spacy-ner
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 6543:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      user: postgres
+      password: postgres
+      host: 127.0.0.1
+      port: 6543
+      dbname: test_db
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -11,8 +11,6 @@
 # production
 /build
 
-/public
-
 src/firebase.js
 
 # misc
