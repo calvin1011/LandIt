@@ -5,13 +5,14 @@ import (
 	"strings"
 
 	"github.com/gomutex/godocx"
+	"github.com/gomutex/godocx/docx"
 )
 
 const docxContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 func exportDOCX(payload ExportPayload) ([]byte, string, error) {
 	tpl := getTemplate(payload)
-	var doc *godocx.Document
+	var doc *docx.RootDoc
 	var err error
 	switch tpl {
 	case "modern":
@@ -41,7 +42,7 @@ func exportDOCX(payload ExportPayload) ([]byte, string, error) {
 	return data, docxContentType, nil
 }
 
-func renderDOCXClassic(payload ExportPayload) (*godocx.Document, error) {
+func renderDOCXClassic(payload ExportPayload) (*docx.RootDoc, error) {
 	doc, err := godocx.NewDocument()
 	if err != nil {
 		return nil, err
@@ -141,10 +142,10 @@ func renderDOCXClassic(payload ExportPayload) (*godocx.Document, error) {
 	return doc, nil
 }
 
-func renderDOCXModern(payload ExportPayload) (*godocx.Document, error) {
+func renderDOCXModern(payload ExportPayload) (*docx.RootDoc, error) {
 	return renderDOCXClassic(payload)
 }
 
-func renderDOCXMinimal(payload ExportPayload) (*godocx.Document, error) {
+func renderDOCXMinimal(payload ExportPayload) (*docx.RootDoc, error) {
 	return renderDOCXClassic(payload)
 }
