@@ -211,65 +211,9 @@ class MuseJobImporter:
             return None
 
     def _extract_skills_from_text(self, text: str) -> List[str]:
-        """Extract common tech skills from job description"""
-        if not text:
-            return []
-
-        text_lower = text.lower()
-
-        # Comprehensive list of tech skills to look for
-        tech_skills = [
-            # Programming Languages
-            'python', 'javascript', 'java', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift',
-            'kotlin', 'typescript', 'scala', 'r', 'matlab', 'sql', 'html', 'css',
-
-            # Frontend Frameworks/Libraries
-            'react', 'angular', 'vue', 'svelte', 'jquery', 'bootstrap', 'tailwind',
-
-            # Backend Frameworks
-            'node.js', 'express', 'django', 'flask', 'spring', 'laravel', 'rails',
-            'fastapi', 'asp.net', 'nestjs',
-
-            # Cloud Platforms
-            'aws', 'azure', 'gcp', 'google cloud', 'heroku', 'digitalocean',
-
-            # DevOps & Tools
-            'docker', 'kubernetes', 'terraform', 'jenkins', 'gitlab', 'github',
-            'ansible', 'puppet', 'chef',
-
-            # Databases
-            'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'cassandra',
-            'dynamodb', 'sqlite', 'oracle',
-
-            # Data Science & ML
-            'tensorflow', 'pytorch', 'scikit-learn', 'pandas', 'numpy', 'matplotlib',
-            'tableau', 'power bi', 'spark', 'hadoop',
-
-            # Mobile Development
-            'ios', 'android', 'react native', 'flutter', 'xamarin',
-
-            # Other Tools
-            'git', 'jira', 'confluence', 'slack', 'figma', 'sketch', 'photoshop',
-            'linux', 'unix', 'bash', 'powershell'
-        ]
-
-        found_skills = []
-        for skill in tech_skills:
-            # Use word boundaries to avoid partial matches
-            if re.search(r'\b' + re.escape(skill.lower()) + r'\b', text_lower):
-                # Capitalize properly
-                if skill == 'node.js':
-                    found_skills.append('Node.js')
-                elif skill == 'c++':
-                    found_skills.append('C++')
-                elif skill == 'c#':
-                    found_skills.append('C#')
-                elif skill == 'asp.net':
-                    found_skills.append('ASP.NET')
-                else:
-                    found_skills.append(skill.title())
-
-        return list(set(found_skills))[:15]  # Limit to top 15 skills
+        """Extract skills from job description using shared COMPREHENSIVE_SKILL_LIBRARY."""
+        from api import extract_skills_for_jobs
+        return extract_skills_for_jobs(text, max_skills=20)
 
     def _determine_experience_level(self, description: str) -> str:
         """Determine experience level from job description"""
