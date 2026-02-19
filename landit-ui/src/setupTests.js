@@ -13,7 +13,10 @@ jest.mock('firebase/auth', () => ({
   GoogleAuthProvider: jest.fn(function () {
     this.providerId = 'google.com';
   }),
-  onAuthStateChanged: jest.fn(() => () => {}),
+  onAuthStateChanged: jest.fn((auth, callback) => {
+    callback(null);
+    return () => {};
+  }),
   signInWithPopup: jest.fn(),
   signOut: jest.fn(),
   createUserWithEmailAndPassword: jest.fn(),
