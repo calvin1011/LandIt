@@ -25,6 +25,8 @@ import requests
 from contextlib import asynccontextmanager
 from thefuzz import fuzz
 from greenhouse_job_importer import GreenhouseJobImporter
+from export_payload import build_canonical_payload
+from relationship_extractor import calculate_ats_score
 
 from spacy.matcher import PhraseMatcher
 
@@ -702,6 +704,15 @@ class SaveJobRequest(BaseModel):
 class QuickApplyRequest(BaseModel):
     user_email: str
     job_id: int
+
+
+class EnhanceForJobRequest(BaseModel):
+    user_email: str
+    job_description: Optional[str] = None
+    job_id: Optional[int] = None
+    template: Optional[str] = "classic"
+    export_format: Optional[str] = "pdf"
+
 
 class ChatRequest(BaseModel):
     user_email: str
@@ -3520,6 +3531,135 @@ def merge_extraction_results(spacy_results: Dict, semantic_results: Dict, origin
             }
 
 
+@app.post("/resume/enhance-for-job")
+def enhance_resume_for_job(request: EnhanceForJobRequest):
+    """
+    Run the enhance-for-job pipeline: JD analysis, gap analysis, experience rewriting,
+    skills reordering, summary generation. Returns enhanced resume in canonical shape plus
+    ats_analysis, keyword_coverage, improvements_made, job_match_delta. Persists to DB.
+    """
+    resume_row = db.get_user_resume(request.user_email)
+    if not resume_row:
+        raise HTTPException(status_code=404, detail="Resume not found for this user")
+    structured = resume_row.get("structured_data")
+    if not structured:
+        try:
+            import json
+            structured = json.loads(resume_row["structured_data"]) if isinstance(resume_row.get("structured_data"), str) else resume_row.get("structured_data")
+        except Exception:
+            pass
+    if not structured:
+        raise HTTPException(status_code=400, detail="No structured resume data; parse and store a resume first")
+
+    job_description = (request.job_description or "").strip()
+    job_id = request.job_id
+    if not job_description and job_id:
+        job = db.get_job_by_id(job_id)
+        if job:
+            job_description = (job.get("description") or job.get("requirements") or "")[:5000]
+            if job.get("title"):
+                job_description = f"Title: {job['title']}\n\n{job_description}"
+    if not job_description:
+        raise HTTPException(status_code=400, detail="Provide job_description or job_id with a stored job")
+
+    from enhance_for_job import analyze_job_description, run_enhance_pipeline
+
+    jd_analysis = analyze_job_description(job_description)
+    jd_keywords = list(
+        set(
+            (jd_analysis.get("repeated_keywords") or [])
+            + extract_skills(jd_analysis.get("description") or "")
+        )
+    )[:40]
+    job_data_for_embedding = {
+        "title": jd_analysis.get("title") or "",
+        "description": jd_analysis.get("description") or "",
+        "requirements": jd_analysis.get("description") or "",
+        "skills_required": jd_keywords,
+    }
+
+    initial_canonical = build_canonical_payload(
+        resume_row,
+        template_name=request.template or "classic",
+        export_format=request.export_format or "pdf",
+        job_title=jd_analysis.get("title"),
+    )
+    enhanced_canonical = run_enhance_pipeline(
+        initial_canonical,
+        jd_analysis,
+        extract_skills_fn=extract_skills,
+        user_experience_level="mid",
+    )
+
+    resume_text_before = (resume_row.get("resume_text") or "")[:10000] or _canonical_to_resume_text(initial_canonical)
+    resume_text_after = _canonical_to_resume_text(enhanced_canonical)
+    structured_before = {
+        "work_experience": initial_canonical.get("work_experience") or [],
+        "education": initial_canonical.get("education") or [],
+        "skills": initial_canonical.get("skills") or {},
+        "personal_info": initial_canonical.get("personal_info") or {},
+    }
+    structured_after = {
+        "work_experience": enhanced_canonical.get("work_experience") or [],
+        "education": enhanced_canonical.get("education") or [],
+        "skills": enhanced_canonical.get("skills") or {},
+        "personal_info": enhanced_canonical.get("personal_info") or {},
+    }
+
+    ats_before = calculate_ats_score(resume_text_before, structured_before, jd_keywords=jd_keywords)
+    ats_after = calculate_ats_score(resume_text_after, structured_after, jd_keywords=jd_keywords)
+    ats_score_original = ats_before.get("score", 0)
+    ats_score_enhanced = ats_after.get("score", 0)
+
+    text_before_lower = resume_text_before.lower()
+    text_after_lower = resume_text_after.lower()
+    jd_set = {k.lower().strip() for k in jd_keywords if k}
+    found = [k for k in jd_keywords if k and k.lower() in text_before_lower]
+    added = [k for k in jd_keywords if k and k.lower() in text_after_lower and k.lower() not in text_before_lower]
+    missing = [k for k in jd_keywords if k and k.lower() not in text_after_lower]
+    keyword_coverage = {"found": found, "added": added, "missing": missing}
+
+    improvements_made = []
+    if ats_score_enhanced > ats_score_original:
+        improvements_made.append(f"ATS score improved from {ats_score_original} to {ats_score_enhanced}")
+    if added:
+        improvements_made.append(f"Added JD keywords to resume: {', '.join(added[:8])}{'...' if len(added) > 8 else ''}")
+    improvements_made.append("Experience bullets rewritten to align with job description")
+    improvements_made.append("Skills reordered to highlight JD matches")
+    improvements_made.append("Summary generated to mirror job title and tone")
+
+    job_match_before = 0.0
+    job_match_after = 0.0
+    if embedding_service:
+        try:
+            resume_embedding_before = embedding_service.generate_resume_embedding(resume_row)
+            resume_data_after = _canonical_to_resume_data_for_embedding(enhanced_canonical)
+            resume_embedding_after = embedding_service.generate_resume_embedding(resume_data_after)
+            job_embedding = embedding_service.generate_job_embedding(job_data_for_embedding)
+            job_match_before = float(embedding_service.calculate_similarity(resume_embedding_before, job_embedding))
+            job_match_after = float(embedding_service.calculate_similarity(resume_embedding_after, job_embedding))
+        except Exception as e:
+            logger.warning(f"Job match delta embedding failed: {e}")
+    job_match_delta = {"before": round(job_match_before, 4), "after": round(job_match_after, 4), "delta": round(job_match_after - job_match_before, 4)}
+
+    db.update_user_resume_enhancement(
+        request.user_email,
+        enhanced_canonical,
+        ats_score_original=ats_score_original,
+        ats_score_enhanced=ats_score_enhanced,
+        last_enhanced_for_job_id=job_id,
+    )
+
+    return {
+        "enhanced_resume": enhanced_canonical,
+        "ats_analysis": {"score_before": ats_score_original, "score_after": ats_score_enhanced, "breakdown_before": ats_before.get("breakdown"), "breakdown_after": ats_after.get("breakdown"), "issues_before": ats_before.get("issues"), "issues_after": ats_after.get("issues")},
+        "keyword_coverage": keyword_coverage,
+        "improvements_made": improvements_made,
+        "job_match_delta": job_match_delta,
+        "export_ready": True,
+    }
+
+
 @app.post("/store-resume")
 def store_resume(request: StoreResumeRequest):
     """
@@ -3685,6 +3825,40 @@ def _extract_skills_list(resume_data: Dict) -> List[str]:
     except Exception as e:
         logger.error(f"Failed to extract skills list: {e}")
         return []
+
+def _canonical_to_resume_text(payload: Dict) -> str:
+    """Build flat resume text from canonical payload for ATS scoring."""
+    parts = []
+    if payload.get("summary"):
+        parts.append(payload["summary"])
+    for exp in payload.get("work_experience") or []:
+        title = exp.get("title") or ""
+        company = exp.get("company") or ""
+        parts.append(f"{title} at {company}")
+        for b in exp.get("bullets") or []:
+            parts.append(b if isinstance(b, str) else str(b))
+    for cat, skill_list in (payload.get("skills") or {}).items():
+        parts.append(" ".join(s if isinstance(s, str) else str(s) for s in skill_list))
+    return "\n".join(parts)
+
+
+def _canonical_to_resume_data_for_embedding(payload: Dict) -> Dict:
+    """Build resume_data dict with structured_data shape expected by embedding_service (achievements = bullets)."""
+    work = []
+    for exp in payload.get("work_experience") or []:
+        work.append({
+            **exp,
+            "achievements": exp.get("bullets") or [],
+        })
+    return {
+        "structured_data": {
+            "work_experience": work,
+            "skills": payload.get("skills") or {},
+            "education": payload.get("education") or [],
+            "personal_info": payload.get("personal_info") or {},
+        }
+    }
+
 
 def _generate_improvement_suggestions(results: Dict) -> List[str]:
     """Generate personalized improvement suggestions with error handling"""
