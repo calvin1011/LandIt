@@ -294,7 +294,9 @@ function App() {
 
         return () => {
             console.log(' Cleaning up Firebase auth listener');
-            unsubscribe();
+            if (typeof unsubscribe === 'function') {
+                unsubscribe();
+            }
         };
     }, []);
 

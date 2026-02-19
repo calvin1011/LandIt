@@ -15,7 +15,7 @@ jest.mock('firebase/auth', () => ({
   }),
   onAuthStateChanged: jest.fn((auth, callback) => {
     callback(null);
-    return () => {};
+    return function unsubscribe() {};
   }),
   signInWithPopup: jest.fn(),
   signOut: jest.fn(),
