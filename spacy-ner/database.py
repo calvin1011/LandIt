@@ -215,6 +215,56 @@ class DatabaseConnection:
             logger.error(f" Failed to get resume: {e}")
             return None
 
+    def update_user_resume_enhancement(
+        self,
+        user_email: str,
+        enhanced_resume: Dict,
+        ats_score_original: Optional[int] = None,
+        ats_score_enhanced: Optional[int] = None,
+        last_enhanced_for_job_id: Optional[int] = None,
+    ) -> None:
+        try:
+            cursor = self.get_cursor()
+            enhanced_json = json.dumps(enhanced_resume)
+            query = """
+                UPDATE user_resumes
+                SET enhanced_resume = %s, ats_score_original = %s, ats_score_enhanced = %s,
+                    last_enhanced_at = NOW(), last_enhanced_for_job_id = %s, updated_at = NOW()
+                WHERE user_email = %s
+            """
+            cursor.execute(
+                query,
+                (enhanced_json, ats_score_original, ats_score_enhanced, last_enhanced_for_job_id, user_email),
+            )
+            cursor.close()
+            logger.info(f" Updated enhancement for {user_email}")
+        except Exception as e:
+            logger.error(f" Failed to update resume enhancement: {e}")
+            raise
+
+    def record_resume_export(
+        self,
+        user_email: str,
+        template: str,
+        format_type: str,
+        job_id: Optional[int] = None,
+        ats_score: Optional[int] = None,
+    ) -> int:
+        try:
+            cursor = self.get_cursor()
+            query = """
+                INSERT INTO resume_exports (user_email, job_id, template, format, ats_score)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            """
+            cursor.execute(query, (user_email, job_id, template, format_type, ats_score))
+            row = cursor.fetchone()
+            cursor.close()
+            return row["id"] if row else 0
+        except Exception as e:
+            logger.error(f" Failed to record resume export: {e}")
+            raise
+
     # Job operations
 
     def store_job_posting(self, job_data: Dict, embeddings: Dict[str, np.ndarray]) -> int:
