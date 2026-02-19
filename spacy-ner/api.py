@@ -813,6 +813,22 @@ def _is_go_language_context(text_lower: str) -> bool:
     return any(s in text_lower for s in signals)
 
 
+def _filter_go_from_skills(skills_list: List[str], context_text: str) -> List[str]:
+    """Remove 'go' from skill list unless context_text indicates the Go language."""
+    if not context_text:
+        return [s for s in skills_list if s and s.lower() != "go"]
+    text_lower = context_text.lower()
+    return [s for s in skills_list if s and (s.lower() != "go" or _is_go_language_context(text_lower))]
+
+
+def _filter_go_from_skill_set(skill_set: set, context_text: str) -> None:
+    """Remove 'go' from skill set in place unless context_text indicates the Go language."""
+    if "go" not in skill_set:
+        return
+    if not context_text or not _is_go_language_context(context_text.lower()):
+        skill_set.discard("go")
+
+
 def extract_skills(text: str) -> List[str]:
     """
     Enhanced skill extraction using HYBRID approach:
@@ -1271,13 +1287,15 @@ def find_job_matches(match_request: JobMatchRequest):
 
         resume_embedding = user_resume['full_resume_embedding']
 
+        resume_text = (user_resume.get('resume_text') or '')[:50000]
         matches = []
         for job in all_jobs:
-            # Calculate Raw Scores
             user_skills_set = set(extract_user_skills(user_resume))
-            job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
+            _filter_go_from_skill_set(user_skills_set, resume_text)
 
-            # Direct keyword matching (our confidence score)
+            job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
+            _filter_go_from_skill_set(job_skills_set, job.get('description') or '')
+
             keyword_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
 
             # Semantic matching (contextual understanding)
@@ -1336,13 +1354,16 @@ def find_job_matches(match_request: JobMatchRequest):
 
             # Append Match if it Meets Threshold
             if overall_score >= match_request.min_similarity:
-                user_skills = extract_user_skills(user_resume)
-                job_skills = job.get('skills_required', [])
-                skill_matches = list(set(user_skills) & set([s.lower() for s in job_skills]))
+                user_skills_filtered = _filter_go_from_skills(
+                    extract_user_skills(user_resume), resume_text)
+                job_desc = (job.get('description') or '').lower()
+                job_skills_filtered = [s for s in (job.get('skills_required') or []) if s and
+                                       (s.lower() != "go" or _is_go_language_context(job_desc))]
+                skill_matches = list(user_skills_set & job_skills_set)
 
                 skill_gaps_detailed = categorize_skill_gaps(
-                    user_skills,
-                    job_skills,
+                    user_skills_filtered,
+                    job_skills_filtered,
                     job,
                     user_resume.get('experience_level', 'mid'),
                     overall_score
@@ -2482,11 +2503,12 @@ async def parse_resume_file(
 
             # Convert to consistent scoring structure
             for job in basic_jobs:
-                # Calculate scores similar to /jobs/find-matches
-                user_skills_set = set(resume_skills)
-                job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
+                user_skills_set = set(s.lower() for s in resume_skills if s)
+                _filter_go_from_skill_set(user_skills_set, text)
 
-                # Calculate various scores
+                job_skills_set = set([s.lower() for s in job.get('skills_required', []) if s])
+                _filter_go_from_skill_set(job_skills_set, job.get('description') or '')
+
                 keyword_score = calculate_fuzzy_skill_similarity(user_skills_set, job_skills_set)
                 skills_similarity = apply_confidence_boost(keyword_score, factor=1.5)
 
