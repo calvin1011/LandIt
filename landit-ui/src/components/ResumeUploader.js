@@ -193,7 +193,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
             setUploadStatus('error');
             handleUploadError(error);
         }
-    }, [userEmail, autoFindJobs, processTextDirectly, storeResumeForMatching, onUploadSuccess, handleUploadError]);
+    }, [userEmail, autoFindJobs, jobDescriptionText, processTextDirectly, storeResumeForMatching, onUploadSuccess, handleUploadError]);
 
     const handleFile = useCallback((selectedFile) => {
         const allowedTypes = [

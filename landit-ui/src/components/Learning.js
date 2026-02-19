@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, User, MessageSquare, ChevronDown, ChevronRight, CheckCircle, Clock, Target, BookOpen, ExternalLink, TrendingUp, AlertCircle, Award, Calendar, Star, Zap } from 'lucide-react';
 
 const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
@@ -28,27 +28,6 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }
   }, [messages.length]);
 
-  useEffect(() => {
-    if (jobContext) {
-      console.log('Job Context received:', jobContext);
-
-      const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
-      const userMessage = {
-        id: Date.now(),
-        type: 'user',
-        content: jobMessage,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, userMessage]);
-      handleGeneratePlan(jobContext);
-
-      if (onClearJobContext) {
-        onClearJobContext();
-      }
-    }
-  }, [jobContext, onClearJobContext]);
-
   const simulateTyping = (responseText, callback, isPlan = false) => {
     setIsTyping(true);
 
@@ -63,7 +42,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }, calculatedDelay);
   };
 
-  const handleGeneratePlan = async (jobData) => {
+  const handleGeneratePlan = useCallback(async (jobData) => {
     setIsLoading(true);
 
     if (!jobData || !jobData.job_id) {
@@ -131,7 +110,28 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (jobContext) {
+      console.log('Job Context received:', jobContext);
+
+      const jobMessage = `Create a learning plan for the ${jobContext.title} position at ${jobContext.company}. I'm interested in this role and want to bridge the skill gaps.`;
+      const userMessage = {
+        id: Date.now(),
+        type: 'user',
+        content: jobMessage,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      handleGeneratePlan(jobContext);
+
+      if (onClearJobContext) {
+        onClearJobContext();
+      }
+    }
+  }, [jobContext, onClearJobContext, handleGeneratePlan]);
 
   const toggleProjectExpansion = (projectId) => {
     setExpandedProjects(prev => ({

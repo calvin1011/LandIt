@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Briefcase, MapPin, DollarSign, RefreshCw, Bookmark, TrendingUp, ArrowRight, BrainCircuit, ThumbsUp, ThumbsDown, BookOpen, Clock } from 'lucide-react';
+import { Briefcase, MapPin, DollarSign, RefreshCw, TrendingUp, ThumbsUp, ThumbsDown, BookOpen, Clock } from 'lucide-react';
 
 // MatchScore Component for the right side of the card
 const MatchScore = ({ job }) => {
@@ -202,13 +202,6 @@ const SkillsGapAnalysis = ({ job, onGenerateLearningPlan }) => {
 const JobCard = ({ job, userEmail, onGenerateLearningPlan, savedJobs, appliedJobs, jobToConfirm, handleSaveJob, handleQuickApply, handleConfirmApply, handleCancelApply, handleFeedback }) => {
     const isSaved = savedJobs.has(job.job_id);
     const isApplied = appliedJobs.has(job.job_id);
-
-    // Get match quality color from original logic
-    const getMatchQualityColor = (score) => {
-        if (score >= 0.8) return '#10b981';
-        if (score >= 0.6) return '#f59e0b';
-        return '#ef4444';
-    };
 
     return (
         <div style={{

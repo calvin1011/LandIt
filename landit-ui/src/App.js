@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import ResumeUploader from './components/ResumeUploader';
@@ -25,7 +25,7 @@ function App() {
     const [userEmail, setUserEmail] = useState('');
     const [userInfo, setUserInfo] = useState(initialUserInfo);
     const [loading, setLoading] = useState(true);
-    const [firebaseUser, setFirebaseUser] = useState(null);
+    const [, setFirebaseUser] = useState(null);
     const [showUploader, setShowUploader] = useState(false);
     const [activeTab, setActiveTab] = useState('resume');
     const [isAdmin, setIsAdmin] = useState(false);
@@ -34,7 +34,6 @@ function App() {
 
     const [jobDescription, setJobDescription] = useState('');
     const [missingSkills, setMissingSkills] = useState([]);
-    const [recommendedJobs, setRecommendedJobs] = useState([]);
 
     // Job recommendations state
     const [jobRecommendations, setJobRecommendations] = useState([]);
@@ -48,7 +47,7 @@ function App() {
     const [jobToConfirm, setJobToConfirm] = useState(null);
 
     // Fetch job recommendations function
-    const fetchJobRecommendations = async (reset = false) => {
+    const fetchJobRecommendations = useCallback(async (reset = false) => {
         if (!userEmail) return;
 
         setJobsLoading(true);
@@ -110,7 +109,7 @@ function App() {
         } finally {
             setJobsLoading(false);
         }
-    };
+    }, [userEmail, jobOffset, shownJobIds]);
 
     // Handler functions for job actions
     const handleJobFeedback = async (recommendationId, feedbackType, rating = null) => {
@@ -245,7 +244,7 @@ function App() {
             // Otherwise fetch from API
             fetchJobRecommendations(true);
         }
-    }, [loggedIn, userEmail]);
+    }, [loggedIn, userEmail, jobRecommendations.length, fetchJobRecommendations]);
 
     useEffect(() => {
         console.log('Setting up Firebase auth listener...');
@@ -295,7 +294,9 @@ function App() {
 
         return () => {
             console.log(' Cleaning up Firebase auth listener');
-            unsubscribe();
+            if (typeof unsubscribe === 'function') {
+                unsubscribe();
+            }
         };
     }, []);
 
@@ -319,7 +320,7 @@ function App() {
         }
     };
 
-    const handleAccountSwitch = (newEmail) => {
+    const handleAccountSwitch = useCallback((newEmail) => {
         console.log(' Account switch detected:', userEmail, '→', newEmail);
 
         if (userEmail && userEmail !== newEmail) {
@@ -336,7 +337,7 @@ function App() {
         } else {
             setUserInfo(initialUserInfo);
         }
-    };
+    }, [userEmail, userInfo]);
 
     const handleNavigateToLearning = (job) => {
         setLearningJobContext(job);
@@ -378,7 +379,7 @@ function App() {
         if (lastUser && userEmail && lastUser !== userEmail) {
             handleAccountSwitch(userEmail);
         }
-    }, [userEmail]);
+    }, [userEmail, handleAccountSwitch]);
 
     useEffect(() => {
         // Check sessionStorage for persisted data when the app loads
