@@ -891,6 +891,20 @@ def extract_skills(text: str) -> List[str]:
     # Sort for consistency
     return sorted(list(final_skills))
 
+
+def extract_skills_for_jobs(text: str, max_skills: int = 20) -> List[str]:
+    """Word-boundary match against COMPREHENSIVE_SKILL_LIBRARY; lightweight, no nlp(). Capped for job import."""
+    if not text:
+        return []
+    text_lower = text.lower()
+    matches = set()
+    for skill in COMPREHENSIVE_SKILL_LIBRARY:
+        pattern = r'\b' + re.escape(skill.lower()) + r'\b'
+        if re.search(pattern, text_lower):
+            matches.add(skill)
+    return sorted(matches)[:max_skills]
+
+
 def _extract_skills_list(resume_data: Dict) -> List[str]:
     """Extract a clean list of skills from resume data"""
     try:

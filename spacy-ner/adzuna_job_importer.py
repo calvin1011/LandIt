@@ -333,24 +333,9 @@ class AdzunaJobImporter:
         return any(keyword in description_lower for keyword in remote_keywords)
 
     def _extract_skills_from_description(self, description: str) -> List[str]:
-        """Extract technical skills from job description"""
-        # Common tech skills to look for
-        tech_skills = [
-            'python', 'java', 'javascript', 'react', 'node.js', 'sql', 'aws', 'docker',
-            'kubernetes', 'git', 'linux', 'mongodb', 'postgresql', 'redis', 'elasticsearch',
-            'machine learning', 'tensorflow', 'pytorch', 'scikit-learn', 'pandas', 'numpy',
-            'html', 'css', 'vue.js', 'angular', 'typescript', 'go', 'rust', 'c++', 'c#',
-            'azure', 'gcp', 'terraform', 'jenkins', 'ci/cd', 'agile', 'scrum'
-        ]
-
-        description_lower = description.lower()
-        found_skills = []
-
-        for skill in tech_skills:
-            if skill.lower() in description_lower:
-                found_skills.append(skill)
-
-        return found_skills[:10]  # Limit to top 10 skills
+        """Extract technical skills from job description using shared skill taxonomy."""
+        from api import extract_skills_for_jobs
+        return extract_skills_for_jobs(description, max_skills=20)
 
     def _is_duplicate_job(self, title: str, company: str) -> bool:
         """Check if job already exists in database"""
