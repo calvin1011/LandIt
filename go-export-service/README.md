@@ -20,8 +20,9 @@ Standalone Go microservice for resume PDF/DOCX export and HTML preview. Runs on 
 ```bash
 go mod tidy
 go build -o landit-export .
-./landit-export
 ```
+
+Then run the binary (Windows: `.\landit-export.exe` or `landit-export`; Linux/macOS: `./landit-export`).
 
 Or: `go run .`
 
