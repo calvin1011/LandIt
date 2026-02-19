@@ -21,6 +21,8 @@ spacy-ner/kaggle_prelabeled_*.json
 spacy-ner/extraction_test_results.json
 
 spacy-ner/__pycache__/
+**/__pycache__/
+*.exe
 .idea/
 node_modules/
 

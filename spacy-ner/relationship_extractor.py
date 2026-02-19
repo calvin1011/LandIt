@@ -1,9 +1,21 @@
 import re
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional, Set, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import spacy
 from spacy.matcher import Matcher
+
+STANDARD_SECTION_HEADERS = [
+    r"work\s+experience", r"professional\s+experience", r"employment", r"experience",
+    r"education", r"academic", r"skills", r"technical\s+skills", r"competencies",
+    r"summary", r"professional\s+summary", r"objective", r"career\s+summary",
+]
+NON_STANDARD_HEADER_HINTS = ["journey", "story", "about me", "my background", "where i've", "life so far"]
+DATE_YEAR = re.compile(r"\b(19|20)\d{2}\b")
+DATE_MONTH_YEAR = re.compile(
+    r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*(\.?\s*)?\d{4}",
+    re.IGNORECASE,
+)
 
 @dataclass
 class WorkExperience:
@@ -500,6 +512,211 @@ class IntelligentRelationshipExtractor:
         }
 
 
+def _infer_context_for_ats(text: str, structured_data: Dict) -> Dict:
+    """Build minimal context_results from text and structured_data when not provided."""
+    text_lower = text.lower()
+    entities = []
+    personal = structured_data.get("personal_info") or {}
+    if isinstance(personal, dict):
+        if personal.get("email") and "@" in str(personal.get("email", "")):
+            entities.append({"label": "EMAIL", "text": str(personal["email"])})
+        if personal.get("phone"):
+            entities.append({"label": "PHONE", "text": str(personal["phone"])})
+        if personal.get("name"):
+            entities.append({"label": "NAME", "text": str(personal["name"])})
+    if not entities and re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", text):
+        entities.append({"label": "EMAIL", "text": "found"})
+    section_analysis = {
+        "has_experience": "experience" in text_lower or "employment" in text_lower,
+        "has_education": "education" in text_lower or "academic" in text_lower,
+        "has_skills": "skills" in text_lower or "competencies" in text_lower,
+        "structure_score": 0,
+    }
+    return {"entities": entities, "section_analysis": section_analysis}
+
+
+def _extract_year_from_date(date_str: Optional[str]) -> Optional[int]:
+    if not date_str:
+        return None
+    m = re.search(r"\b(19|20)\d{2}\b", str(date_str))
+    return int(m.group()) if m else None
+
+
+def _run_ats_engine(
+    text: str,
+    context_results: Dict,
+    structured_data: Dict,
+    jd_keywords: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Core ATS scoring: returns score (0-100), breakdown dict, and issues list.
+    When jd_keywords is provided, adds keyword_coverage to breakdown and JD-related issues.
+    """
+    breakdown = {}
+    issues: List[str] = []
+    text_lower = text.lower()
+    entities = context_results.get("entities") or []
+    section_analysis = context_results.get("section_analysis") or {}
+
+    if jd_keywords:
+        weights = {
+            "sections": 20,
+            "contact": 20,
+            "dates": 10,
+            "formatting": 10,
+            "work_experience": 15,
+            "education": 5,
+            "skills": 5,
+            "section_order": 5,
+            "keyword_coverage": 10,
+        }
+    else:
+        weights = {
+            "sections": 25,
+            "contact": 20,
+            "dates": 15,
+            "formatting": 15,
+            "work_experience": 15,
+            "education": 5,
+            "skills": 5,
+        }
+
+    has_email = any(e.get("label") == "EMAIL" and "@" in str(e.get("text", "")) for e in entities)
+    has_phone = any(e.get("label") == "PHONE" for e in entities)
+    has_name = any(e.get("label") in ("NAME", "PERSON") for e in entities)
+    contact_pts = (40 if has_email else 0) + (30 if has_phone else 0) + (30 if has_name else 0)
+    breakdown["contact"] = min(100, contact_pts)
+    if not has_email:
+        issues.append("Email missing")
+    if not has_phone:
+        issues.append("Phone number missing")
+    if not has_name:
+        issues.append("Name or contact block unclear")
+
+    standard_sections = ["experience", "education", "skills", "summary"]
+    found_sections = sum(1 for s in standard_sections if s in text_lower)
+    breakdown["sections"] = min(100, int((found_sections / 4) * 100))
+    if "summary" not in text_lower and "objective" not in text_lower:
+        issues.append("Summary section missing")
+
+    header_lines = [ln.strip() for ln in text.split("\n") if 5 <= len(ln.strip()) <= 60]
+    for line in header_lines:
+        line_lower = line.lower()
+        if any(re.search(p, line_lower) for p in STANDARD_SECTION_HEADERS):
+            continue
+        if line_lower.replace(" ", "").isalpha() or (len(line) < 40 and line[0].isupper()):
+            if any(h in line_lower for h in NON_STANDARD_HEADER_HINTS):
+                issues.append(f"Non-standard section header: \"{line[:50]}\"")
+                break
+
+    has_years = bool(DATE_YEAR.search(text))
+    month_year = bool(DATE_MONTH_YEAR.search(text_lower))
+    date_formats_consistent = has_years and (month_year or re.search(r"\b\d{1,2}/\d{4}\b|\b\d{4}\b", text))
+    breakdown["dates"] = 100 if (has_years and month_year) else (80 if has_years else 0)
+    if has_years and not date_formats_consistent:
+        issues.append("Date format inconsistent; use Month YYYY or YYYY consistently")
+
+    special_count = len(re.findall(r"[^\w\s\-.,()@\n]", text))
+    excess_special = special_count > len(text) * 0.02
+    excess_newlines = len(re.findall(r"\n\s*\n\s*\n", text)) > 3
+    formatting_penalty = (15 if excess_special else 0) + (15 if excess_newlines else 0)
+    breakdown["formatting"] = max(0, 100 - formatting_penalty)
+    if excess_special:
+        issues.append("Excessive special characters may hurt ATS parsing")
+    if excess_newlines:
+        issues.append("Inconsistent formatting or too many blank lines")
+
+    work_exp = structured_data.get("work_experience") or []
+    if not work_exp:
+        breakdown["work_experience"] = 0
+    else:
+        with_structure = sum(
+            1 for exp in work_exp
+            if (exp.get("title") or exp.get("company")) and (exp.get("start_date") or exp.get("end_date"))
+        )
+        breakdown["work_experience"] = min(100, int((with_structure / len(work_exp)) * 100))
+
+    education = structured_data.get("education") or []
+    if not education:
+        breakdown["education"] = 0
+    else:
+        with_school = sum(1 for edu in education if edu.get("degree") and edu.get("school"))
+        breakdown["education"] = min(100, int((with_school / len(education)) * 100))
+
+    skills_dict = structured_data.get("skills") or {}
+    total_skills = sum(len(slist) for slist in skills_dict.values() if isinstance(slist, list))
+    breakdown["skills"] = min(100, total_skills * 5) if total_skills else 0
+
+    exp_pos = text_lower.find("experience") if "experience" in text_lower else len(text) + 1
+    edu_pos = text_lower.find("education") if "education" in text_lower else len(text) + 1
+    work_before_edu = exp_pos <= edu_pos or not work_exp
+    if "section_order" in weights:
+        breakdown["section_order"] = 100 if work_before_edu else 50
+    if work_exp and not work_before_edu:
+        issues.append("Work experience should appear before education for experienced candidates")
+
+    job_start_years = []
+    for exp in work_exp:
+        y = _extract_year_from_date(exp.get("start_date") or exp.get("end_date"))
+        if y is not None:
+            job_start_years.append(y)
+    reverse_chron = True
+    if len(job_start_years) >= 2:
+        reverse_chron = job_start_years == sorted(job_start_years, reverse=True)
+    if not reverse_chron and len(job_start_years) >= 2:
+        issues.append("Dates should be reverse chronological (most recent first)")
+
+    if jd_keywords:
+        keywords_lower = [k.lower().strip() for k in jd_keywords if k and isinstance(k, str)]
+        if keywords_lower:
+            idxs = [text_lower.find(w) for w in ("experience", "education", "skills")]
+            summary_end = min(400, *(i if i >= 0 else len(text_lower) for i in idxs), len(text_lower))
+            summary_zone = text_lower[:summary_end]
+            titles_zone = " ".join([str(e.get("title") or "") for e in work_exp]).lower()
+            skills_text = " ".join(
+                str(s.get("name", s) if isinstance(s, dict) else s).lower()
+                for slist in skills_dict.values() for s in (slist if isinstance(slist, list) else [])
+            )
+            body_zone = text_lower
+            def count_in_zone(zone: str) -> int:
+                return sum(1 for kw in keywords_lower if kw in zone)
+            summary_hits = count_in_zone(summary_zone)
+            title_hits = count_in_zone(titles_zone)
+            body_hits = count_in_zone(body_zone)
+            skill_hits = count_in_zone(skills_text)
+            total_hits = summary_hits * 4 + title_hits * 3 + body_hits * 2 + skill_hits
+            max_possible = len(keywords_lower) * (4 + 3 + 2 + 1)
+            breakdown["keyword_coverage"] = min(100, int((total_hits / max_possible * 100))) if max_possible else 0
+            if skill_hits == 0 and keywords_lower:
+                issues.append("Skills section contains no JD keywords")
+    else:
+        breakdown["keyword_coverage"] = 0
+
+    total = sum(
+        (breakdown.get(key) or 0) / 100.0 * w
+        for key, w in weights.items()
+        if w and key in breakdown
+    )
+    score = max(0, min(100, int(round(total))))
+    return {"score": score, "breakdown": breakdown, "issues": issues}
+
+
+def calculate_ats_score(
+    resume_text: str,
+    structured_data: Dict,
+    context_results: Optional[Dict] = None,
+    jd_keywords: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Public ATS scorer for resume text and structured data. Use from enhance endpoint
+    for before/after scoring (ats_score_original, ats_score_enhanced).
+    Returns dict with score (0-100), breakdown, and issues.
+    """
+    if context_results is None:
+        context_results = _infer_context_for_ats(resume_text, structured_data)
+    return _run_ats_engine(resume_text, context_results, structured_data, jd_keywords=jd_keywords)
+
+
 class ResumeIntelligenceAnalyzer:
     """
     Main class that combines section detection and relationship extraction
@@ -551,21 +768,20 @@ class ResumeIntelligenceAnalyzer:
         # Resume completeness score
         completeness_score = self._calculate_completeness_score(context_results, relationship_results)
 
-        # ATS compatibility score
-        ats_score = self._calculate_ats_compatibility(text, context_results)
+        ats_result = self._calculate_ats_compatibility(text, context_results, relationship_results)
+        ats_score = ats_result["score"]
+        ats_breakdown = ats_result["breakdown"]
+        ats_issues = ats_result.get("issues") or []
 
-        # Skills match analysis (could be enhanced with job requirements)
         skills_analysis = self._analyze_skills_depth(relationship_results["skills"])
-
-        # Red flags detection
         red_flags = self._detect_red_flags(relationship_results, text)
-
-        # Strengths identification
         strengths = self._identify_strengths(relationship_results, context_results)
 
         return {
             "completeness_score": completeness_score,
             "ats_compatibility_score": ats_score,
+            "ats_breakdown": ats_breakdown,
+            "ats_issues": ats_issues,
             "skills_analysis": skills_analysis,
             "red_flags": red_flags,
             "strengths": strengths,
@@ -613,34 +829,14 @@ class ResumeIntelligenceAnalyzer:
 
         return min(100, score)
 
-    def _calculate_ats_compatibility(self, text: str, context_results: Dict) -> int:
-        """Calculate ATS (Applicant Tracking System) compatibility score"""
-        score = 100  # Start with perfect score and deduct
-
-        # Check for problematic formatting
-        if len(re.findall(r'[^\w\s\-.,()@]', text)) > len(text) * 0.02:  # Too many special chars
-            score -= 15
-
-        # Check for standard section headers
-        standard_sections = ["experience", "education", "skills", "summary"]
-        found_sections = 0
-        for section in standard_sections:
-            if section.lower() in text.lower():
-                found_sections += 1
-
-        if found_sections < 3:
-            score -= 20
-
-        # Check for proper contact format
-        entities = context_results["entities"]
-        if not any(e["label"] == "EMAIL" and "@" in e["text"] for e in entities):
-            score -= 15
-
-        # Check for date formats
-        if not re.search(r'\b\d{4}\b', text):  # Should have years
-            score -= 10
-
-        return max(0, score)
+    def _calculate_ats_compatibility(self, text: str, context_results: Dict, relationship_results: Dict) -> Dict:
+        """
+        Calculate ATS compatibility via full engine; returns score, breakdown, and issues.
+        Existing callers still get numeric score from result["score"].
+        """
+        return _run_ats_engine(
+            text, context_results, relationship_results, jd_keywords=None
+        )
 
     def _analyze_skills_depth(self, skills_dict: Dict) -> Dict:
         """Analyze the depth and breadth of skills"""
