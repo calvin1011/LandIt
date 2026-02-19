@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  backend:
+    name: Backend (spacy-ner)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: spacy-ner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('spacy-ner/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Smoke test
+        run: python -m pytest tests/test_smoke.py -v
+
+  frontend:
+    name: Frontend (landit-ui)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landit-ui
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: landit-ui/node_modules
+          key: node-${{ hashFiles('landit-ui/package-lock.json') }}
+          restore-keys: |
+            node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test -- --watchAll=false --passWithNoTests
