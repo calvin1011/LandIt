@@ -28,6 +28,8 @@ node_modules/
 
 .cursor/
 
+supabase-export-schema.sql
+
 spacy-ner/Skills.txt
 spacy-ner/scripts/
 spacy-ner/requirements-full.txt
