@@ -804,6 +804,15 @@ def enhance_personal_info_with_location(personal_info: Dict[str, Any], text: str
 
     return personal_info
 
+def _is_go_language_context(text_lower: str) -> bool:
+    """Return True if text suggests the Go programming language, not the verb 'go'."""
+    if not text_lower:
+        return False
+    signals = ("golang", "go 1.", "go runtime", "go modules", "go lang", " in go ", "with go ",
+               "written in go", "programming in go", "coding in go", "developed in go", "built with go")
+    return any(s in text_lower for s in signals)
+
+
 def extract_skills(text: str) -> List[str]:
     """
     Enhanced skill extraction using HYBRID approach:
@@ -886,6 +895,9 @@ def extract_skills(text: str) -> List[str]:
                 if skill_lower in potential_lower:
                     skills.add(canonical)
 
+    if "Go" in skills and not _is_go_language_context(text_lower):
+        skills.discard("Go")
+
     final_skills = {s for s in skills if len(s) > 1}
 
     # Sort for consistency
@@ -901,6 +913,8 @@ def extract_skills_for_jobs(text: str, max_skills: int = 20) -> List[str]:
     for skill in COMPREHENSIVE_SKILL_LIBRARY:
         pattern = r'\b' + re.escape(skill.lower()) + r'\b'
         if re.search(pattern, text_lower):
+            if skill == "Go" and not _is_go_language_context(text_lower):
+                continue
             matches.add(skill)
     return sorted(matches)[:max_skills]
 
