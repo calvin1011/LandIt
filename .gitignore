@@ -35,4 +35,5 @@ spacy-ner/scripts/
 spacy-ner/requirements-full.txt
 spacy-ner/spacy_api.py
 spacy-ner/test_*.py
+spacy-ner/tests/test_*.py
 landit-ui/src/components/SpacyModelDemo.js
