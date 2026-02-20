@@ -3670,6 +3670,7 @@ def enhance_resume_for_job(request: EnhanceForJobRequest):
     )
 
     return {
+        "original_resume": initial_canonical,
         "enhanced_resume": enhanced_canonical,
         "ats_analysis": {"score_before": ats_score_original, "score_after": ats_score_enhanced, "breakdown_before": ats_before.get("breakdown"), "breakdown_after": ats_after.get("breakdown"), "issues_before": ats_before.get("issues"), "issues_after": ats_after.get("issues")},
         "keyword_coverage": keyword_coverage,
