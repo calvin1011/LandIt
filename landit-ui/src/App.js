@@ -9,6 +9,7 @@ import AdminPanel from './components/AdminPanel';
 import './App.css';
 import Learning from './components/Learning';
 import SavedJobs from './components/SavedJobs';
+import EnhanceAndExportPanel from './components/EnhanceAndExportPanel';
 
 const initialUserInfo = {
     fullName: '',
@@ -873,8 +874,7 @@ function App() {
                                     />
                                 ) : (
                                     <>
-                                        {/* Display missing skills if they exist */}
-                                      {missingSkills.length > 0 && (
+                                        {missingSkills.length > 0 && (
                                         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
                                           <h3 style={{ color: '#c2410c' }}>Skills to Add</h3>
                                           <p style={{color: '#9a3412'}}>Based on the job description, you might want to highlight these skills on your resume:</p>
@@ -886,7 +886,8 @@ function App() {
                                             ))}
                                           </div>
                                         </div>
-                                      )}
+                                        )}
+                                        <EnhanceAndExportPanel userEmail={userEmail} />
                                     </>
                                 )}
                             </>
