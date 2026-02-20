@@ -14,7 +14,8 @@ jest.mock('./firebase', () => ({
   auth: {
     signOut: jest.fn().mockResolvedValue(undefined),
     currentUser: null
-  }
+  },
+  isFirebaseConfigured: jest.fn(() => true)
 }));
 
 jest.mock('./components/Login', () => {
