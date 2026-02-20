@@ -1,9 +1,11 @@
 import spacy
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
+import httpx
 import re
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import time
 import json
 from pathlib import Path
@@ -29,6 +31,8 @@ from export_payload import build_canonical_payload
 from relationship_extractor import calculate_ats_score
 
 from spacy.matcher import PhraseMatcher
+
+GO_EXPORT_SERVICE_URL = os.getenv("GO_EXPORT_SERVICE_URL", "http://localhost:8001")
 
 COMPREHENSIVE_SKILL_LIBRARY = {
     # Programming Languages
@@ -539,13 +543,21 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events for the FastAPI application.
     This replaces the deprecated on_event handlers.
     """
-    # Code to run on startup
     scheduler.start()
     logger.info("APScheduler started... will run job imports every 6 hours.")
 
-    yield  # The application runs here
+    app.state.go_export_available = False
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/health", timeout=2.0)
+            app.state.go_export_available = r.status_code == 200
+        if not app.state.go_export_available:
+            logger.warning("Go export service health check failed (status %s)", getattr(r, "status_code", None))
+    except Exception as e:
+        logger.warning("Go export service unavailable at startup: %s", e)
 
-    # Code to run on shutdown
+    yield
+
     scheduler.shutdown()
     logger.info("APScheduler shut down.")
 
@@ -712,6 +724,13 @@ class EnhanceForJobRequest(BaseModel):
     job_id: Optional[int] = None
     template: Optional[str] = "classic"
     export_format: Optional[str] = "pdf"
+
+
+class ExportRequest(BaseModel):
+    user_email: str
+    template: Optional[str] = "classic"
+    job_id: Optional[int] = None
+    ats_mode: Optional[bool] = False
 
 
 class ChatRequest(BaseModel):
@@ -3732,6 +3751,137 @@ def store_resume(request: StoreResumeRequest):
     except Exception as e:
         logger.error(f" Failed to store resume for {request.user_email}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to store resume: {str(e)}")
+
+
+def _get_export_payload_for_user(
+    user_email: str,
+    template: str = "classic",
+    export_format: str = "pdf",
+    job_id: Optional[int] = None,
+    ats_mode: bool = False,
+) -> Tuple[Dict[str, Any], Optional[int]]:
+    resume_row = db.get_user_resume(user_email)
+    if not resume_row:
+        raise HTTPException(status_code=404, detail="No resume found for user")
+    job_title = None
+    if job_id:
+        job = db.get_job_by_id(job_id)
+        if job:
+            job_title = job.get("title") or ""
+    payload = build_canonical_payload(
+        resume_row,
+        template_name=template,
+        export_format=export_format,
+        ats_mode=ats_mode,
+        job_title=job_title,
+    )
+    ats_score = None
+    if resume_row.get("enhanced_resume"):
+        ats_score = resume_row.get("ats_score_enhanced")
+    if ats_score is None:
+        ats_score = resume_row.get("ats_score_original")
+    return payload, ats_score
+
+
+@app.post("/export/pdf")
+async def export_pdf(request: ExportRequest):
+    if not getattr(app.state, "go_export_available", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Export service is unavailable. Please try again later.",
+        )
+    payload, ats_score = _get_export_payload_for_user(
+        request.user_email,
+        template=request.template or "classic",
+        export_format="pdf",
+        job_id=request.job_id,
+        ats_mode=request.ats_mode or False,
+    )
+    url = f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/export/pdf"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=503, detail=f"Export service error: {e.response.status_code}")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.warning("Go export service request failed: %s", e)
+        raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
+    db.record_resume_export(
+        user_email=request.user_email,
+        template=request.template or "classic",
+        format_type="pdf",
+        job_id=request.job_id,
+        ats_score=ats_score,
+    )
+    return Response(content=data, media_type="application/pdf")
+
+
+@app.post("/export/docx")
+async def export_docx(request: ExportRequest):
+    if not getattr(app.state, "go_export_available", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Export service is unavailable. Please try again later.",
+        )
+    payload, ats_score = _get_export_payload_for_user(
+        request.user_email,
+        template=request.template or "classic",
+        export_format="docx",
+        job_id=request.job_id,
+        ats_mode=request.ats_mode or False,
+    )
+    url = f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/export/docx"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=503, detail=f"Export service error: {e.response.status_code}")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.warning("Go export service request failed: %s", e)
+        raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
+    db.record_resume_export(
+        user_email=request.user_email,
+        template=request.template or "classic",
+        format_type="docx",
+        job_id=request.job_id,
+        ats_score=ats_score,
+    )
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+@app.post("/export/preview")
+async def export_preview(request: ExportRequest):
+    if not getattr(app.state, "go_export_available", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Export service is unavailable. Please try again later.",
+        )
+    payload, _ = _get_export_payload_for_user(
+        request.user_email,
+        template=request.template or "classic",
+        export_format="pdf",
+        job_id=request.job_id,
+        ats_mode=request.ats_mode or False,
+    )
+    url = f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/export/preview"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=503, detail=f"Export service error: {e.response.status_code}")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.warning("Go export service request failed: %s", e)
+        raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
+    return data
 
 
 def _reconstruct_resume_text(resume_data: Dict) -> str:
