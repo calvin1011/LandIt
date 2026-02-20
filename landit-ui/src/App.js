@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, isFirebaseConfigured } from './firebase';
 import ResumeUploader from './components/ResumeUploader';
 import JobRecommendations from './components/JobRecommendations';
 import Login from "./components/Login";
@@ -248,6 +248,10 @@ function App() {
     }, [loggedIn, userEmail, jobRecommendations.length, fetchJobRecommendations]);
 
     useEffect(() => {
+        if (!isFirebaseConfigured()) {
+            setLoading(false);
+            return;
+        }
         console.log('Setting up Firebase auth listener...');
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -312,7 +316,7 @@ function App() {
         console.log(' Logging out...');
 
         try {
-            await auth.signOut();
+            if (auth) await auth.signOut();
             setParsedData([]);
             setShowUploader(false);
             setActiveTab('resume');
@@ -422,14 +426,16 @@ function App() {
     return (
         <div className="App">
             {!loggedIn ? (
-                <Login onLoginSuccess={handleLoginSuccess} />
+                <Login onLoginSuccess={handleLoginSuccess} firebaseConfigured={isFirebaseConfigured()} />
             ) : (
                 <div style={{
                     height: '100vh',
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     position: 'relative',
-                    overflow: 'auto'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
                 }}>
                     {/* Animated Background Elements */}
                     <div style={{
@@ -791,12 +797,14 @@ function App() {
                     </div>
 
                     <div style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflowY: 'auto',
                         padding: '30px 40px',
                         paddingTop: '130px',
                         width: '100%',
                         boxSizing: 'border-box',
-                        animation: 'fadeIn 0.6s ease-out',
-                        minHeight: 'calc(100vh - 130px)'
+                        animation: 'fadeIn 0.6s ease-out'
                     }}>
                         {/* Profile Section - Only show on Resume tab */}
                         {activeTab === 'resume' && <Profile userInfo={userInfo} setUserInfo={setUserInfo} />}

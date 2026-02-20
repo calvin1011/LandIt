@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
-const Login = ({ onLoginSuccess }) => {
+const Login = ({ onLoginSuccess, firebaseConfigured = true }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLogin, setIsLogin] = useState(true);
@@ -18,11 +18,11 @@ const Login = ({ onLoginSuccess }) => {
     const [error, setError] = useState('');
 
     const handleFirebaseAuth = async (authPromise, email) => {
+        if (!auth) return;
         try {
             setLoading(true);
             setError('');
 
-            // Set persistence based on "Remember Me" checkbox
             const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
             await setPersistence(auth, persistence);
 
@@ -77,8 +77,35 @@ const Login = ({ onLoginSuccess }) => {
     };
 
     const handleGoogleLogin = async () => {
+        if (!auth || !googleProvider) return;
         await handleFirebaseAuth(signInWithPopup(auth, googleProvider), 'google-user');
     };
+
+    if (!firebaseConfigured) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+            }}>
+                <div style={{
+                    background: 'white',
+                    padding: '32px',
+                    borderRadius: '12px',
+                    maxWidth: '420px',
+                    textAlign: 'center',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                }}>
+                    <p style={{ margin: 0, fontSize: '16px', color: '#333' }}>
+                        Firebase is not configured. Add <code style={{ background: '#f0f0f0', padding: '2px 6px', borderRadius: '4px' }}>REACT_APP_FIREBASE_API_KEY</code> and other Firebase env vars to <code style={{ background: '#f0f0f0', padding: '2px 6px', borderRadius: '4px' }}>landit-ui/.env</code>, then restart the dev server.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{
