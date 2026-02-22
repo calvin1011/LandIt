@@ -435,8 +435,9 @@ def run_job_cleanup():
     except Exception as e:
         logger.error(f"SCHEDULER: Job cleanup failed: {e}")
 
-# Schedule job imports every 6 hours
-scheduler.add_job(run_all_job_imports, 'interval', hours=6, next_run_time=datetime.now() + timedelta(seconds=10))
+# First job import run: delayed so server starts without freezing (default 1 hour; set JOB_IMPORT_FIRST_RUN_DELAY_SECONDS=10 for old behavior)
+_first_delay_secs = int(os.getenv("JOB_IMPORT_FIRST_RUN_DELAY_SECONDS", "3600"))
+scheduler.add_job(run_all_job_imports, 'interval', hours=6, next_run_time=datetime.now() + timedelta(seconds=_first_delay_secs))
 scheduler.add_job(run_job_cleanup, 'cron', hour=2, minute=0)
 
 # simple in memory cache for requests
@@ -544,7 +545,7 @@ async def lifespan(app: FastAPI):
     This replaces the deprecated on_event handlers.
     """
     scheduler.start()
-    logger.info("APScheduler started... will run job imports every 6 hours.")
+    logger.info("APScheduler started; job imports every 6 hours, first run in %s seconds.", _first_delay_secs)
 
     app.state.go_export_available = False
     try:
