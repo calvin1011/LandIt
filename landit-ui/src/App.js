@@ -230,22 +230,21 @@ function App() {
         };
     }, []);
 
-    // Only fetch jobs when user logs in or uploads resume, not when switching tabs
+    // Fetch jobs only when user opens Jobs tab (or after resume upload via handleUploadSuccess)
     useEffect(() => {
-        if (loggedIn && userEmail && jobRecommendations.length === 0) {
-            // Check if we have jobs from resume upload first
-            const persistedData = sessionStorage.getItem('resumeAnalysisData');
-            if (persistedData) {
+        if (activeTab !== 'jobs' || !userEmail || jobRecommendations.length > 0) return;
+        const persistedData = sessionStorage.getItem('resumeAnalysisData');
+        if (persistedData) {
+            try {
                 const data = JSON.parse(persistedData);
                 if (data.recommended_jobs && data.recommended_jobs.length > 0) {
                     setJobRecommendations(data.recommended_jobs);
                     return;
                 }
-            }
-            // Otherwise fetch from API
-            fetchJobRecommendations(true);
+            } catch (_) {}
         }
-    }, [loggedIn, userEmail, jobRecommendations.length, fetchJobRecommendations]);
+        fetchJobRecommendations(true);
+    }, [activeTab, userEmail, jobRecommendations.length, fetchJobRecommendations]);
 
     useEffect(() => {
         if (!isFirebaseConfigured()) {
