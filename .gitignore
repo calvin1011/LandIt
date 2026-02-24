@@ -3,6 +3,7 @@ config/google-service-key.json
 
 upload/
 .env
+**/.env
 
 FrontEnd/
 
