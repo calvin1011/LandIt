@@ -34,6 +34,19 @@ from spacy.matcher import PhraseMatcher
 
 GO_EXPORT_SERVICE_URL = os.getenv("GO_EXPORT_SERVICE_URL", "http://localhost:8001")
 
+CORS_ORIGINS_DEFAULT = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3003",
+    "http://127.0.0.1:3003",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:8080",
+    "http://localhost:8081",
+]
+_cors_extra = os.getenv("CORS_ORIGINS", "")
+CORS_ORIGINS = CORS_ORIGINS_DEFAULT + [o.strip() for o in _cors_extra.split(",") if o.strip()]
+
 COMPREHENSIVE_SKILL_LIBRARY = {
     # Programming Languages
     "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "Go", "Rust",
@@ -570,16 +583,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3003",
-        "http://127.0.0.1:3003",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://localhost:8080",
-        "http://localhost:8081"
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
