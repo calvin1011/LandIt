@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, User, MessageSquare, ChevronDown, ChevronRight, CheckCircle, Clock, Target, BookOpen, ExternalLink, TrendingUp, AlertCircle, Award, Calendar, Star, Zap } from 'lucide-react';
+import { API_BASE } from '../config';
 
 const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
   const [messages, setMessages] = useState([]);
@@ -63,7 +64,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/generate-learning-plan', {
+      const response = await fetch(`${API_BASE}/generate-learning-plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -500,7 +501,7 @@ const Learning = ({ userEmail, jobContext, onClearJobContext }) => {
     setIsTyping(true);
 
     try {
-      const response = await fetch('http://localhost:8000/ai/chat', {
+      const response = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

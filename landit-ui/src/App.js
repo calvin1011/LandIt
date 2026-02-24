@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from './firebase';
+import { API_BASE } from './config';
 import ResumeUploader from './components/ResumeUploader';
 import JobRecommendations from './components/JobRecommendations';
 import Login from "./components/Login";
@@ -64,7 +65,7 @@ function App() {
         }
 
         try {
-            const response = await fetch('http://localhost:8000/jobs/find-matches', {
+            const response = await fetch(`${API_BASE}/jobs/find-matches`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -115,7 +116,7 @@ function App() {
     // Handler functions for job actions
     const handleJobFeedback = async (recommendationId, feedbackType, rating = null) => {
         try {
-            const response = await fetch('http://localhost:8000/jobs/feedback', {
+            const response = await fetch(`${API_BASE}/jobs/feedback`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -143,7 +144,7 @@ function App() {
         if (savedJobs.has(jobId)) return;
 
         try {
-            const response = await fetch('http://localhost:8000/jobs/save', {
+            const response = await fetch(`${API_BASE}/jobs/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_email: userEmail, job_id: jobId }),
@@ -187,7 +188,7 @@ function App() {
         setAppliedJobs(prev => new Set(prev).add(job_id));
 
         try {
-            const response = await fetch('http://localhost:8000/jobs/quick-apply', {
+            const response = await fetch(`${API_BASE}/jobs/quick-apply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_email: userEmail, job_id: job_id }),

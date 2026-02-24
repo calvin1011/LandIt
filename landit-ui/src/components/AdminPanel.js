@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const AdminPanel = () => {
     const [importing, setImporting] = useState(false);
@@ -14,7 +15,7 @@ const AdminPanel = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:8000/admin/jobs/stats');
+            const response = await fetch(`${API_BASE}/admin/jobs/stats`);
             if (response.ok) {
                 const data = await response.json();
                 setStats(data);
@@ -30,7 +31,7 @@ const AdminPanel = () => {
         setImporting(true);
         setImportResult(null);
         try {
-            const response = await fetch('http://localhost:8000/admin/import-all-jobs', {
+            const response = await fetch(`${API_BASE}/admin/import-all-jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ max_jobs_per_source: 25 })
@@ -55,7 +56,7 @@ const AdminPanel = () => {
         setTesting(true);
         setTestResult(null);
         try {
-            const response = await fetch('http://localhost:8000/admin/test-all-importers', { method: 'POST' });
+            const response = await fetch(`${API_BASE}/admin/test-all-importers`, { method: 'POST' });
 
             // Check if the response was successful. If not, parse the error and throw it.
             if (!response.ok) {
