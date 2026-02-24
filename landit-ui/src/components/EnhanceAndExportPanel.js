@@ -42,6 +42,12 @@ const EnhanceAndExportPanel = ({ userEmail }) => {
   const [atsMode, setAtsMode] = useState(false);
   const [downloading, setDownloading] = useState({ pdf: false, docx: false });
   const [lastFilename, setLastFilename] = useState('');
+  const [coverLetterModalOpen, setCoverLetterModalOpen] = useState(false);
+  const [coverLetterGenerating, setCoverLetterGenerating] = useState(false);
+  const [coverLetterError, setCoverLetterError] = useState('');
+  const [coverLetterText, setCoverLetterText] = useState('');
+  const [coverLetterPayload, setCoverLetterPayload] = useState(null);
+  const [coverLetterExporting, setCoverLetterExporting] = useState({ pdf: false, docx: false });
 
   const handleEnhance = async () => {
     if (!userEmail) return;
@@ -107,6 +113,69 @@ const EnhanceAndExportPanel = ({ userEmail }) => {
       setEnhanceError(e.message || `Export ${format} failed`);
     } finally {
       setDownloading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleOpenCoverLetter = () => {
+    setCoverLetterError('');
+    setCoverLetterModalOpen(true);
+    if (!coverLetterPayload && jobDescription.trim()) {
+      setCoverLetterGenerating(true);
+      fetch(`${API_BASE}/resume/generate-cover-letter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: userEmail,
+          job_description: jobDescription.trim()
+        })
+      })
+        .then(res => {
+          if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Generate failed'); });
+          return res.json();
+        })
+        .then(data => {
+          setCoverLetterText(data.cover_letter_text || '');
+          setCoverLetterPayload(data.payload || null);
+        })
+        .catch(e => setCoverLetterError(e.message || 'Failed to generate cover letter'))
+        .finally(() => setCoverLetterGenerating(false));
+    } else if (!coverLetterPayload) {
+      setCoverLetterError('Paste a job description above and click Enhance, or generate again after adding a JD.');
+    }
+  };
+
+  const handleCoverLetterExport = async (format) => {
+    if (!coverLetterPayload) return;
+    const key = format === 'pdf' ? 'pdf' : 'docx';
+    setCoverLetterExporting(prev => ({ ...prev, [key]: true }));
+    const paragraphs = coverLetterText.trim().split(/\n\n+/).filter(Boolean);
+    const payload = {
+      ...coverLetterPayload,
+      paragraphs: paragraphs.length ? paragraphs : [coverLetterText.trim() || '']
+    };
+    try {
+      const res = await fetch(`${API_BASE}/export/cover-letter-${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Export failed: ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cover-letter.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (e) {
+      setCoverLetterError(e.message || `Export ${format} failed`);
+    } finally {
+      setCoverLetterExporting(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -348,11 +417,136 @@ const EnhanceAndExportPanel = ({ userEmail }) => {
           >
             {downloading.docx ? 'Generating...' : 'Download DOCX'}
           </button>
+          <button
+            onClick={handleOpenCoverLetter}
+            style={{
+              padding: '12px 24px',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Cover Letter
+          </button>
         </div>
         {lastFilename && (
           <p style={{ marginTop: '12px', color: 'rgba(255,255,255,0.9)', fontSize: '14px' }}>Generated: {lastFilename}</p>
         )}
       </div>
+
+      {coverLetterModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={(e) => e.target === e.currentTarget && setCoverLetterModalOpen(false)}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '640px',
+              width: '90%',
+              maxHeight: '85vh',
+              overflow: 'auto',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.4)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '18px' }}>Cover Letter</h3>
+              <button
+                type="button"
+                onClick={() => setCoverLetterModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '0 4px'
+                }}
+              >
+                x
+              </button>
+            </div>
+            {coverLetterGenerating && (
+              <p style={{ color: 'rgba(255,255,255,0.9)', marginBottom: '12px' }}>Generating cover letter...</p>
+            )}
+            {coverLetterError && (
+              <p style={{ color: '#f87171', marginBottom: '12px', fontSize: '14px' }}>{coverLetterError}</p>
+            )}
+            {(coverLetterPayload || coverLetterText) && (
+              <>
+                <textarea
+                  value={coverLetterText}
+                  onChange={(e) => setCoverLetterText(e.target.value)}
+                  placeholder="Cover letter body (edit as needed)"
+                  style={{
+                    width: '100%',
+                    minHeight: '200px',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: '14px',
+                    background: 'rgba(255,255,255,0.08)',
+                    color: 'white',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                    marginBottom: '16px'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleCoverLetterExport('pdf')}
+                    disabled={coverLetterExporting.pdf}
+                    style={{
+                      padding: '10px 20px',
+                      background: coverLetterExporting.pdf ? '#6b7280' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      cursor: coverLetterExporting.pdf ? 'not-allowed' : 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {coverLetterExporting.pdf ? 'Generating...' : 'Download PDF'}
+                  </button>
+                  <button
+                    onClick={() => handleCoverLetterExport('docx')}
+                    disabled={coverLetterExporting.docx}
+                    style={{
+                      padding: '10px 20px',
+                      background: coverLetterExporting.docx ? '#6b7280' : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      cursor: coverLetterExporting.docx ? 'not-allowed' : 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {coverLetterExporting.docx ? 'Generating...' : 'Download DOCX'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
