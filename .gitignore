@@ -29,6 +29,8 @@ node_modules/
 
 .cursor/
 
+DEPLOY_GUIDE.md
+
 supabase-export-schema.sql
 
 spacy-ner/Skills.txt
