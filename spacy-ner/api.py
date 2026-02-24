@@ -27,7 +27,7 @@ import requests
 from contextlib import asynccontextmanager
 from thefuzz import fuzz
 from greenhouse_job_importer import GreenhouseJobImporter
-from export_payload import build_canonical_payload
+from export_payload import build_canonical_payload, build_cover_letter_payload
 from relationship_extractor import calculate_ats_score
 
 from spacy.matcher import PhraseMatcher
@@ -732,6 +732,16 @@ class ExportRequest(BaseModel):
     template: Optional[str] = "classic"
     job_id: Optional[int] = None
     ats_mode: Optional[bool] = False
+
+
+class GenerateCoverLetterRequest(BaseModel):
+    user_email: str
+    job_id: Optional[int] = None
+    job_description: Optional[str] = None
+
+
+class CoverLetterExportRequest(BaseModel):
+    payload: Dict[str, Any]
 
 
 class ChatRequest(BaseModel):
@@ -3755,6 +3765,53 @@ def store_resume(request: StoreResumeRequest):
         raise HTTPException(status_code=500, detail=f"Failed to store resume: {str(e)}")
 
 
+@app.post("/resume/generate-cover-letter")
+def generate_cover_letter(request: GenerateCoverLetterRequest):
+    """
+    Generate cover letter from enhanced or parsed resume and job description.
+    Returns cover_letter_text and canonical payload for Go export.
+    """
+    resume_row = db.get_user_resume(request.user_email)
+    if not resume_row:
+        raise HTTPException(status_code=404, detail="No resume found for user")
+    job_description = (request.job_description or "").strip()
+    job_id = request.job_id
+    job_title = ""
+    if not job_description and job_id:
+        job = db.get_job_by_id(job_id)
+        if job:
+            job_description = (job.get("description") or job.get("requirements") or "")[:5000]
+            job_title = (job.get("title") or "").strip()
+            if job_description:
+                job_description = f"Title: {job['title']}\n\n{job_description}"
+    if not job_description:
+        raise HTTPException(status_code=400, detail="Provide job_description or job_id with a stored job")
+    if not job_title and job_description.lower().startswith("title:"):
+        first_line = job_description.split("\n", 1)[0]
+        job_title = first_line[6:].strip()
+
+    canonical = build_canonical_payload(
+        resume_row,
+        template_name="classic",
+        export_format="pdf",
+        job_title=job_title or None,
+    )
+    from cover_letter import generate_cover_letter_text
+    cover_text, paragraphs = generate_cover_letter_text(
+        canonical,
+        job_description,
+        job_title=job_title,
+    )
+    payload = build_cover_letter_payload(
+        resume_row,
+        paragraphs,
+        template_name="classic",
+        export_format="pdf",
+        job_title=job_title or None,
+    )
+    return {"cover_letter_text": cover_text, "payload": payload}
+
+
 def _get_export_payload_for_user(
     user_email: str,
     template: str = "classic",
@@ -3884,6 +3941,53 @@ async def export_preview(request: ExportRequest):
         logger.warning("Go export service request failed: %s", e)
         raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
     return data
+
+
+@app.post("/export/cover-letter-pdf")
+async def export_cover_letter_pdf(request: CoverLetterExportRequest):
+    if not getattr(app.state, "go_export_available", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Export service is unavailable. Please try again later.",
+        )
+    payload = request.payload
+    url = f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/export/cover-letter-pdf"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=503, detail=f"Export service error: {e.response.status_code}")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.warning("Go export service request failed: %s", e)
+        raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
+    return Response(content=data, media_type="application/pdf")
+
+
+@app.post("/export/cover-letter-docx")
+async def export_cover_letter_docx(request: CoverLetterExportRequest):
+    if not getattr(app.state, "go_export_available", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Export service is unavailable. Please try again later.",
+        )
+    payload = request.payload
+    url = f"{GO_EXPORT_SERVICE_URL.rstrip('/')}/export/cover-letter-docx"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=503, detail=f"Export service error: {e.response.status_code}")
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.warning("Go export service request failed: %s", e)
+        raise HTTPException(status_code=503, detail="Export service is temporarily unavailable.")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
 
 
 def _reconstruct_resume_text(resume_data: Dict) -> str:

@@ -14,6 +14,8 @@ Standalone Go microservice for resume PDF/DOCX export and HTML preview. Runs on 
 - `POST /export/pdf` — JSON body (canonical resume payload), returns binary PDF
 - `POST /export/docx` — same payload, returns binary DOCX
 - `POST /export/preview` — same payload, returns JSON `{"html": "..."}` for iframe preview
+- `POST /export/cover-letter-pdf` — JSON body (cover letter payload: personal_info, paragraphs, metadata), returns binary PDF
+- `POST /export/cover-letter-docx` — same cover letter payload, returns binary DOCX
 
 ## Build and run
 

@@ -147,3 +147,35 @@ def build_canonical_payload(
             "job_title": (job_title or "").strip(),
         },
     }
+
+
+def build_cover_letter_payload(
+    resume_source: Dict,
+    paragraphs: List[str],
+    template_name: str = "classic",
+    export_format: str = "pdf",
+    job_title: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Build canonical cover letter payload for the Go export service.
+    Same header/contact as resume; body is the given paragraphs.
+    """
+    enhanced = resume_source.get("enhanced_resume")
+    if enhanced is not None:
+        raw = enhanced if isinstance(enhanced, dict) else _ensure_dict(enhanced)
+        personal = _personal_info_to_canonical(raw.get("personal_info"))
+    else:
+        structured = _ensure_dict(resume_source.get("structured_data"))
+        personal = _personal_info_to_canonical(structured.get("personal_info"))
+    paras = [p.strip() for p in paragraphs if (p and p.strip())]
+    if not paras:
+        paras = [""]
+    return {
+        "personal_info": personal,
+        "paragraphs": paras,
+        "metadata": {
+            "template_name": template_name,
+            "export_format": export_format,
+            "job_title": (job_title or "").strip(),
+        },
+    }
