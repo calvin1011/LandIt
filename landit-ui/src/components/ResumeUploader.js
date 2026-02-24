@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { API_BASE } from '../config';
 
 // Simple SVG Icon Components
 const Upload = ({ style }) => (
@@ -66,7 +67,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
             setProgress(95);
             const structuredData = resumeData.structured_data || resumeData;
 
-            const storeResponse = await fetch('http://localhost:8000/store-resume', {
+            const storeResponse = await fetch(`${API_BASE}/store-resume`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -106,7 +107,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
         setUploadStatus('processing');
         setProgress(50);
         try {
-            const response = await fetch('http://localhost:8000/parse-resume', {
+            const response = await fetch(`${API_BASE}/parse-resume`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -166,7 +167,7 @@ const ResumeUploader = ({ onUploadSuccess, userEmail, jobDescriptionText }) => {
                 });
             }, 200);
 
-            const response = await fetch('http://localhost:8000/parse-resume-file', {
+            const response = await fetch(`${API_BASE}/parse-resume-file`, {
                 method: 'POST',
                 body: formData
             });

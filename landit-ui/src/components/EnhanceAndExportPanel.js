@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE = 'http://localhost:8000';
+import { API_BASE } from '../config';
 
 const ScoreRing = ({ score, label, color }) => {
   const circumference = 2 * Math.PI * 36;
