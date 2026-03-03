@@ -573,6 +573,7 @@ class IntelligentSectionDetector:
             section, confidence = self._detect_section_by_content(gap_text)
             if section and confidence > 0.5:
                 sections[section].append(SectionBoundary(
+                    section=section,
                     start=gap_start,
                     end=gap_end,
                     content=gap_text,
@@ -580,8 +581,8 @@ class IntelligentSectionDetector:
                     detected_by="gap_filling"
                 ))
             else:
-                # Assign to OTHER if no section detected
                 sections[ResumeSection.OTHER].append(SectionBoundary(
+                    section=ResumeSection.OTHER,
                     start=gap_start,
                     end=gap_end,
                     content=gap_text,
@@ -670,11 +671,12 @@ class ContextAwareEntityExtractor:
                 validated_entity['section'] = section.value
                 validated_entities.append(validated_entity)
 
-        # Structure the final results
         results = {
             "entities": validated_entities,
-            "sections": {s.section.value: s.content for s in sections},
-            # Add other analysis results here if needed
+            "sections": {
+                sec.value: "\n".join(b.content for b in boundaries) if boundaries else ""
+                for sec, boundaries in sections.items()
+            },
         }
         return results
 
