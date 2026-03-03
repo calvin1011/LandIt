@@ -453,7 +453,8 @@ _first_delay_secs = int(os.getenv("JOB_IMPORT_FIRST_RUN_DELAY_SECONDS", "3600"))
 scheduler.add_job(run_all_job_imports, 'interval', hours=6, next_run_time=datetime.now() + timedelta(seconds=_first_delay_secs))
 scheduler.add_job(run_job_cleanup, 'cron', hour=2, minute=0)
 
-# simple in memory cache for requests
+RECENT_LEARNING_CACHE_MAX_SIZE = 50
+RECENT_LEARNING_CACHE_TTL_MINUTES = 2
 recent_learning_requests = {}
 recent_match_requests = {}
 
@@ -540,15 +541,16 @@ except Exception as e:
     logger.error(f" Failed to load hybrid model: {e}")
     skill_matcher = None
     SKILL_LOWER_TO_CANONICAL = {s.lower(): s for s in COMPREHENSIVE_SKILL_LIBRARY}
-    try:
-        nlp = spacy.load("output_hybrid")
-        training_info = {"model_type": "custom_only"}
-        logger.warning(" Using fallback custom model")
-    except Exception as e2:
-        logger.error(f" Failed to load any model: {e2}")
-        nlp = nlp = spacy.load("en_core_web_lg")
-        training_info = {"model_type": "pretrained_only"}
-        logger.warning(" Using pretrained model only")
+    for fallback in ("en_core_web_lg", "en_core_web_sm"):
+        try:
+            nlp = spacy.load(fallback)
+            training_info = {"model_type": "pretrained_only"}
+            logger.warning(" Using pretrained model only: %s", fallback)
+            break
+        except Exception as e2:
+            logger.warning(" Fallback %s failed: %s", fallback, e2)
+    else:
+        raise RuntimeError("No spaCy model available. Install en_core_web_lg or en_core_web_sm.") from e
 
 
 @asynccontextmanager
@@ -2134,15 +2136,19 @@ def generate_learning_plan(request: LearningPlanRequest):
                 logger.info(f"Duplicate learning plan request detected for {request_key}, returning cached result")
                 return cached_entry['response']
 
-        # Clean old entries (keep cache small)
         keys_to_remove = []
         for key, value in recent_learning_requests.items():
-            if now - value['timestamp'] > timedelta(minutes=2):
+            if now - value['timestamp'] > timedelta(minutes=RECENT_LEARNING_CACHE_TTL_MINUTES):
                 keys_to_remove.append(key)
         for key in keys_to_remove:
             del recent_learning_requests[key]
+        if len(recent_learning_requests) >= RECENT_LEARNING_CACHE_MAX_SIZE:
+            by_time = sorted(
+                (k, v["timestamp"]) for k, v in recent_learning_requests.items()
+            )
+            for k, _ in by_time[: len(recent_learning_requests) - RECENT_LEARNING_CACHE_MAX_SIZE + 1]:
+                del recent_learning_requests[k]
 
-        # Mark this request as processing immediately
         recent_learning_requests[request_hash] = {
             'timestamp': now,
             'processing': True,
