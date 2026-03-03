@@ -701,22 +701,14 @@ class ContextAwareEntityExtractor:
         return enhanced_entities
 
     def _validate_entity_with_context(self, entity: Dict, section: ResumeSection) -> Optional[Dict]:
-        """
-        Validate entities based on their section context.
-        """
-        # Example validation rules
+        if 'confidence' not in entity:
+            entity['confidence'] = 1.0
         if section == ResumeSection.EDUCATION:
             if entity['label'] == 'COMPANY':
-                # Companies in education section might actually be schools
                 entity['label'] = 'SCHOOL'
-                entity['confidence'] *= 0.8  # Reduce confidence slightly
-
+                entity['confidence'] *= 0.8
         elif section == ResumeSection.SKILLS:
             if entity['label'] == 'COMPANY' and len(entity['text']) < 4:
-                # Short company names in skills might be technologies
                 entity['label'] = 'TECHNOLOGY'
                 entity['confidence'] *= 0.7
-
-        # Add more context-aware validation rules as needed
-
         return entity
